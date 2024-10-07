@@ -1,0 +1,5 @@
+package Sssksmotri.com.action_notes
+
+import io.flutter.embedding.android.FlutterActivity
+
+class MainActivity: FlutterActivity()
