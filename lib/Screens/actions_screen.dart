@@ -115,7 +115,6 @@ class _ActionsScreenState extends State<ActionsScreen> {
           });
         },
         style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.purple,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(30),
           ),
