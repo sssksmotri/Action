@@ -1,17 +1,23 @@
 import 'package:flutter/material.dart';
 import 'package:easy_localization/easy_localization.dart';
-import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:action_notes/Service/NotificationService.dart';
 import 'actions_screen.dart';
 import 'settings_screen.dart';
+import 'notifications_screen.dart';
+import 'package:action_notes/Service/database_helper.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await EasyLocalization.ensureInitialized();
 
+  NotificationService notificationService = NotificationService();
+  await notificationService.init();
+  await DatabaseHelper.instance.database;
+
   runApp(
     EasyLocalization(
       supportedLocales: const [Locale('en'), Locale('ru')],
-      path: 'assets/translations', // Localization files path
+      path: 'assets/translations',
       fallbackLocale: const Locale('en'),
       child: const MyApp(),
     ),
@@ -74,6 +80,20 @@ class _HomePageState extends State<HomePage> {
           ),
         ],
       ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () {
+          // Переход на страницу NotificationsScreen при нажатии на кнопку
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const NotificationsPage(),
+            ),
+          );
+        },
+        child: const Icon(Icons.notifications),
+      ),
     );
   }
 }
+
+
