@@ -150,6 +150,20 @@ class DatabaseHelper {
     return await db.update(tableReminders, row, where: 'id = ?', whereArgs: [id]);
   }
 
+  // Добавляем метод для обновления состояния уведомлений конкретной привычки
+  Future<int> updateHabitNotificationState(int habitId, int isActive) async {
+    Database db = await instance.database;
+
+    // Обновляем поле active (0 - включено, 1 - выключено) для конкретной привычки
+    return await db.update(
+      tableHabits,
+      {'active': isActive}, // обновляем только поле активного уведомления
+      where: 'id = ?',
+      whereArgs: [habitId],
+    );
+  }
+
+
   Future<int> deleteReminder(int id) async {
     Database db = await instance.database;
     return await db.delete(tableReminders, where: 'id = ?', whereArgs: [id]);

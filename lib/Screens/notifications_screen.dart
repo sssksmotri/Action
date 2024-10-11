@@ -27,10 +27,18 @@ class _NotificationsPageState extends State<NotificationsPage> {
   Future<void> _fetchHabits() async {
     final dbHelper = DatabaseHelper.instance;
     List<Map<String, dynamic>> fetchedHabits = await dbHelper.queryAllHabits();
+
     setState(() {
-      habits = fetchedHabits; // Сохраняем привычки в состоянии
+      habits = fetchedHabits;
     });
+
+    // Загружаем уведомления после того, как привычки загружены
+    await _loadNotifications();
+
+    // Проверяем состояние основного тумблера
+    _updateAllNotificationsState();
   }
+
 
   void _onItemTapped(int index) {
     setState(() {
@@ -70,11 +78,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
         child: Column(
           children: [
             // Тумблер для всех уведомлений
-            _buildNotificationToggle('All notifications', allNotificationsEnabled, (value) {
-              setState(() {
-                allNotificationsEnabled = value;
-              });
-            }),
+            _buildMainNotificationToggle(),
             const SizedBox(height: 16),
 
             // Отображение уведомлений для привычек
@@ -138,28 +142,69 @@ class _NotificationsPageState extends State<NotificationsPage> {
     );
   }
 
-  Widget _buildNotificationToggle(String title, bool value, Function(bool) onChanged) {
+  Widget _buildMainNotificationToggle() {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16.0),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(
-            title,
-            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-          ),
-          Switch(
-            value: value,
-            onChanged: onChanged,
-            activeColor: Colors.deepPurple,
-          ),
-        ],
+      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+      child: Container(
+        padding: const EdgeInsets.all(12.0),
+        decoration: BoxDecoration(
+          color: Colors.white, // Белый фон для контейнера
+          borderRadius: BorderRadius.circular(12.0),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.grey.withOpacity(0.2),
+              spreadRadius: 2,
+              blurRadius: 5,
+              offset: const Offset(0, 3), // Смещение тени
+            ),
+          ],
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Text(
+              "Все уведомления",
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black),
+            ),
+            Switch(
+              value: allNotificationsEnabled,
+              onChanged: (bool value) {
+                setState(() {
+                  allNotificationsEnabled = value;
+
+                  habits = habits.map((habit) {
+                    return {
+                      ...habit,
+                      'active': value ? 0 : 1,
+                    };
+                  }).toList();
+
+                  _updateAllHabitsNotificationState(value);
+
+                  if (value) {
+                    for (var habit in habits) {
+                      _showNotificationDaysMenu(habit);
+                      HabitReminderService().initializeReminders();
+                    }
+                  } else {
+                    for (var habit in habits) {
+                      HabitReminderService().cancelAllReminders(habit['id']);
+                    }
+                  }
+                });
+              },
+              activeColor: Colors.deepPurple,
+            ),
+          ],
+        ),
       ),
     );
   }
 
+
+// Обновление отдельной привычки и проверка основного тумблера
   Widget _buildHabitNotificationSection(Map<String, dynamic> habit) {
-    bool isHabitNotificationEnabled = habit['archived'] == 0;
+    bool isHabitNotificationEnabled = habit['active'] == 0;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
@@ -181,35 +226,40 @@ class _NotificationsPageState extends State<NotificationsPage> {
                       if (h['id'] == habit['id']) {
                         return {
                           ...h,
-                          'archived': value ? 0 : 1, // 0 — включено, 1 — выключено
+                          'active': value ? 0 : 1, // 0 — включено, 1 — выключено
                         };
                       }
                       return h;
                     }).toList();
+
+                    // Проверяем состояние всех привычек и обновляем основной тумблер
+                    _updateAllNotificationsState();
                   });
 
-                  // Обновляем привычку в базе данных
-                  await DatabaseHelper.instance.updateHabit({
-                    'id': habit['id'],
-                    'archived': value ? 0 : 1,
-                  });
-
-                  // Если тумблер включен, показываем выбор дней и времени
                   if (value) {
-                    _showNotificationDaysMenu(habit); // Показать выбор времени и дней
+                    _showNotificationDaysMenu(habit);
+                    await HabitReminderService().initializeReminders();
+                  } else {
+                    await HabitReminderService().cancelAllReminders(habit['id']);
                   }
+
+                  // Обновляем статус в базе данных
+                  await DatabaseHelper.instance.updateHabitNotificationState(habit['id'], value ? 0 : 1);
                 },
                 activeColor: Colors.deepPurple,
               ),
             ],
           ),
           const SizedBox(height: 8),
-          // Карточка с уведомлением и кнопки добавления/удаления
-          _buildNotificationTimesSelection(habit['id'], habit),
+          Visibility(
+            visible: isHabitNotificationEnabled,
+            child: _buildNotificationTimesSelection(habit['id'], habit),
+          ),
         ],
       ),
     );
   }
+
 
   Widget _buildNotificationTimesSelection(int habitId, Map<String, dynamic> habit) {
     List<Map<String, dynamic>> notificationsForHabit =
@@ -265,6 +315,88 @@ class _NotificationsPageState extends State<NotificationsPage> {
         );
       }).toList(),
     );
+  }
+
+
+
+  Widget _buildDaysOfWeekCheckboxes(List<bool> days, int habitId, int reminderId) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceAround,
+      children: List.generate(7, (index) {
+        return Column(
+          children: [
+            Checkbox(
+              value: days[index],
+              onChanged: (bool? value) async {
+                // Проверяем, чтобы хотя бы один день оставался включенным
+                if (!value! && days.where((day) => day).length == 1) {
+                  // Если это последний активный день, не даем его отключить
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text("Нельзя отключить все дни. Должен быть выбран хотя бы один."),
+                    ),
+                  );
+                  return;
+                }
+
+                // Обновляем состояние чекбоксов
+                setState(() {
+                  days[index] = value;
+                });
+
+                // Обновляем данные в базе при изменении чекбокса
+                await DatabaseHelper.instance.updateReminder({
+                  'id': reminderId,
+                  _getDayColumnName(index): value ? 1 : 0,
+                });
+
+                // Отмена существующих напоминаний
+                await HabitReminderService().cancelAllReminders(habitId);
+
+                // Планирование новых уведомлений с обновленными данными
+                await HabitReminderService().scheduleReminder(
+                  habitId,
+                  notificationTimes.firstWhere((reminder) => reminder['id'] == reminderId)['time'],
+                  (await DatabaseHelper.instance.queryHabitById(habitId))['name'],
+                  {
+                    'monday': days[0] ? 1 : 0,
+                    'tuesday': days[1] ? 1 : 0,
+                    'wednesday': days[2] ? 1 : 0,
+                    'thursday': days[3] ? 1 : 0,
+                    'friday': days[4] ? 1 : 0,
+                    'saturday': days[5] ? 1 : 0,
+                    'sunday': days[6] ? 1 : 0,
+                  },
+                );
+              },
+            ),
+            Text(['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'][index]),
+          ],
+        );
+      }),
+    );
+  }
+
+// Вспомогательная функция для получения названия колонки дня
+  String _getDayColumnName(int index) {
+    switch (index) {
+      case 0:
+        return 'sunday';
+      case 1:
+        return 'monday';
+      case 2:
+        return 'tuesday';
+      case 3:
+        return 'wednesday';
+      case 4:
+        return 'thursday';
+      case 5:
+        return 'friday';
+      case 6:
+        return 'saturday';
+      default:
+        return '';
+    }
   }
 
   Future<void> _selectTime(BuildContext context, int index) async {
@@ -326,75 +458,6 @@ class _NotificationsPageState extends State<NotificationsPage> {
     }
   }
 
-  Widget _buildDaysOfWeekCheckboxes(List<bool> days, int habitId, int reminderId) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceAround,
-      children: List.generate(7, (index) {
-        return Column(
-          children: [
-            Checkbox(
-              value: days[index],
-              onChanged: (bool? value) async {
-                setState(() {
-                  days[index] = value ?? false;
-                });
-
-                // Обновляем данные в базе при изменении чекбокса
-                await DatabaseHelper.instance.updateReminder({
-                  'id': reminderId,
-                  _getDayColumnName(index): value! ? 1 : 0,
-                });
-
-                // Отмена существующих напоминаний
-                await HabitReminderService().cancelAllReminders(habitId);
-
-                // Планирование новых уведомлений с обновленными данными
-                await HabitReminderService().scheduleReminder(
-                  habitId,
-                  notificationTimes.firstWhere((reminder) => reminder['id'] == reminderId)['time'],
-                  (await DatabaseHelper.instance.queryHabitById(habitId))['name'],
-                  {
-                    'monday': days[0] ? 1 : 0,
-                    'tuesday': days[1] ? 1 : 0,
-                    'wednesday': days[2] ? 1 : 0,
-                    'thursday': days[3] ? 1 : 0,
-                    'friday': days[4] ? 1 : 0,
-                    'saturday': days[5] ? 1 : 0,
-                    'sunday': days[6] ? 1 : 0,
-                  },
-                );
-              },
-            ),
-            Text(['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'][index]),
-          ],
-        );
-      }),
-    );
-  }
-
-// Вспомогательная функция для получения названия колонки дня
-  String _getDayColumnName(int index) {
-    switch (index) {
-      case 0:
-        return 'sunday';
-      case 1:
-        return 'monday';
-      case 2:
-        return 'tuesday';
-      case 3:
-        return 'wednesday';
-      case 4:
-        return 'thursday';
-      case 5:
-        return 'friday';
-      case 6:
-        return 'saturday';
-      default:
-        return '';
-    }
-  }
-
-
   Future<void> _loadNotifications() async {
     try {
       List<Map<String, dynamic>> reminders = await DatabaseHelper.instance.queryAllReminders();
@@ -428,35 +491,9 @@ class _NotificationsPageState extends State<NotificationsPage> {
     final existingNotifications = notificationTimes.where((entry) => entry['habitId'] == habit['id']).toList();
 
     if (existingNotifications.isNotEmpty) {
-      _showExistingNotifications(existingNotifications);
     } else {
       _addNewNotification(habit);
     }
-  }
-
-  void _showExistingNotifications(List<Map<String, dynamic>> existingNotifications) {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('Existing Notifications'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: existingNotifications.map((entry) {
-              return Text('Notification at ${entry['time']}');
-            }).toList(),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-              },
-              child: const Text('Close'),
-            ),
-          ],
-        );
-      },
-    );
   }
 
   void _addNewNotification(Map<String, dynamic> habit) async {
@@ -510,6 +547,24 @@ class _NotificationsPageState extends State<NotificationsPage> {
           return habit;
         }).toList();
       });
+    }
+  }
+
+  void _updateAllNotificationsState() {
+    // Проверяем, если все привычки отключены, выключаем основной тумблер.
+    bool allDisabled = habits.every((habit) => habit['active'] == 1);
+
+    // Если хотя бы одна привычка включена, включаем основной тумблер.
+    bool anyEnabled = habits.any((habit) => habit['active'] == 0);
+
+    setState(() {
+      allNotificationsEnabled = anyEnabled; // Включаем тумблер, если есть хотя бы одна активная привычка.
+    });
+  }
+  Future<void> _updateAllHabitsNotificationState(bool enabled) async {
+    final dbHelper = DatabaseHelper.instance;
+    for (var habit in habits) {
+      await dbHelper.updateHabitNotificationState(habit['id'], enabled ? 0 : 1);
     }
   }
 
