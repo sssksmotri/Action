@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'main.dart';
 import 'package:action_notes/Service/database_helper.dart';
 import 'package:action_notes/Service/HabitReminderService.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class NotificationsPage extends StatefulWidget {
   const NotificationsPage({Key? key}) : super(key: key);
@@ -267,7 +268,12 @@ class _NotificationsPageState extends State<NotificationsPage> {
 
     return Column(
       children: notificationsForHabit.map((timeEntry) {
-        bool isLastNotification = notificationsForHabit.length == 1; // Проверка на последнее напоминание
+        bool isLastNotification = notificationsForHabit.length == 1;
+
+        // Разделяем время на часы и минуты
+        List<String> timeParts = timeEntry['time'].split(":");
+        String selectedHour = timeParts[0];
+        String selectedMinute = timeParts[1];
 
         return Container(
           margin: const EdgeInsets.only(bottom: 16),
@@ -287,25 +293,108 @@ class _NotificationsPageState extends State<NotificationsPage> {
           child: Column(
             children: [
               Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                mainAxisAlignment: MainAxisAlignment.start,
                 children: [
-                  GestureDetector(
-                    onTap: () => _selectTime(context, notificationTimes.indexOf(timeEntry)),
-                    child: Text(timeEntry['time'], style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                  ),
-                  Row(
-                    children: [
-                      IconButton(
-                        icon: const Icon(Icons.add_circle, color: Colors.purple),
-                        onPressed: () => _addNewNotification(habit),
+                  // Поле для ввода часов
+                  Container(
+                    width: 80,
+                    height: 50,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: Color(0xFFF8F9F9),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: TextFormField(
+                      textAlign: TextAlign.center,
+                      initialValue: selectedHour.padLeft(2, '0'),
+                      keyboardType: TextInputType.number,
+                      decoration: InputDecoration(
+                        border: InputBorder.none,
                       ),
-                      if (!isLastNotification) // Показываем кнопку удаления, только если это не последнее напоминание
-                        IconButton(
-                          icon: const Icon(Icons.delete, color: Colors.red),
-                          onPressed: () => _removeNotification(timeEntry),
-                        ),
-                    ],
+                      style: const TextStyle(
+                        fontSize: 20,
+                        color: Colors.black,
+                      ),
+                      onChanged: (String value) {
+                        setState(() {
+                          selectedHour = value.padLeft(2, '0');
+                          timeEntry['time'] = "$selectedHour:$selectedMinute"; // Обновляем значение времени
+                        });
+                      },
+                    ),
                   ),
+                  const Text(
+                    ' : ',
+                    style: TextStyle(
+                      fontSize: 24,
+                      color: Colors.black,
+                    ),
+                  ),
+                  // Поле для ввода минут
+                  Container(
+                    width: 80,
+                    height: 50,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: Color(0xFFF8F9F9),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: TextFormField(
+                      textAlign: TextAlign.center,
+                      initialValue: selectedMinute.padLeft(2, '0'),
+                      keyboardType: TextInputType.number,
+                      decoration: InputDecoration(
+                        border: InputBorder.none,
+                      ),
+                      style: const TextStyle(
+                        fontSize: 20,
+                        color: Colors.black,
+                      ),
+                      onChanged: (String value) {
+                        setState(() {
+                          selectedMinute = value.padLeft(2, '0');
+                          timeEntry['time'] = "$selectedHour:$selectedMinute"; // Обновляем значение времени
+                        });
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 16), // Отступ между полями и кнопками
+                  // Кнопка "+"
+                  GestureDetector(
+                    onTap: () => _addNewNotification(habit),
+                    child: Container(
+                      width: 30,
+                      height: 30,
+                      decoration: BoxDecoration(
+                        color: Color(0xFFEEE9FF), // Светлый фон вокруг "+"
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(
+                        Icons.add,
+                        color: Color(0xFF5F33E1), // Фиолетовый цвет иконки
+                        size: 24,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 16), // Отступ между кнопками
+                  // Кнопка "x", если это не последнее уведомление
+                  if (!isLastNotification)
+                    GestureDetector(
+                      onTap: () => _removeNotification(timeEntry),
+                      child: Container(
+                        width: 30,
+                        height: 30,
+                        decoration: BoxDecoration(
+                          color: Color(0xFFFFE7E5), // Светлый фон вокруг "x"
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: const Icon(
+                          Icons.close,
+                          color: Color(0xFFFF3B30), // Красный цвет иконки
+                          size: 24,
+                        ),
+                      ),
+                    ),
                 ],
               ),
               const SizedBox(height: 12),
@@ -316,6 +405,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
       }).toList(),
     );
   }
+
 
 
 
@@ -458,6 +548,17 @@ class _NotificationsPageState extends State<NotificationsPage> {
     }
   }
 
+  void _saveAllNotificationsState(bool value) async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('allNotificationsEnabled', value);
+  }
+
+  void _saveHabitNotificationState(int habitId, bool value) async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('habit_$habitId', value);
+  }
+
+
   Future<void> _loadNotifications() async {
     try {
       List<Map<String, dynamic>> reminders = await DatabaseHelper.instance.queryAllReminders();
@@ -551,14 +652,8 @@ class _NotificationsPageState extends State<NotificationsPage> {
   }
 
   void _updateAllNotificationsState() {
-    // Проверяем, если все привычки отключены, выключаем основной тумблер.
-    bool allDisabled = habits.every((habit) => habit['active'] == 1);
-
-    // Если хотя бы одна привычка включена, включаем основной тумблер.
-    bool anyEnabled = habits.any((habit) => habit['active'] == 0);
-
     setState(() {
-      allNotificationsEnabled = anyEnabled; // Включаем тумблер, если есть хотя бы одна активная привычка.
+      allNotificationsEnabled = habits.any((habit) => habit['active'] == 0); // Set to true if any habit is active
     });
   }
   Future<void> _updateAllHabitsNotificationState(bool enabled) async {
@@ -567,5 +662,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
       await dbHelper.updateHabitNotificationState(habit['id'], enabled ? 0 : 1);
     }
   }
+
+
 
 }
