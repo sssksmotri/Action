@@ -37,13 +37,15 @@ class DatabaseHelper {
       CREATE TABLE $tableHabits (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT NOT NULL,
-        type TEXT NOT NULL,
-        target INTEGER,
-        interval INTEGER,
+        type INTEGER NOT NULL,
+        quantity INTEGER,
+        volume_per_press TEXT,
+        volume_specified TEXT,
         start_date TEXT NOT NULL,
+        end_date TEXT,
         days_of_week TEXT,
-        tracking_period INTEGER,
-        archived BOOLEAN NOT NULL DEFAULT 0
+        notifications_enabled INTEGER DEFAULT 0,
+        archived INTEGER DEFAULT 0
       )
     ''');
 
