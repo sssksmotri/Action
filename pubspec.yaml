@@ -23,6 +23,10 @@ dependencies:
   path_provider: ^2.1.4
   flutter_local_notifications: ^17.2.3
   flutter_timezone: ^3.0.1
+  fl_chart: ^0.69.0
+  syncfusion_flutter_charts: ^27.1.52
+  shared_preferences: ^2.3.2
+  reorderables: ^0.6.0
 
 
 dev_dependencies:
@@ -48,4 +52,10 @@ flutter:
     - assets/images/ar_back.png
     - assets/images/Filter.png
     - assets/images/Folder.png
+    - assets/images/Chart.png
+    - assets/images/Chart1.png
+    - assets/images/Chart2.png
+    - assets/images/Chart3.png
+    - assets/images/Folder2.png
+    - assets/images/Upload.png
 
