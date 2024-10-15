@@ -25,9 +25,16 @@ class _AddActionPageState extends State<AddActionPage> {
   int selectedHour = 8; // Время по умолчанию: 8 часов
   int selectedMinute = 0; // Время по умолчанию: 0 минут
   int _selectedIndex = 0;
-  TextEditingController quantityController = TextEditingController();
-  TextEditingController volumePerPressController = TextEditingController();
-  TextEditingController volumeSpecifiedController = TextEditingController();
+  String? nameError;
+  String? dateError;
+  String? quantityError;
+  String? volumeError;
+  String? periodError;
+  String? typeError;
+  bool allDaysSelected = false;
+  final TextEditingController quantityController = TextEditingController();
+  final TextEditingController volumePerPressController = TextEditingController();
+  final TextEditingController volumeSpecifiedController = TextEditingController();
   DateTime _selectedDate = DateTime.now();
 
 
@@ -38,6 +45,7 @@ class _AddActionPageState extends State<AddActionPage> {
   // Списки для выбора часов и минут
   final List<int> hours = List.generate(24, (index) => index);
   final List<int> minutes = List.generate(60, (index) => index);
+
   void _onItemTapped(int index) {
     setState(() {
       _selectedIndex = index;
@@ -117,7 +125,7 @@ class _AddActionPageState extends State<AddActionPage> {
                       Navigator.of(context).pop(); // Закрыть диалог
                     },
                     style: TextButton.styleFrom(
-                      backgroundColor: const Color(0xFFEEE9FF),
+                      backgroundColor: const Color(0xFFFFFFF),
                       // Легкий фиолетовый фон
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(24),
@@ -164,6 +172,7 @@ class _AddActionPageState extends State<AddActionPage> {
       },
     );
   }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -187,17 +196,22 @@ class _AddActionPageState extends State<AddActionPage> {
           padding: const EdgeInsets.all(16.0),
           child: Column(
             children: [
-              _buildActionNameCard(), // Карточка с названием действия
+              _buildActionNameCard(),
+              // Карточка с названием действия
               const SizedBox(height: 24),
-              _buildTypeSelectionCard(), // Карточка с типом выполнения
+              _buildTypeSelectionCard(),
+              // Карточка с типом выполнения
               const SizedBox(height: 24),
-              _buildDateSelectionCard(), // Карточка с выбором дат
+              _buildDateSelectionCard(),
+              // Карточка с выбором дат
               const SizedBox(height: 24),
-              _buildDaysAndNotifications(), // Чекбоксы с днями и тумблер для уведомлений
+              _buildDaysAndNotifications(),
+              // Чекбоксы с днями и тумблер для уведомлений
               const SizedBox(height: 24),
               _buildNotificationToggle(),
               const SizedBox(height: 24),
-              _buildAddButton(taskTitle), // Кнопка создания действия
+              _buildAddButton(taskTitle),
+              // Кнопка создания действия
             ],
           ),
         ),
@@ -230,6 +244,7 @@ class _AddActionPageState extends State<AddActionPage> {
 
     );
   }
+
   Widget _buildNavItem(int index, String assetPath, {bool isSelected = false}) {
     return GestureDetector(
       onTap: () => _onItemTapped(index),
@@ -254,12 +269,20 @@ class _AddActionPageState extends State<AddActionPage> {
     );
   }
 
-  // Карточка с названием действия
+  void _showError(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Colors.red,
+      ),
+    );
+  }
+
   Widget _buildActionNameCard() {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white, // Белая карточка
+        color: Colors.white,
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
@@ -270,22 +293,35 @@ class _AddActionPageState extends State<AddActionPage> {
           ),
         ],
       ),
-      child: TextField(
-        decoration: InputDecoration(
-          filled: true,
-          fillColor: Color(0xFFF8F9F9), // Серый цвет текстбокса
-          labelText: 'Name of action', // Серый заголовок
-          labelStyle: const TextStyle(color: Colors.grey), // Серый цвет текста
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(8), // Скругленные углы для текстбокса
-            borderSide: BorderSide.none, // Без границы
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          TextField(
+            decoration: InputDecoration(
+              filled: true,
+              fillColor: Color(0xFFF8F9F9),
+              labelText: 'Название действия',
+              labelStyle: const TextStyle(color: Colors.grey),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: BorderSide.none,
+              ),
+            ),
+            onChanged: (value) {
+              setState(() {
+                actionName = value;
+              });
+            },
           ),
-        ),
-        onChanged: (value) {
-          setState(() {
-            actionName = value;
-          });
-        },
+          if (nameError != null) // Отображение ошибки под полем ввода
+            Padding(
+              padding: const EdgeInsets.only(top: 8.0),
+              child: Text(
+                nameError!,
+                style: const TextStyle(color: Colors.red, fontSize: 12),
+              ),
+            ),
+        ],
       ),
     );
   }
@@ -324,23 +360,30 @@ class _AddActionPageState extends State<AddActionPage> {
             ],
           ),
           const SizedBox(height: 16),
-          if (selectedType == 1) _buildTextField('Specify the quantity'), // Одно поле для второго варианта
+          if (selectedType == 1) _buildQuantityTextField(errorMessage: quantityError),
           if (selectedType == 2) ...[
-            _buildTextField('Specify the quantity'), // Первое поле для третьего варианта
+            _buildVolumeTextField(errorMessage: volumeError),
             const SizedBox(height: 16),
-            _buildTextField('What volume does one press equal?'), // Второе поле для третьего варианта
+            _buildVolumePerPressTextField(errorMessage: volumeError), // Ошибка может быть та же
           ],
         ],
       ),
     );
   }
-  // Круглый чекбокс для типа выполнения
-// Круглый чекбокс с отступами
+
+  void _resetErrorMessages() {
+    setState(() {
+      quantityError = null;
+      volumeError = null;
+    });
+  }
+
   Widget _buildCustomCheckbox(String label, int index) {
     return GestureDetector(
       onTap: () {
         setState(() {
-          selectedType = index; // Только один элемент может быть выбран
+          selectedType = index;
+          _resetErrorMessages();// Только один элемент может быть выбран
         });
       },
       child: Row(
@@ -352,7 +395,8 @@ class _AddActionPageState extends State<AddActionPage> {
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               border: Border.all(
-                color: selectedType == index ? const Color(0xFF5F33E1) : Colors.grey,
+                color: selectedType == index ? const Color(0xFF5F33E1) : Colors
+                    .grey,
                 width: 2,
               ),
             ),
@@ -360,11 +404,15 @@ class _AddActionPageState extends State<AddActionPage> {
               // Внутренний контейнер для создания эффекта отступов
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 200),
-                width: selectedType == index ? 14 : 0, // Ширина внутреннего контейнера
-                height: selectedType == index ? 14 : 0, // Высота внутреннего контейнера
+                width: selectedType == index ? 14 : 0,
+                // Ширина внутреннего контейнера
+                height: selectedType == index ? 14 : 0,
+                // Высота внутреннего контейнера
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: selectedType == index ? const Color(0xFF5F33E1) : Colors.transparent,
+                  color: selectedType == index
+                      ? const Color(0xFF5F33E1)
+                      : Colors.transparent,
                 ),
               ),
             ),
@@ -382,20 +430,96 @@ class _AddActionPageState extends State<AddActionPage> {
     );
   }
 
-  Widget _buildTextField(String label) {
-    return TextField(
-      decoration: InputDecoration(
-        filled: true,
-        fillColor: Colors.grey[200], // Серый цвет фона
-        labelText: label, // Серый заголовок
-        labelStyle: const TextStyle(color: Colors.grey), // Цвет текста
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8), // Скругленные углы
-          borderSide: BorderSide.none, // Без границ
+  Widget _buildQuantityTextField({String? errorMessage}) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        TextField(
+          controller: quantityController,
+          decoration: InputDecoration(
+            filled: true,
+            fillColor: Colors.grey[200],
+            labelText: 'Specify the quantity',
+            labelStyle: const TextStyle(color: Colors.grey),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide.none,
+            ),
+          ),
+          keyboardType: TextInputType.number,
         ),
-      ),
+        if (errorMessage != null && errorMessage.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(top: 8.0),
+            child: Text(
+              errorMessage,
+              style: TextStyle(color: Colors.red),
+            ),
+          ),
+      ],
     );
   }
+
+  Widget _buildVolumeTextField({String? errorMessage}) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        TextField(
+          controller: volumeSpecifiedController,
+          decoration: InputDecoration(
+            filled: true,
+            fillColor: Colors.grey[200],
+            labelText: 'Specify the volume',
+            labelStyle: const TextStyle(color: Colors.grey),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide.none,
+            ),
+          ),
+          keyboardType: TextInputType.number,
+        ),
+        if (errorMessage != null && errorMessage.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(top: 8.0),
+            child: Text(
+              errorMessage,
+              style: TextStyle(color: Colors.red),
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildVolumePerPressTextField({String? errorMessage}) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        TextField(
+          controller: volumePerPressController,
+          decoration: InputDecoration(
+            filled: true,
+            fillColor: Colors.grey[200],
+            labelText: 'What volume does one press equal?',
+            labelStyle: const TextStyle(color: Colors.grey),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide.none,
+            ),
+          ),
+          keyboardType: TextInputType.number,
+        ),
+        if (errorMessage != null && errorMessage.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(top: 8.0),
+            child: Text(
+              errorMessage,
+              style: TextStyle(color: Colors.red),
+            ),
+          ),
+      ],
+    );
+  }
+
   // Карточка с выбором дат
   void _showCalendarDialog(DateTime initialDate, ValueChanged<DateTime> onDateSelected) {
     showDialog(
@@ -416,7 +540,7 @@ class _AddActionPageState extends State<AddActionPage> {
                   lastDay: DateTime.utc(2030, 3, 14),
                   focusedDay: initialDate,
                   selectedDayPredicate: (day) {
-                    return isSameDay(day, initialDate); // Проверяем, является ли день выбранным
+                    return isSameDay(day, initialDate);
                   },
                   calendarStyle: CalendarStyle(
                     selectedDecoration: BoxDecoration(
@@ -424,28 +548,35 @@ class _AddActionPageState extends State<AddActionPage> {
                       shape: BoxShape.circle,
                     ),
                     todayDecoration: BoxDecoration(
-                      color: Colors.transparent, // Без фона
+                      color: Colors.transparent,
                       shape: BoxShape.circle,
                       border: Border.all(
-                        color: const Color(0xFF5F33E1), // Цвет контура
-                        width: 1, // Толщина контура
+                        color: const Color(0xFF5F33E1),
+                        width: 1,
                       ),
                     ),
                     todayTextStyle: TextStyle(
-                      color: Colors.black, // Цвет текста для сегодняшнего дня
+                      color: Colors.black,
                     ),
                     outsideDaysVisible: false,
                   ),
                   headerStyle: HeaderStyle(
                     formatButtonVisible: false,
                     titleCentered: true,
-                    leftChevronIcon: const Icon(Icons.chevron_left, color: Color(0xFF5F33E1)),
-                    rightChevronIcon: const Icon(Icons.chevron_right, color: Color(0xFF5F33E1)),
+                    leftChevronIcon: const Icon(
+                        Icons.chevron_left, color: Color(0xFF5F33E1)),
+                    rightChevronIcon: const Icon(
+                        Icons.chevron_right, color: Color(0xFF5F33E1)),
                   ),
                   daysOfWeekVisible: true,
                   onDaySelected: (selectedDay, focusedDay) {
                     // Выбор даты
-                    onDateSelected(selectedDay); // Передаем выбранную дату
+                    // Передаем выбранные даты в _onDateChanged
+                    if (initialDate == startDate) {
+                      _onDateChanged(selectedDay, endDate ?? selectedDay);
+                    } else {
+                      _onDateChanged(startDate ?? selectedDay, selectedDay);
+                    }
                     Navigator.pop(context); // Закрываем диалог после выбора даты
                   },
                 ),
@@ -457,42 +588,44 @@ class _AddActionPageState extends State<AddActionPage> {
     );
   }
 
-  // Метод для построения селектора даты
-  Widget _buildDatePicker(String label, String value, ValueChanged<DateTime?> onDatePicked) {
+  Widget _buildDatePicker(String label, String value,
+      ValueChanged<DateTime?> onDatePicked) {
     return GestureDetector(
       onTap: () {
-        // Вызываем диалог выбора даты
-        DateTime initialDate = label == 'Start Date' ? (startDate ?? DateTime.now()) : (endDate ?? DateTime.now());
+        DateTime initialDate = label == 'Start Date'
+            ? (startDate ?? DateTime.now())
+            : (endDate ?? DateTime.now());
         _showCalendarDialog(initialDate, (selectedDate) {
           onDatePicked(selectedDate);
         });
       },
       child: Container(
-        width: 130, // Ширина контейнера
-        height: 60, // Высота контейнера
-        padding: const EdgeInsets.symmetric(horizontal: 8), // Отступы по горизонтали
+        width: 130,
+        height: 60,
+        padding: const EdgeInsets.symmetric(horizontal: 8),
         decoration: BoxDecoration(
-          color: const Color(0xFFF8F9F9), // Цвет фона поля даты
+          color: const Color(0xFFF8F9F9),
           borderRadius: BorderRadius.circular(8),
         ),
         child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween, // Выравнивание по краям
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Text(
               value,
               style: const TextStyle(fontSize: 16, color: Colors.black),
             ),
             Image.asset(
-              'assets/images/Calendar.png', // Используем изображение календаря
-              width: 24, // Ширина изображения
-              height: 24, // Высота изображения
-              color: const Color(0xFF5F33E1), // Устанавливаем цвет (если нужно)
+              'assets/images/Calendar.png',
+              width: 24,
+              height: 24,
+              color: const Color(0xFF5F33E1),
             ),
           ],
         ),
       ),
     );
   }
+
 
   // Метод для построения карточки выбора даты
   Widget _buildDateSelectionCard() {
@@ -511,23 +644,29 @@ class _AddActionPageState extends State<AddActionPage> {
         ],
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start, // Выравнивание по левому краю
+        crossAxisAlignment: CrossAxisAlignment.start,
+        // Выравнивание по левому краю
         children: [
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Expanded(
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start, // Выравнивание заголовка по левому краю
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  // Выравнивание заголовка по левому краю
                   children: [
                     const Text(
                       'Start Date', // Заголовок для поля начальной даты
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                      style: TextStyle(
+                          fontSize: 18, fontWeight: FontWeight.bold),
                     ),
-                    const SizedBox(height: 8), // Отступ между заголовком и полем
+                    const SizedBox(height: 8),
+                    // Отступ между заголовком и полем
                     _buildDatePicker(
                       'Start Date',
-                      startDate != null ? DateFormat('dd.MM.yy').format(startDate!) : 'From',
+                      startDate != null
+                          ? DateFormat('dd.MM.yy').format(startDate!)
+                          : 'From',
                           (pickedDate) {
                         setState(() {
                           startDate = pickedDate;
@@ -540,16 +679,21 @@ class _AddActionPageState extends State<AddActionPage> {
               const SizedBox(width: 16),
               Expanded(
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start, // Выравнивание заголовка по левому краю
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  // Выравнивание заголовка по левому краю
                   children: [
                     const Text(
                       'End Date', // Заголовок для поля конечной даты
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                      style: TextStyle(
+                          fontSize: 18, fontWeight: FontWeight.bold),
                     ),
-                    const SizedBox(height: 8), // Отступ между заголовком и полем
+                    const SizedBox(height: 8),
+                    // Отступ между заголовком и полем
                     _buildDatePicker(
                       'End Date',
-                      endDate != null ? DateFormat('dd.MM.yy').format(endDate!) : 'To',
+                      endDate != null
+                          ? DateFormat('dd.MM.yy').format(endDate!)
+                          : 'To',
                           (pickedDate) {
                         setState(() {
                           endDate = pickedDate;
@@ -561,12 +705,19 @@ class _AddActionPageState extends State<AddActionPage> {
               ),
             ],
           ),
+          // Отображение ошибки для дат
+          if (dateError != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 8.0),
+              child: Text(
+                dateError!,
+                style: const TextStyle(color: Colors.red, fontSize: 12),
+              ),
+            ),
         ],
       ),
     );
   }
-
-
 
 
   // Карточка с чекбоксами дней недели и тумблером для уведомлений
@@ -595,6 +746,51 @@ class _AddActionPageState extends State<AddActionPage> {
   }
 
   // Чекбоксы дней недели
+  // Метод для проверки, попадает ли выбранный день в диапазон дат
+  bool _isWithinDateRange(DateTime start, DateTime end, int selectedIndex) {
+    final difference = end.difference(start).inDays;
+
+    // Если разница больше 7 дней, разрешаем все дни
+    if (difference > 7) {
+      return true;
+    }
+
+    // Иначе проверяем, входит ли день в диапазон
+    final int startDayIndex = start.weekday - 1;
+    final int endDayIndex = end.weekday - 1;
+
+    return selectedIndex >= startDayIndex && selectedIndex <= endDayIndex;
+  }
+
+  void _resetInvalidDays() {
+    if (startDate != null && endDate != null) {
+      final int periodLength = endDate!.difference(startDate!).inDays;
+
+      setState(() {
+        if (periodLength > 7) {
+          // Если период больше 7 дней, не сбрасываем дни
+          // Можно оставить выбранные дни без изменений
+        } else {
+          final int startDayIndex = startDate!.weekday - 1;
+          final int endDayIndex = endDate!.weekday - 1;
+
+          // Сбрасываем дни вне диапазона
+          for (int i = 0; i < 7; i++) {
+            selectedDays[i] = (i >= startDayIndex && i <= endDayIndex) ? selectedDays[i] : false;
+          }
+        }
+      });
+    }
+  }
+
+  void _onDateChanged(DateTime newStartDate, DateTime newEndDate) {
+    setState(() {
+      startDate = newStartDate;
+      endDate = newEndDate;
+      _resetInvalidDays(); // Сбрасываем дни только если диапазон меньше 7 дней
+    });
+  }
+
   Widget _buildDaysOfWeekCheckboxes() {
     List<String> days = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
 
@@ -607,17 +803,25 @@ class _AddActionPageState extends State<AddActionPage> {
             return Column(
               children: [
                 Text(
-                  days[index], // Текст сверху чекбокса
+                  days[index],
                   style: const TextStyle(
                     fontSize: 16,
-                    color: Color(0xFF212121), // Текстовые надписи серого цвета
+                    color: Color(0xFF212121),
                   ),
                 ),
-                const SizedBox(height: 8), // Отступ между текстом и чекбоксом
+                const SizedBox(height: 8),
                 GestureDetector(
                   onTap: () {
                     setState(() {
-                      selectedDays[index] = !selectedDays[index]; // Переключение состояния
+                      if (startDate != null && endDate != null) {
+                        if (_isWithinDateRange(startDate!, endDate!, index)) {
+                          selectedDays[index] = !selectedDays[index];
+                        } else {
+                          _showError('Выбранный день не входит в диапазон');
+                        }
+                      } else {
+                        _showError('Пожалуйста, выберите даты начала и окончания');
+                      }
                     });
                   },
                   child: Container(
@@ -625,21 +829,21 @@ class _AddActionPageState extends State<AddActionPage> {
                     height: 24,
                     decoration: BoxDecoration(
                       color: selectedDays[index]
-                          ? const Color(0xFF5F33E1) // Фиолетовая заливка если выбрано
-                          : Colors.transparent, // Прозрачная заливка если не выбрано
-                      borderRadius: BorderRadius.circular(5), // Закругление рамки
+                          ? const Color(0xFF5F33E1)
+                          : Colors.transparent,
+                      borderRadius: BorderRadius.circular(5),
                       border: Border.all(
                         color: selectedDays[index]
-                            ? const Color(0xFF5F33E1) // Фиолетовая рамка если выбрано
-                            : Colors.grey, // Серая рамка если не выбрано
-                        width: 1, // Тонкая рамка
+                            ? const Color(0xFF5F33E1)
+                            : Colors.grey,
+                        width: 1,
                       ),
                     ),
                     child: selectedDays[index]
                         ? const Icon(
                       Icons.check,
                       size: 18,
-                      color: Colors.white, // Галочка белого цвета на фиолетовом фоне
+                      color: Colors.white,
                     )
                         : null,
                   ),
@@ -651,6 +855,8 @@ class _AddActionPageState extends State<AddActionPage> {
       ],
     );
   }
+
+
 
   // Тумблер для включения/выключения уведомлений
   Widget _buildNotificationToggle() {
@@ -681,26 +887,33 @@ class _AddActionPageState extends State<AddActionPage> {
                       notificationsEnabled = value;
                     });
                   },
-                  activeColor: Color(0xFFFFFFFF), // Цвет при включении
-                  activeTrackColor: Color(0xFF5F33E1), // Трек при включении
-                  inactiveTrackColor: Color(0xFFEEE9FF), // Трек при выключении
-                  inactiveThumbColor: Color(0xFF5F33E1), // Шарик при выключении
-                  splashRadius: 0.0, // Убираем эффект нажатия
-                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap, // Уменьшаем высоту
+                  activeColor: Color(0xFFFFFFFF),
+                  // Цвет при включении
+                  activeTrackColor: Color(0xFF5F33E1),
+                  // Трек при включении
+                  inactiveTrackColor: Color(0xFFEEE9FF),
+                  // Трек при выключении
+                  inactiveThumbColor: Color(0xFF5F33E1),
+                  // Шарик при выключении
+                  splashRadius: 0.0,
+                  // Убираем эффект нажатия
+                  materialTapTargetSize: MaterialTapTargetSize
+                      .shrinkWrap, // Уменьшаем высоту
                 ),
               ],
             ),
             if (notificationsEnabled)
               Padding(
-                padding: const EdgeInsets.only(top: 16.0), // Отступ сверху для выборщика времени
-                  child:Column(
-                children:[
-                 _buildTimePicker(),
-                  const SizedBox(height: 8),
+                  padding: const EdgeInsets.only(top: 16.0),
+                  // Отступ сверху для выборщика времени
+                  child: Column(
+                      children: [
+                        _buildTimePicker(),
+                        const SizedBox(height: 8),
 
-                  _buildDaysOfWeekCheckboxes(),
-                   ]
-                )
+                        _buildDaysOfWeekCheckboxes(),
+                      ]
+                  )
               ),
           ],
         ),
@@ -722,7 +935,8 @@ class _AddActionPageState extends State<AddActionPage> {
             borderRadius: BorderRadius.circular(8), // Скругленные углы
           ),
           child: TextFormField(
-            textAlign: TextAlign.center, // Центрирование текста
+            textAlign: TextAlign.center,
+            // Центрирование текста
             initialValue: selectedHour.toString().padLeft(2, '0'),
             keyboardType: TextInputType.number,
             decoration: InputDecoration(
@@ -796,6 +1010,7 @@ class _AddActionPageState extends State<AddActionPage> {
       ],
     );
   }
+
   //Кнопка
   Widget _buildAddButton(String taskTitle) {
     return ElevatedButton(
@@ -822,39 +1037,124 @@ class _AddActionPageState extends State<AddActionPage> {
     );
   }
 
+
   Future<void> _addHabit(String taskTitle) async {
-    if (actionName.isNotEmpty) {
-      // Получаем значения из новых текстовых полей
-      int? quantity = int.tryParse(quantityController.text); // Получаем количество
-      String volumePerPress = volumePerPressController.text; // Объем за один раз (в строковом формате)
-      String volumeSpecified = volumeSpecifiedController.text; // Указанный объем (в строковом формате)
+    setState(() {
+      // Валидация типа выполнения
+      if (selectedType == -1) {
+        typeError = 'Необходимо выбрать тип выполнения';
+      } else {
+        typeError = null;
+      }
+
+      // Валидация названия действия
+      nameError = actionName.isEmpty || actionName.length < 2
+          ? 'Имя должно содержать не менее 2 символов'
+          : null;
+
+      // Валидация дат
+      if (startDate == null || endDate == null) {
+        dateError = 'Выберите начальную и конечную дату';
+      } else if (endDate!.isBefore(startDate!)) {
+        dateError = 'Дата завершения не может быть раньше даты начала';
+      } else {
+        dateError = null;
+      }
+
+      // Валидация количества для выбранного типа
+      if (selectedType == 1) {
+        String quantityText = quantityController.text.trim();
+        if (quantityText.isEmpty) {
+          quantityError = 'Количество должно быть целым числом';
+        } else {
+          int? quantityValue = int.tryParse(quantityText);
+          if (quantityValue == null) {
+            quantityError = 'Количество должно быть целым числом';
+          } else {
+            quantityError = null; // Если всё в порядке, сбрасываем ошибку
+          }
+        }
+      }
+
+      // Валидация объема для типа 2
+      if (selectedType == 2) {
+        double? volumePerPress = double.tryParse(volumePerPressController.text);
+        double? volumeSpecified = double.tryParse(volumeSpecifiedController.text);
+        if (volumePerPress == null || volumeSpecified == null) {
+          volumeError = 'Поля объема должны содержать допустимые числа';
+        } else {
+          volumeError = null;
+        }
+      }
+
+      // Проверка на выбор дней при одинаковом начале и конце или меньшем периоде
+      if (startDate != null && endDate != null) {
+        final int periodLength = endDate!.difference(startDate!).inDays;
+
+        if (periodLength <= 7) {
+          bool invalidDaySelected = false;
+
+          // Проверяем, что не выбраны дни за пределами допустимого диапазона
+          for (int i = 0; i < 7; i++) {
+            if (selectedDays[i] && !_isWithinDateRange(startDate!, endDate!, i)) {
+              invalidDaySelected = true;
+              break;
+            }
+          }
+
+          if (invalidDaySelected) {
+            periodError = 'Выбраны недопустимые дни для выбранного периода';
+          } else {
+            periodError = null;
+          }
+        }
+      }
+
+      // Если даты не выбраны
+      if (startDate == null || endDate == null) {
+        periodError = 'Необходимо выбрать даты начала и завершения';
+      }
+    });
+
+    // Проверка ошибок перед добавлением привычки
+    if (nameError == null &&
+        dateError == null &&
+        quantityError == null &&
+        volumeError == null &&
+        periodError == null &&
+        typeError == null) {
+      int? quantity = int.tryParse(quantityController.text.trim());
+      double? volumePerPress = double.tryParse(volumePerPressController.text);
+      double? volumeSpecified = double.tryParse(volumeSpecifiedController.text);
 
       Map<String, dynamic> newHabit = {
         'name': actionName,
         'type': selectedType.toString(),
-        'start_date': startDate != null ? DateFormat('yyyy-MM-dd').format(startDate!) : DateFormat('yyyy-MM-dd').format(DateTime.now()),
+        'start_date': startDate != null ? DateFormat('yyyy-MM-dd').format(startDate!) : null,
         'end_date': endDate != null ? DateFormat('yyyy-MM-dd').format(endDate!) : null,
-        'days_of_week': selectedDays.map((isSelected) => isSelected ? 1 : 0).toList().join(','),
-        'notifications_enabled': 0,
-        // Если тип не "Выполнить определенный объем", quantity не добавляем
-        'quantity': (selectedType != "Perform a certain volume") ? quantity ?? 0 : null,
-        'volume_per_press': (selectedType == "Perform a certain volume") ? null : volumePerPress,
-        'volume_specified': (selectedType == "Perform a certain volume") ? volumeSpecified : null,
-        'archived': 0
+        'quantity': selectedType == 1 ? quantity : null,
+        'volume_per_press': selectedType == 2 ? volumePerPress : null,
+        'volume_specified': selectedType == 2 ? volumeSpecified : null,
       };
 
+      // Логика добавления привычки
       try {
-        int id = await DatabaseHelper.instance.insertHabit(newHabit);
-        print('Inserted habit with id: $id');
-
         _showDeleteDialog(context, taskTitle, () {
-          // Действия после подтверждения диалога
         });
       } catch (e) {
         print('Error inserting habit: $e');
       }
     } else {
-      print('Habit name cannot be empty!');
+      // Если есть ошибки, отображаем через SnackBar
+      String errorMessage = 'Пожалуйста, исправьте ошибки:';
+      if (typeError != null) errorMessage += '\n- $typeError';
+      if (nameError != null) errorMessage += '\n- $nameError';
+      if (dateError != null) errorMessage += '\n- $dateError';
+      if (quantityError != null) errorMessage += '\n- $quantityError';
+      if (volumeError != null) errorMessage += '\n- $volumeError';
+      if (periodError != null) errorMessage += '\n- $periodError';
+
+      _showError(errorMessage);
     }
   }
 }
