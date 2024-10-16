@@ -56,22 +56,27 @@ class HabitReminderService {
       reminder['sunday'] == 1,
     ];
 
+    print('Планирование уведомлений для дней недели: $days');
+
     for (int i = 0; i < days.length; i++) {
       if (days[i]) {
         DateTime scheduledDate = DateTime(
           now.year,
           now.month,
-          now.day + ((i + 7 - now.weekday) % 7), // Calculate next occurrence of the day
-          int.parse(time.split(':')[0]), // Hour
-          int.parse(time.split(':')[1]), // Minute
+          now.day + ((i + 7 - now.weekday) % 7), // Вычисление следующего дня недели
+          int.parse(time.split(':')[0]), // Часы
+          int.parse(time.split(':')[1]), // Минуты
         );
+
+        print('Планирую уведомление на $scheduledDate для привычки "$habitName"');
 
         await notificationService.scheduleNotification(
           habitId,
-          'Время заняться привычкой!', // Updated title
-          'Напоминание о привычке: $habitName', // Используем имя привычки
+          'Время заняться привычкой!',
+          'Напоминание о привычке: $habitName',
           scheduledDate,
         );
+        print('Уведомление запланировано для привычки с ID $habitId на $scheduledDate');
       }
     }
   }

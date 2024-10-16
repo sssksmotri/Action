@@ -146,10 +146,14 @@ class DatabaseHelper {
     return await db.query(tableReminders, where: 'habit_id = ?', whereArgs: [habitId]);
   }
 
-  Future<int> updateReminder(Map<String, dynamic> row) async {
-    Database db = await instance.database;
-    int id = row['id'];
-    return await db.update(tableReminders, row, where: 'id = ?', whereArgs: [id]);
+  Future<int> updateReminder(int reminderId, Map<String, dynamic> reminderData) async {
+    final db = await database;
+    return await db.update(
+      'reminders', // Имя таблицы
+      reminderData, // Данные для обновления
+      where: 'id = ?', // Условие для обновления
+      whereArgs: [reminderId], // Аргументы для условия
+    );
   }
 
   // Добавляем метод для обновления состояния уведомлений конкретной привычки
@@ -164,6 +168,8 @@ class DatabaseHelper {
       whereArgs: [habitId],
     );
   }
+
+
 
 
   Future<int> deleteReminder(int id) async {

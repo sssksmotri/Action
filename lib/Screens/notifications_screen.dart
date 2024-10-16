@@ -76,11 +76,12 @@ class _NotificationsPageState extends State<NotificationsPage> {
         ),
       ),
       body: SingleChildScrollView(
+
         child: Column(
           children: [
             // Тумблер для всех уведомлений
             _buildMainNotificationToggle(),
-            const SizedBox(height: 16),
+            const SizedBox(height: 8),
 
             // Отображение уведомлений для привычек
             if (allNotificationsEnabled) ...[
@@ -91,6 +92,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
           ],
         ),
       ),
+      backgroundColor: Colors.white,
       bottomNavigationBar: Container(
         margin: const EdgeInsets.only(bottom: 30, right: 16, left: 16),
         decoration: BoxDecoration(
@@ -116,6 +118,25 @@ class _NotificationsPageState extends State<NotificationsPage> {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildCard({Key? key, required Widget child}) {
+    return Container(
+      key: key,
+      margin: const EdgeInsets.symmetric(vertical: 6.0, horizontal: 16.0),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12.0),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: child,
     );
   }
 
@@ -194,7 +215,10 @@ class _NotificationsPageState extends State<NotificationsPage> {
                   }
                 });
               },
-              activeColor: Colors.deepPurple,
+              activeColor: Colors.white,
+              activeTrackColor: const Color(0xFF5F33E1), // Цвет фона при включении
+              inactiveTrackColor: const Color(0xFFEEE9FF), // Цвет фона при выключении
+              inactiveThumbColor: const Color(0xFF5F33E1), // Цвет кнопки при выключении
             ),
           ],
         ),
@@ -203,360 +227,323 @@ class _NotificationsPageState extends State<NotificationsPage> {
   }
 
 
-// Обновление отдельной привычки и проверка основного тумблера
   Widget _buildHabitNotificationSection(Map<String, dynamic> habit) {
-    bool isHabitNotificationEnabled = habit['active'] == 0;
+    bool isHabitNotificationEnabled = habit['notifications_enabled'] == 1;
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                habit['name'],
-                style: const TextStyle(fontSize: 16),
+    return _buildCard(
+      child: Padding(
+        padding: const EdgeInsets.all(8.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: Text(
+                    habit['name'],
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                Switch(
+                  value: isHabitNotificationEnabled,
+                  onChanged: (bool value) async {
+                    setState(() {
+                      habit['notifications_enabled'] = value ? 1 : 0;
+                      _updateHabitInDatabase(habit);
+                    });
+
+                    if (value) {
+                      _showNotificationDaysMenu(habit);
+                      await habitReminderService.initializeReminders();
+                    } else {
+                      await habitReminderService.cancelAllReminders(habit['id']);
+                    }
+                  },
+                  activeColor: Colors.white,
+                  activeTrackColor: const Color(0xFF5F33E1),
+                  inactiveTrackColor: const Color(0xFFEEE9FF),
+                  inactiveThumbColor: const Color(0xFF5F33E1),
+                ),
+              ],
+            ),
+            if (isHabitNotificationEnabled)
+              Padding(
+                padding: const EdgeInsets.only(top: 8.0),
+                child: Column(
+                  children: [
+                    _buildNotificationSettings(habit),
+                  ],
+                ),
               ),
-              Switch(
-                value: isHabitNotificationEnabled,
-                onChanged: (bool value) async {
-                  setState(() {
-                    habits = habits.map((h) {
-                      if (h['id'] == habit['id']) {
-                        return {
-                          ...h,
-                          'active': value ? 0 : 1, // 0 — включено, 1 — выключено
-                        };
-                      }
-                      return h;
-                    }).toList();
-
-                    // Проверяем состояние всех привычек и обновляем основной тумблер
-                    _updateAllNotificationsState();
-                  });
-
-                  if (value) {
-                    _showNotificationDaysMenu(habit);
-                    await HabitReminderService().initializeReminders();
-                  } else {
-                    await HabitReminderService().cancelAllReminders(habit['id']);
-                  }
-
-                  // Обновляем статус в базе данных
-                  await DatabaseHelper.instance.updateHabitNotificationState(habit['id'], value ? 0 : 1);
-                },
-                activeColor: Colors.deepPurple,
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Visibility(
-            visible: isHabitNotificationEnabled,
-            child: _buildNotificationTimesSelection(habit['id'], habit),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 
 
-  Widget _buildNotificationTimesSelection(int habitId, Map<String, dynamic> habit) {
-    List<Map<String, dynamic>> notificationsForHabit =
-    notificationTimes.where((entry) => entry['habitId'] == habitId).toList();
+  Widget _buildNotificationSettings(Map<String, dynamic> habit) {
+    List<Map<String, dynamic>> habitReminders = notificationTimes
+        .where((reminder) => reminder['habitId'] == habit['id'])
+        .toList();
+
+    if (habitReminders.isEmpty) {
+      habitReminders = [{'time': '08:00', 'days': List<bool>.filled(7, false)}];
+    }
 
     return Column(
-      children: notificationsForHabit.map((timeEntry) {
-        bool isLastNotification = notificationsForHabit.length == 1;
-
-        // Разделяем время на часы и минуты
-        List<String> timeParts = timeEntry['time'].split(":");
-        String selectedHour = timeParts[0];
-        String selectedMinute = timeParts[1];
-
-        return Container(
-          margin: const EdgeInsets.only(bottom: 16),
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(12),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.grey.withOpacity(0.2),
-                spreadRadius: 2,
-                blurRadius: 5,
-                offset: const Offset(0, 3),
-              ),
-            ],
-          ),
-          child: Column(
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.start,
-                children: [
-                  // Поле для ввода часов
-                  Container(
-                    width: 80,
-                    height: 50,
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      color: Color(0xFFF8F9F9),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: TextFormField(
-                      textAlign: TextAlign.center,
-                      initialValue: selectedHour.padLeft(2, '0'),
-                      keyboardType: TextInputType.number,
-                      decoration: InputDecoration(
-                        border: InputBorder.none,
-                      ),
-                      style: const TextStyle(
-                        fontSize: 20,
-                        color: Colors.black,
-                      ),
-                      onChanged: (String value) {
-                        setState(() {
-                          selectedHour = value.padLeft(2, '0');
-                          timeEntry['time'] = "$selectedHour:$selectedMinute"; // Обновляем значение времени
-                        });
-                      },
-                    ),
-                  ),
-                  const Text(
-                    ' : ',
-                    style: TextStyle(
-                      fontSize: 24,
-                      color: Colors.black,
-                    ),
-                  ),
-                  // Поле для ввода минут
-                  Container(
-                    width: 80,
-                    height: 50,
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      color: Color(0xFFF8F9F9),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: TextFormField(
-                      textAlign: TextAlign.center,
-                      initialValue: selectedMinute.padLeft(2, '0'),
-                      keyboardType: TextInputType.number,
-                      decoration: InputDecoration(
-                        border: InputBorder.none,
-                      ),
-                      style: const TextStyle(
-                        fontSize: 20,
-                        color: Colors.black,
-                      ),
-                      onChanged: (String value) {
-                        setState(() {
-                          selectedMinute = value.padLeft(2, '0');
-                          timeEntry['time'] = "$selectedHour:$selectedMinute"; // Обновляем значение времени
-                        });
-                      },
-                    ),
-                  ),
-                  const SizedBox(width: 16), // Отступ между полями и кнопками
-                  // Кнопка "+"
-                  GestureDetector(
-                    onTap: () => _addNewNotification(habit),
-                    child: Container(
-                      width: 30,
-                      height: 30,
-                      decoration: BoxDecoration(
-                        color: Color(0xFFEEE9FF), // Светлый фон вокруг "+"
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: const Icon(
-                        Icons.add,
-                        color: Color(0xFF5F33E1), // Фиолетовый цвет иконки
-                        size: 24,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 16), // Отступ между кнопками
-                  // Кнопка "x", если это не последнее уведомление
-                  if (!isLastNotification)
-                    GestureDetector(
-                      onTap: () => _removeNotification(timeEntry),
-                      child: Container(
-                        width: 30,
-                        height: 30,
-                        decoration: BoxDecoration(
-                          color: Color(0xFFFFE7E5), // Светлый фон вокруг "x"
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: const Icon(
-                          Icons.close,
-                          color: Color(0xFFFF3B30), // Красный цвет иконки
-                          size: 24,
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              _buildDaysOfWeekCheckboxes(timeEntry['days'], habitId, timeEntry['id']),
-            ],
-          ),
-        );
-      }).toList(),
-    );
-  }
-
-
-
-
-  Widget _buildDaysOfWeekCheckboxes(List<bool> days, int habitId, int reminderId) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceAround,
-      children: List.generate(7, (index) {
+      children: List.generate(habitReminders.length, (index) {
         return Column(
           children: [
-            Checkbox(
-              value: days[index],
-              onChanged: (bool? value) async {
-                // Проверяем, чтобы хотя бы один день оставался включенным
-                if (!value! && days.where((day) => day).length == 1) {
-                  // Если это последний активный день, не даем его отключить
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text("Нельзя отключить все дни. Должен быть выбран хотя бы один."),
-                    ),
-                  );
-                  return;
-                }
-
-                // Обновляем состояние чекбоксов
-                setState(() {
-                  days[index] = value;
-                });
-
-                // Обновляем данные в базе при изменении чекбокса
-                await DatabaseHelper.instance.updateReminder({
-                  'id': reminderId,
-                  _getDayColumnName(index): value ? 1 : 0,
-                });
-
-                // Отмена существующих напоминаний
-                await HabitReminderService().cancelAllReminders(habitId);
-
-                // Планирование новых уведомлений с обновленными данными
-                await HabitReminderService().scheduleReminder(
-                  habitId,
-                  notificationTimes.firstWhere((reminder) => reminder['id'] == reminderId)['time'],
-                  (await DatabaseHelper.instance.queryHabitById(habitId))['name'],
-                  {
-                    'monday': days[0] ? 1 : 0,
-                    'tuesday': days[1] ? 1 : 0,
-                    'wednesday': days[2] ? 1 : 0,
-                    'thursday': days[3] ? 1 : 0,
-                    'friday': days[4] ? 1 : 0,
-                    'saturday': days[5] ? 1 : 0,
-                    'sunday': days[6] ? 1 : 0,
-                  },
-                );
-              },
-            ),
-            Text(['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'][index]),
+            _buildTimePicker(habitReminders[index], habit, index),
+            const SizedBox(height: 24),
           ],
         );
       }),
     );
   }
 
-// Вспомогательная функция для получения названия колонки дня
-  String _getDayColumnName(int index) {
-    switch (index) {
-      case 0:
-        return 'sunday';
-      case 1:
-        return 'monday';
-      case 2:
-        return 'tuesday';
-      case 3:
-        return 'wednesday';
-      case 4:
-        return 'thursday';
-      case 5:
-        return 'friday';
-      case 6:
-        return 'saturday';
-      default:
-        return '';
-    }
+  Widget _buildTimePicker(Map<String, dynamic> reminder, Map<String, dynamic> habit, int index) {
+    String selectedTime = reminder['time'];
+    List<String> timeParts = selectedTime.split(":");
+    int selectedHour = int.parse(timeParts[0]);
+    int selectedMinute = int.parse(timeParts[1]);
+
+    // Получаем id привычки из объекта habit
+    int habitId = habit['id'];
+
+    // Фильтруем уведомления для конкретной привычки
+    List<Map<String, dynamic>> notificationsForHabit = notificationTimes
+        .where((entry) => entry['habitId'] == habitId)
+        .toList();
+
+    // Проверка на последнее уведомление
+    bool isLastNotification = notificationsForHabit.length == 1;
+
+    return Column(
+      children: [
+        Row(
+          children: [
+            // Поле для ввода часов
+            Container(
+              width: 60,
+              height: 50,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: Color(0xFFF8F9F9),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: TextFormField(
+                textAlign: TextAlign.center,
+                initialValue: selectedHour.toString().padLeft(2, '0'),
+                keyboardType: TextInputType.number,
+                decoration: InputDecoration(border: InputBorder.none),
+                style: TextStyle(fontSize: 20, color: Colors.black),
+                onChanged: (String value) {
+                  setState(() {
+                    int? hour = int.tryParse(value);
+                    if (hour != null && hour >= 0 && hour < 24) {
+                      reminder['time'] =
+                      '${hour.toString().padLeft(2, '0')}:${selectedMinute.toString().padLeft(2, '0')}';
+                      _updateReminderInDatabase(reminder['id'], newTime: reminder['time']);
+
+                    } else {
+                      print("Invalid hour input.");
+                    }
+                  });
+                },
+              ),
+            ),
+            Text(' : ', style: TextStyle(fontSize: 24, color: Colors.black)),
+            // Поле для ввода минут
+            Container(
+              width: 60,
+              height: 50,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: Color(0xFFF8F9F9),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: TextFormField(
+                textAlign: TextAlign.center,
+                initialValue: selectedMinute.toString().padLeft(2, '0'),
+                keyboardType: TextInputType.number,
+                decoration: InputDecoration(border: InputBorder.none),
+                style: TextStyle(fontSize: 20, color: Colors.black),
+                onChanged: (String value) {
+                  setState(() {
+                    int? minute = int.tryParse(value);
+                    if (minute != null && minute >= 0 && minute < 60) {
+                      reminder['time'] =
+                      '${selectedHour.toString().padLeft(2, '0')}:${minute.toString().padLeft(2, '0')}';
+                      _updateReminderInDatabase(reminder['id'], newTime: reminder['time']);
+
+                    } else {
+                      print("Invalid minute input.");
+                    }
+                  });
+                },
+              ),
+            ),
+            SizedBox(width: 12), // Отступ между полем времени и кнопкой "+"
+            // Кнопка "+" для добавления уведомления
+            GestureDetector(
+              onTap: () async {
+                await _addNewReminder(habit);
+              },
+              child: Container(
+                width: 30,
+                height: 30,
+                decoration: BoxDecoration(
+                  color: Color(0xFFEEE9FF),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(Icons.add, color: Color(0xFF5F33E1), size: 24),
+              ),
+            ),
+            Spacer(),
+            // Условие для отображения крестика
+            if (!isLastNotification)
+              GestureDetector(
+                onTap: () async {
+                  _removeNotification(reminder);
+                  setState(() {
+                    notificationTimes.removeAt(index);
+                  });
+                },
+                child: Container(
+                  width: 30,
+                  height: 30,
+                  decoration: BoxDecoration(
+                    color: Color(0xFFFFE7E5),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(Icons.close, color: Color(0xFFFF3B30), size: 24),
+                ),
+              ),
+          ],
+        ),
+        const SizedBox(height: 12), // Увеличение отступа между временем и днями недели
+        _buildDaysOfWeekCheckboxes(reminder, habit),
+      ],
+    );
   }
 
-  Future<void> _selectTime(BuildContext context, int index) async {
-    try {
-      TimeOfDay? pickedTime = await showTimePicker(
-        context: context,
-        initialTime: TimeOfDay.now(),
-      );
 
-      if (pickedTime != null) {
-        String formattedTime = '${pickedTime.hour}:${pickedTime.minute.toString().padLeft(2, '0')}';
-        int? habitId = notificationTimes[index]['habitId'] as int?;
-        int? reminderId = notificationTimes[index]['id'] as int?;
+  Widget _buildDaysOfWeekCheckboxes(Map<String, dynamic> reminder, Map<String, dynamic> habit) {
+    // Получаем startDate и endDate из habit
+    DateTime startDate = DateTime.parse(habit['start_date']);
+    DateTime endDate = habit['end_date'] != null
+        ? DateTime.parse(habit['end_date'])
+        : startDate.add(Duration(days: 6)); // Предположим, если endDate не задан, то это 6 дней после startDate
 
-        if (habitId == null || reminderId == null) {
-          print('Ошибка: habitId или reminderId равно null.');
-          return;
-        }
+    // Убедимся, что 'days' инициализирован как список булевых значений
+    List<bool> selectedDays = reminder['days'] != null
+        ? List<bool>.from(reminder['days'])
+        : [false, false, false, false, false, false, false];
 
-        // Обновляем время в локальном состоянии
-        setState(() {
-          notificationTimes[index]['time'] = formattedTime;
-        });
+    List<String> days = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
 
-        // Обновляем напоминание в базе данных
-        await DatabaseHelper.instance.updateReminder({
-          'id': reminderId,
-          'time': formattedTime,
-        });
+    // Сбрасываем недопустимые дни
+    _resetInvalidDays(startDate, endDate, selectedDays, reminder);
 
-        // Получаем имя привычки для уведомления
-        String habitName = (await DatabaseHelper.instance.queryHabitById(habitId))['name'] ?? 'Неизвестная привычка';
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: List.generate(7, (dayIndex) {
+        // Проверяем, входит ли день в диапазон привычки
+        bool isWithinRange = _isWithinDateRange(startDate, endDate, dayIndex);
 
-        // Отменяем старые напоминания
-        await HabitReminderService().cancelAllReminders(habitId);
-
-        // Запланируем новое напоминание с обновленным временем и днями
-        List<bool> days = notificationTimes[index]['days'];
-        await HabitReminderService().scheduleReminder(
-          habitId,
-          formattedTime,
-          habitName,
-          {
-            'monday': days[0] ? 1 : 0,
-            'tuesday': days[1] ? 1 : 0,
-            'wednesday': days[2] ? 1 : 0,
-            'thursday': days[3] ? 1 : 0,
-            'friday': days[4] ? 1 : 0,
-            'saturday': days[5] ? 1 : 0,
-            'sunday': days[6] ? 1 : 0,
-          },
+        return Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4.0),
+              child: Text(
+                days[dayIndex],
+                style: const TextStyle(
+                  fontSize: 14,
+                  color: Color(0xFF212121),  // Цвет текста всегда активен
+                ),
+              ),
+            ),
+            const SizedBox(height: 4),
+            GestureDetector(
+              onTap: isWithinRange // Если день вне диапазона, не разрешаем его выбирать
+                  ? () {
+                setState(() {
+                  selectedDays[dayIndex] = !selectedDays[dayIndex];  // Меняем состояние выбранного дня
+                  _updateReminderInDatabase(reminder['id'], selectedDays: selectedDays);
+                });
+              }
+                  : null, // Если день не входит в диапазон, отключаем нажатие
+              child: Container(
+                width: 24,
+                height: 24,
+                decoration: BoxDecoration(
+                  color: selectedDays[dayIndex] ? const Color(0xFF5F33E1) : Colors.transparent,
+                  borderRadius: BorderRadius.circular(5),
+                  border: Border.all(
+                    color: isWithinRange // Изменяем цвет в зависимости от доступности выбора
+                        ? (selectedDays[dayIndex] ? const Color(0xFF5F33E1) : Colors.grey)
+                        : Colors.red, // Если день вне диапазона, подсвечиваем красным
+                    width: 1,
+                  ),
+                ),
+                child: selectedDays[dayIndex]
+                    ? const Icon(
+                  Icons.check,
+                  size: 18,
+                  color: Colors.white,
+                )
+                    : null,
+              ),
+            ),
+          ],
         );
+      }),
+    );
+  }
 
-        print('Напоминание обновлено: время $formattedTime, id привычки: $habitId');
+  void _resetInvalidDays(DateTime startDate, DateTime endDate, List<bool> selectedDays, Map<String, dynamic> reminder) {
+    final int startDayIndex = startDate.weekday % 7;
+    final int endDayIndex = endDate.weekday % 7;
+
+    // Сбрасываем дни вне диапазона
+    for (int i = 0; i < 7; i++) {
+      if (i < startDayIndex || i > endDayIndex) {
+        selectedDays[i] = false; // Сбрасываем дни вне диапазона
       }
-    } catch (e, stackTrace) {
-      print('Ошибка в методе _selectTime: $e');
-      print(stackTrace);
     }
+
+    // Обновляем состояние родительского виджета
+    setState(() {
+      reminder['days'] = selectedDays; // Сохраняем изменения
+    });
   }
 
-  void _saveAllNotificationsState(bool value) async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('allNotificationsEnabled', value);
+
+
+
+  bool _isWithinDateRange(DateTime start, DateTime end, int selectedIndex) {
+    final int difference = end.difference(start).inDays;
+
+    // Если период больше недели, все дни доступны для выбора
+    if (difference >= 7) {
+      return true;
+    }
+
+    // Преобразуем дни недели в индексы от 0 (Воскресенье) до 6 (Суббота)
+    final int startDayIndex = start.weekday % 7;
+    final int endDayIndex = end.weekday % 7;
+
+    // Возвращаем true, если день находится в диапазоне
+    return selectedIndex >= startDayIndex && selectedIndex <= endDayIndex;
   }
 
-  void _saveHabitNotificationState(int habitId, bool value) async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('habit_$habitId', value);
-  }
+
 
 
   Future<void> _loadNotifications() async {
@@ -593,27 +580,11 @@ class _NotificationsPageState extends State<NotificationsPage> {
 
     if (existingNotifications.isNotEmpty) {
     } else {
-      _addNewNotification(habit);
+      _addNewReminder(habit);
     }
   }
 
-  void _addNewNotification(Map<String, dynamic> habit) async {
-    String defaultTime = '20:35';
-    List<bool> defaultDays = List.generate(7, (index) => true);
 
-    // Получаем reminderId от метода addNewReminder
-    int reminderId = await habitReminderService.addNewReminder(habit['id'], defaultTime, defaultDays);
-
-    // Добавляем новое уведомление в список
-    setState(() {
-      notificationTimes.add({
-        'habitId': habit['id'],
-        'time': defaultTime,
-        'days': defaultDays,
-        'id': reminderId, // Используем полученный reminderId
-      });
-    });
-  }
 
   void _removeNotification(Map<String, dynamic> timeEntry) async {
     setState(() {
@@ -662,6 +633,101 @@ class _NotificationsPageState extends State<NotificationsPage> {
       await dbHelper.updateHabitNotificationState(habit['id'], enabled ? 0 : 1);
     }
   }
+
+  Future<void> _addNewReminder(Map<String, dynamic> habit) async {
+    String defaultTime = '08:00'; // Время по умолчанию
+    List<bool> defaultDays = List<bool>.filled(7, false); // Все дни по умолчанию выключены
+
+    // Добавляем новое напоминание в БД
+    await habitReminderService.addNewReminder(habit['id'], defaultTime, defaultDays);
+
+    // Перезагружаем уведомления
+    await _loadNotifications();
+  }
+  Future<void> _updateHabitInDatabase(Map<String, dynamic> habit) async {
+    await DatabaseHelper.instance.updateHabit(habit);
+    print('Привычка обновлена: ${habit['name']}');
+  }
+
+  // Метод обновления напоминания
+  Future<void> _updateReminderInDatabase(int reminderId, {String? newTime, List<bool>? selectedDays}) async {
+    // Создаем карту для обновления данных
+    Map<String, dynamic> updateData = {};
+
+    // Получаем текущее напоминание для перепланирования
+    Map<String, dynamic>? existingReminder = await DatabaseHelper.instance.queryReminderById(reminderId);
+
+    if (existingReminder == null) {
+      print('Напоминание с ID $reminderId не найдено.');
+      return;
+    }
+
+    int habitId = existingReminder['habit_id'];
+
+    // Если передано новое время, добавляем его в данные для обновления
+    if (newTime != null) {
+      updateData['time'] = newTime;
+      print('Новое время: $newTime');
+    }
+
+    // Если переданы выбранные дни или они уже были установлены ранее, добавляем их
+    if (selectedDays != null) {
+      Map<String, dynamic> daysOfWeek = {
+        'monday': selectedDays[0] ? 1 : 0,
+        'tuesday': selectedDays[1] ? 1 : 0,
+        'wednesday': selectedDays[2] ? 1 : 0,
+        'thursday': selectedDays[3] ? 1 : 0,
+        'friday': selectedDays[4] ? 1 : 0,
+        'saturday': selectedDays[5] ? 1 : 0,
+        'sunday': selectedDays[6] ? 1 : 0,
+      };
+      updateData.addAll(daysOfWeek);
+      print('Обновленные дни недели: $daysOfWeek');
+    } else {
+      // Если selectedDays не переданы, берем существующие дни из базы данных
+      Map<String, dynamic> daysOfWeek = {
+        'monday': existingReminder['monday'],
+        'tuesday': existingReminder['tuesday'],
+        'wednesday': existingReminder['wednesday'],
+        'thursday': existingReminder['thursday'],
+        'friday': existingReminder['friday'],
+        'saturday': existingReminder['saturday'],
+        'sunday': existingReminder['sunday'],
+      };
+      updateData.addAll(daysOfWeek);
+      print('Используем существующие дни недели: $daysOfWeek');
+    }
+
+    // Если есть данные для обновления, обновляем в базе
+    if (updateData.isNotEmpty) {
+      await DatabaseHelper.instance.updateReminder(reminderId, updateData);
+      print('Напоминание обновлено с ID: $reminderId с данными: $updateData');
+
+      HabitReminderService habitReminderService = HabitReminderService();
+
+      // Отменяем старые напоминания
+      print('Отменяю старые уведомления для привычки с ID $habitId');
+      await habitReminderService.cancelAllReminders(habitId);
+      print('Все старые уведомления отменены для привычки с ID $habitId');
+
+      // Перепланируем новое уведомление
+      await habitReminderService.scheduleReminder(
+          habitId,
+          newTime ?? existingReminder['time'], // Используем новое или существующее время
+          (await DatabaseHelper.instance.queryHabitById(habitId))['name'], // Получаем имя привычки
+          updateData.isNotEmpty ? updateData : existingReminder // Используем обновленные или существующие данные
+      );
+    } else {
+      print('Нет данных для обновления.');
+    }
+  }
+
+
+
+
+
+
+
 
 
 
