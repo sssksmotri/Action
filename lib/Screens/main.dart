@@ -12,6 +12,7 @@ import 'package:table_calendar/table_calendar.dart';
 import 'package:action_notes/Service/NotificationService.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
+import 'package:action_notes/Service/HabitReminderService.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -66,6 +67,7 @@ class _HomePageState extends State<HomePage> {
   int _selectedIndex = 0;
   DateTime _selectedDate = DateTime.now();
   DateTime _today = DateTime.now();
+  final HabitReminderService habitReminderService = HabitReminderService();
 
   @override
   void initState() {
@@ -74,7 +76,8 @@ class _HomePageState extends State<HomePage> {
     _loadSelectedFilter().then((value) {
       setState(() {
         _selectedFilter = value; // Устанавливаем загруженный фильтр
-        _filterHabits(); // Фильтруем привычки при инициализации
+        _filterHabits();
+        habitReminderService.initializeReminders();// Фильтруем привычки при инициализации
       });
     });
   }
