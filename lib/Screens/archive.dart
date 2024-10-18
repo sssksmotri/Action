@@ -5,9 +5,8 @@ import 'addpage.dart';
 import 'settings_screen.dart';
 import 'notes.dart';
 import 'add.dart';
-import 'main.dart';
 import 'stat.dart';
-
+import 'package:action_notes/Service/database_helper.dart'; // Импортируйте свой класс для работы с БД
 
 class ArchivePage extends StatefulWidget {
   const ArchivePage({Key? key}) : super(key: key);
@@ -19,6 +18,22 @@ class ArchivePage extends StatefulWidget {
 class _ArchivePageState extends State<ArchivePage> {
   int _selectedIndex = 4;
   bool _isFolderPressed = true; // Состояние для кнопки папки (сразу нажатая)
+  List<Map<String, dynamic>> _archivedHabits = []; // Список архивированных привычек
+
+  @override
+  void initState() {
+    super.initState();
+    _loadArchivedHabits(); // Загружаем архивированные привычки
+  }
+
+  // Метод для загрузки архивированных привычек из БД
+  void _loadArchivedHabits() async {
+    DatabaseHelper db = DatabaseHelper.instance; // Создаем экземпляр класса БД
+    List<Map<String, dynamic>> habits = await db.getArchivedHabits(); // Получаем архивированные привычки
+    setState(() {
+      _archivedHabits = habits; // Обновляем состояние
+    });
+  }
 
   void _onItemTapped(int index) {
     setState(() {
@@ -36,7 +51,6 @@ class _ArchivePageState extends State<ArchivePage> {
         MaterialPageRoute(builder: (context) => const NotesPage()),
       );
     }
-
     if (index == 4) {
       Navigator.push(
         context,
@@ -56,6 +70,7 @@ class _ArchivePageState extends State<ArchivePage> {
       );
     }
   }
+
   void _showDeleteDialog(BuildContext context, String taskTitle,
       Function() onDelete) {
     showDialog(
@@ -66,7 +81,6 @@ class _ArchivePageState extends State<ArchivePage> {
             borderRadius: BorderRadius.circular(20),
           ),
           contentPadding: const EdgeInsets.fromLTRB(24, 20, 24, 10),
-          // Паддинг для внутреннего контента
           content: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.center,
@@ -84,7 +98,6 @@ class _ArchivePageState extends State<ArchivePage> {
                       text: taskTitle,
                       style: const TextStyle(
                         color: Color(0xFF5F33E1),
-                        // Фиолетовый цвет для названия задачи
                         fontWeight: FontWeight.bold,
                       ),
                     ),
@@ -102,7 +115,6 @@ class _ArchivePageState extends State<ArchivePage> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                // Кнопка "No, leave it"
                 Expanded(
                   child: TextButton(
                     onPressed: () {
@@ -110,7 +122,6 @@ class _ArchivePageState extends State<ArchivePage> {
                     },
                     style: TextButton.styleFrom(
                       backgroundColor: const Color(0xFFEEE9FF),
-                      // Легкий фиолетовый фон
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(24),
                       ),
@@ -119,14 +130,13 @@ class _ArchivePageState extends State<ArchivePage> {
                     child: const Text(
                       "No, leave it",
                       style: TextStyle(
-                        color: Color(0xFF5F33E1), // Фиолетовый текст
+                        color: Color(0xFF5F33E1),
                         fontWeight: FontWeight.bold,
                       ),
                     ),
                   ),
                 ),
-                const SizedBox(width: 10), // Отступ между кнопками
-                // Кнопка "Yes, delete"
+                const SizedBox(width: 10),
                 Expanded(
                   child: TextButton(
                     onPressed: () {
@@ -134,7 +144,7 @@ class _ArchivePageState extends State<ArchivePage> {
                       onDelete(); // Вызов метода удаления
                     },
                     style: TextButton.styleFrom(
-                      backgroundColor: Colors.red, // Красный фон
+                      backgroundColor: Colors.red,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(24),
                       ),
@@ -143,7 +153,7 @@ class _ArchivePageState extends State<ArchivePage> {
                     child: const Text(
                       "Yes, delete",
                       style: TextStyle(
-                        color: Colors.white, // Белый текст
+                        color: Colors.white,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
@@ -168,7 +178,7 @@ class _ArchivePageState extends State<ArchivePage> {
             height: 30,
           ),
           onPressed: () {
-            Navigator.of(context).pop();
+            Navigator.of(context).pop(true);
           },
         ),
         title: Row(
@@ -188,23 +198,21 @@ class _ArchivePageState extends State<ArchivePage> {
             Row(
               children: [
                 IconButton(
-                  iconSize: 32, // Увеличиваем размер иконки
-                  padding: EdgeInsets.zero, // Убираем отступы
+                  iconSize: 32,
+                  padding: EdgeInsets.zero,
                   icon: Image.asset(
-                    'assets/images/Chart.png', // Укажите путь к изображению
-                    width: 32, // Ширина иконки
-                    height: 32, // Высота иконки
+                    'assets/images/Chart.png',
+                    width: 32,
+                    height: 32,
                   ),
-                  onPressed: () {
-                  },
+                  onPressed: () {},
                 ),
-
                 Container(
-                  width: 32, // Ширина контейнера
-                  height: 32, // Высота контейнера
+                  width: 32,
+                  height: 32,
                   decoration: BoxDecoration(
-                    color: Color(0xFF5F33E1), // Цвет фона
-                    shape: BoxShape.circle, // Круглая форма
+                    color: Color(0xFF5F33E1),
+                    shape: BoxShape.circle,
                     boxShadow: [
                       BoxShadow(
                         color: Colors.black.withOpacity(0.2),
@@ -215,10 +223,10 @@ class _ArchivePageState extends State<ArchivePage> {
                   ),
                   child: ClipOval(
                     child: Padding(
-                      padding: EdgeInsets.all(4.0), // Отступы вокруг изображения
+                      padding: EdgeInsets.all(4.0),
                       child: Image.asset(
                         'assets/images/Folder2.png',
-                        fit: BoxFit.cover, // Масштабируем изображение
+                        fit: BoxFit.cover,
                       ),
                     ),
                   ),
@@ -231,38 +239,20 @@ class _ArchivePageState extends State<ArchivePage> {
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
-        child: Column(
-          children: [
-            GestureDetector(
+        child: ListView.builder(
+          itemCount: _archivedHabits.length,
+          itemBuilder: (context, index) {
+            final habit = _archivedHabits[index];
+            return GestureDetector(
               onTap: () {
+                // Здесь можно добавить действие по нажатию на привычку
               },
-              child: _buildSettingContainer('Read 100 pages'),
-            ),
-            GestureDetector(
-              onTap: () {
-              },
-              child: _buildSettingContainer('Read 100 pages'),
-            ),
-            GestureDetector(
-              onTap: () {
-              },
-              child: _buildSettingContainer('Read 100 pages'),
-            ),
-            GestureDetector(
-              onTap: () {
-              },
-              child: _buildSettingContainer('Read 100 pages'),
-            ),
-            GestureDetector(
-              onTap: () {
-              },
-              child: _buildSettingContainer('Read 100 pages'),
-            ),
-
-
-          ],
+              child: _buildSettingContainer(habit['name'], habit['id']),
+            );
+          },
         ),
       ),
+      backgroundColor: Colors.white,
       bottomNavigationBar: Container(
         margin: const EdgeInsets.only(bottom: 30, right: 16, left: 16),
         decoration: BoxDecoration(
@@ -290,7 +280,8 @@ class _ArchivePageState extends State<ArchivePage> {
       ),
     );
   }
-  Widget _buildSettingContainer(String title) {
+
+  Widget _buildSettingContainer(String title, int habitId) {
     return Container(
       padding: const EdgeInsets.all(12),
       height: 50,
@@ -310,7 +301,6 @@ class _ArchivePageState extends State<ArchivePage> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          // Текст заголовка
           Text(
             title,
             style: const TextStyle(
@@ -321,19 +311,24 @@ class _ArchivePageState extends State<ArchivePage> {
           ),
           Row(
             children: [
-              // Иконка перед точками
-              Image.asset(
-                'assets/images/Upload.png', // Путь к вашей иконке
-                width: 24,
-                height: 24,
+              GestureDetector(
+                onTap: () {
+                  _activeHabit(habitId); // Выводим сообщение в консоль при нажатии
+                },
+                child: Image.asset(
+                  'assets/images/Upload.png',
+                  width: 24,
+                  height: 24,
+                ),
               ),
               Transform.rotate(
-                angle: -90 * (3.141592653589793238 / 180), // Поворот на 90 градусов влево
+                angle: -90 * (3.141592653589793238 / 180),
                 child: PopupMenuButton<String>(
                   onSelected: (value) {
                     if (value == 'Delete') {
                       _showDeleteDialog(context, title, () {
-                        // Логика удаления
+                        // Логика удаления привычки
+                       // Вызов метода удаления привычки
                       });
                     } else {
                       print('Selected: $value');
@@ -393,5 +388,18 @@ class _ArchivePageState extends State<ArchivePage> {
       ),
     );
   }
-}
 
+  void _activeHabit(int habitId) async {
+    DatabaseHelper db = DatabaseHelper.instance; // Получаем экземпляр вашего помощника по базе данных
+
+    // Обновляем привычку в базе данных, устанавливая archived в 1
+    await db.updateHabit({'id': habitId, 'archived': 0}); // Архивируем привычку
+
+    // Обновляем состояние
+    setState(() {
+      // Создаем новый список на основе существующего, чтобы избежать ошибок с изменяемыми объектами
+     _loadArchivedHabits();
+    });
+  }
+
+}

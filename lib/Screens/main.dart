@@ -62,24 +62,18 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
 
   List<Map<String, dynamic>> _habits = [];
-  List<Map<String, dynamic>> _filteredHabits = [];
   String? _selectedFilter;
   int _selectedIndex = 0;
   DateTime _selectedDate = DateTime.now();
   DateTime _today = DateTime.now();
   final HabitReminderService habitReminderService = HabitReminderService();
 
+
   @override
   void initState() {
     super.initState();
     _loadHabits();
-    _loadSelectedFilter().then((value) {
-      setState(() {
-        _selectedFilter = value; // Устанавливаем загруженный фильтр
-        _filterHabits();
-        habitReminderService.initializeReminders();// Фильтруем привычки при инициализации
-      });
-    });
+    habitReminderService.initializeReminders();// Фильтруем привычки при инициализации
   }
 
   void _onItemTapped(int index) {
@@ -120,16 +114,8 @@ class _HomePageState extends State<HomePage> {
   }
 
 
-  // Метод для переключения состояния активности
-  void _toggleCheck(bool isChecked, Function(bool) callback) {
-    setState(() {
-      callback(!isChecked);
-    });
-  }
-
-
   // Метод для подтверждения удаления
-  void _showDeleteDialog(BuildContext context, String taskTitle,
+  void _showDeleteDialog(BuildContext context, String taskTitle,int habitId,
       Function() onDelete) {
     showDialog(
       context: context,
@@ -204,7 +190,7 @@ class _HomePageState extends State<HomePage> {
                   child: TextButton(
                     onPressed: () {
                       Navigator.of(context).pop(); // Закрыть диалог
-                      onDelete(); // Вызов метода удаления
+                      _deleteHabit(habitId); // Вызов метода удаления
                     },
                     style: TextButton.styleFrom(
                       backgroundColor: Colors.red, // Красный фон
@@ -231,11 +217,6 @@ class _HomePageState extends State<HomePage> {
   }
 
   @override
-  @override
-// Добавляем переменную состояния для контроля над видимостью текста
-  bool _isTextVisible = true;
-
-  @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9F9),
@@ -260,7 +241,7 @@ class _HomePageState extends State<HomePage> {
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(
-                    '${_filteredHabits.length}', // Динамическое отображение количества отфильтрованных привычек
+                    '${_habits.length}', // Динамическое отображение количества привычек
                     style: TextStyle(
                       color: Color(0xFF5F33E1),
                       fontWeight: FontWeight.bold,
@@ -286,7 +267,14 @@ class _HomePageState extends State<HomePage> {
                       MaterialPageRoute(
                         builder: (context) => ArchivePage(),
                       ),
-                    );
+                    ).then((result) {
+                      // Здесь вы можете обновить состояние, если нужно
+                      if (result != null) {
+                        setState(() {
+                          _loadHabits();
+                        });
+                      }
+                    });
                   },
                 ),
               ],
@@ -301,74 +289,136 @@ class _HomePageState extends State<HomePage> {
             Expanded(
               child: ReorderableListView.builder(
                 onReorder: _onReorder, // Используем метод _onReorder
-                itemCount: _filteredHabits.length, // Изменено на отфильтрованные привычки
+                itemCount: _habits.length, // Количество привычек
                 itemBuilder: (context, index) {
-                  final habit = _filteredHabits[index]; // Используем отфильтрованный список
+                  final habit = _habits[index]; // Привычка
                   int habitType = int.parse(habit['type'].toString());
+
+                  // Для привычек с типом "одно действие" (habitType == 0)
                   if (habitType == 0) {
+                    bool isCompleted = habit['currentProgress'] == 1;
+
                     return _buildHabitItem(
-                      habit['name'],
-                      (habit['archived'] ?? 0) == 1,
-                          () {
-                        _toggleCheck((habit['archived'] ?? 0) == 1, (value) {
-                          setState(() {
-                            habit['archived'] = value ? 1 : 0;
-                          });
+                      habit['name'], // Название привычки
+                      isCompleted, // Завершена ли привычка
+                          () async {  // Функция обработки нажатия
+                        // Переключаем состояние завершения привычки
+                        int newProgress = isCompleted ? 0 : 1; // Устанавливаем новое состояние: 0 - не завершено, 1 - завершено
+
+                        await DatabaseHelper.instance.updateHabitProgress(
+                          habit['id'],
+                          newProgress.toDouble(), // Обновляем прогресс до нового значения
+                          DateTime.now().toIso8601String().split('T')[0],
+                        );
+
+                        setState(() {
+                          _habits = List.from(_habits);
+                          _habits[index] = Map<String, dynamic>.from(_habits[index])
+                            ..['currentProgress'] = newProgress; // Обновляем текущий прогресс
                         });
                       },
-                      key: ValueKey(habit['id']), // Убедитесь, что habit['id'] уникален
+                      habit['id'], // Добавленный недостающий аргумент habitId
+                      key: ValueKey(habit['id']), // Опциональный ключ
                     );
                   }
-                  if (habitType == 1) {
+
+
+                  // Для привычек с количеством (habitType == 1)
+                  else if (habitType == 1) {
+                    int currentProgress = (habit['currentProgress'] ?? 0).toInt(); // Начальное значение текущего прогресса
+                    int maxProgress = (habit['quantity'] ?? 10).toInt(); // Максимальное значение прогресса
+
                     return _buildCountItem(
                       habit['name'],
-                      habit['quantity'] ?? 0, // Текущее количество
-                      10, // Максимальное количество (например, 10, если это фиксированное значение)
-                          () {
-                        setState(() {
-                          // Увеличиваем количество, если оно меньше максимального
-                          if ((habit['quantity'] ?? 0) < 10) { // Заменить 10 на нужное максимальное количество
-                            habit['quantity'] = (habit['quantity'] ?? 0) + 1; // Увеличиваем количество
-                          }
-                        });
-                      },
-                          () {
-                        if ((habit['quantity'] ?? 0) > 0) {
+                      currentProgress, // Отображаем текущий прогресс
+                      maxProgress,
+                          () async {
+                        if (currentProgress < maxProgress) {
+                          int newProgress = currentProgress + 1; // Увеличиваем прогресс на 1
+                          await DatabaseHelper.instance.updateHabitProgress(
+                            habit['id'],
+                            newProgress.toDouble(),
+                            DateTime.now().toIso8601String().split('T')[0],
+                          );
                           setState(() {
-                            habit['quantity'] = (habit['quantity'] ?? 0) - 1; // Уменьшаем количество
+                            _habits = List.from(_habits);
+                            _habits[index] = Map<String, dynamic>.from(_habits[index])
+                              ..['currentProgress'] = newProgress; // Обновляем текущий прогресс
+                          });
+                        }
+                      },
+                          () async {
+                        if (currentProgress > 0) {
+                          int newProgress = currentProgress - 1; // Уменьшаем прогресс на 1
+                          await DatabaseHelper.instance.updateHabitProgress(
+                            habit['id'],
+                            newProgress.toDouble(),
+                            DateTime.now().toIso8601String().split('T')[0],
+                          );
+                          setState(() {
+                            _habits = List.from(_habits);
+                            _habits[index] = Map<String, dynamic>.from(_habits[index])
+                              ..['currentProgress'] = newProgress; // Обновляем текущий прогресс
                           });
                         }
                       },
                           () {
-                        _showDeleteDialog(context, habit['name'], () {});
+                        _showDeleteDialog(context, habit['name'], habit['id'], () {});
                       },
+                      habit['id'],
                       key: ValueKey(habit['id']),
                     );
                   }
+                  // Для привычек с объёмом (habitType == 2)
                   else if (habitType == 2) {
-                    return _buildCountItem(
-                      habit['name'],
-                      habit['quantity'] ?? 0,
-                      int.tryParse(habit['volume_specified'] ?? '1') ?? 1, // Обработка объема нажатия
-                          () {
-                        setState(() {
-                          habit['quantity'] = (habit['quantity'] ?? 0) + 1; // Увеличиваем количество
-                        });
-                      },
-                          () {
-                        if ((habit['quantity'] ?? 0) > 0) {
+                    double currentProgress = habit['currentProgress'] ?? 0.0;
+                    double maxProgress = habit['volume_specified'] ?? 1.0; // Общий объем
+
+                    return _buildPressCountHabit(
+                      habit,
+                          () async {
+                        if (currentProgress < maxProgress) {
+                          double newProgress = currentProgress + (habit['volume_per_press'] ?? 0.1);
+                          await DatabaseHelper.instance.updateHabitProgress(
+                            habit['id'],
+                            newProgress.toDouble(),
+                            DateTime.now().toIso8601String().split('T')[0],
+                          );
                           setState(() {
-                            habit['quantity'] = (habit['quantity'] ?? 0) - 1; // Уменьшаем количество
+                            // Создаем копию и обновляем прогресс
+                            _habits = List.from(_habits);
+                            _habits[index] = Map<String, dynamic>.from(_habits[index])
+                              ..['currentProgress'] = newProgress;
+                          });
+                        }
+                      },
+                          () async {
+                        if (currentProgress > 0) {
+                          double newProgress = currentProgress - (habit['volume_per_press'] ?? 0.1);
+                          await DatabaseHelper.instance.updateHabitProgress(
+                            habit['id'],
+                            newProgress.toDouble(),
+                            DateTime.now().toIso8601String().split('T')[0],
+                          );
+                          setState(() {
+                            // Создаем копию и обновляем прогресс
+                            _habits = List.from(_habits);
+                            _habits[index] = Map<String, dynamic>.from(_habits[index])
+                              ..['currentProgress'] = newProgress;
                           });
                         }
                       },
                           () {
-                        _showDeleteDialog(context, habit['name'], () {});
+                        // Логика редактирования привычки
                       },
-                      key: ValueKey(habit['id']), // Убедитесь, что habit['id'] уникален
+                          () {
+                        _showDeleteDialog(context, habit['name'],habit['id'], () {});
+                      },
+                      habit['id'],
+                      key: ValueKey(habit['id']),
                     );
                   } else {
-                    return Container();
+                    return Container(); // Для других типов
                   }
                 },
               ),
@@ -406,64 +456,81 @@ class _HomePageState extends State<HomePage> {
   }
 
 
+
+
+
   Future<void> _loadHabits() async {
+    // Создаем экземпляр DatabaseHelper для работы с базой данных
     DatabaseHelper dbHelper = DatabaseHelper.instance;
-    List<Map<String, dynamic>> habits = await dbHelper.queryAllHabits();
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    String? habitsJson = prefs.getString('habits');
-    String? selectedFilter = await _loadSelectedFilter();
 
+    // Получаем все активные привычки
+    List<Map<String, dynamic>> habits = await dbHelper.queryActiveHabits();
+
+    // Получаем список id всех привычек
+    List<int> habitIds = habits.map((habit) => habit['id'] as int).toList();
+
+    // Получаем прогресс привычек из таблицы HabitLog за текущий день
+    String today = DateTime.now().toIso8601String().split('T')[0];
+    Map<int, double> habitProgress = await dbHelper.getHabitsProgressForDay(habitIds, today);
+
+    // Обновляем состояние приложения
     setState(() {
-      if (habitsJson != null) {
-        List<Map<String, dynamic>> loadedHabits = List<Map<String, dynamic>>.from(json.decode(habitsJson));
-        _habits = loadedHabits.isNotEmpty ? loadedHabits : habits; // Здесь нужно использовать loadedHabits
-      } else {
-        _habits = habits; // Загрузите привычки из базы данных, если в SharedPreferences ничего нет
-      }
-
-
-      if (selectedFilter != null && selectedFilter.isNotEmpty) {
-        _selectedFilter = selectedFilter;
-        _filteredHabits = List.from(_habits);
-        _filterHabits();
-      }
+      _habits = habits.map((habit) {
+        int habitId = habit['id'] as int;
+        double currentProgress = habitProgress[habitId] ?? 0.0;
+        return {
+          ...habit,
+          'currentProgress': currentProgress,  // Добавляем прогресс
+        };
+      }).toList();
     });
   }
 
 
-  Future<void> _saveHabits() async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    await prefs.setString('habits', json.encode(_habits));
-  }
 
 
-  void _onReorder(int oldIndex, int newIndex) {
-    // Проверяем, действительны ли индексы
-    if (oldIndex < 0 || oldIndex >= _filteredHabits.length || newIndex < 0 || newIndex >= _filteredHabits.length) {
+
+  void _onReorder(int oldIndex, int newIndex) async {
+    // Корректируем индекс, если перемещение сверху вниз
+    if (oldIndex < newIndex) {
+      newIndex--;
+    }
+
+    // Проверяем индексы, чтобы они находились в пределах списка
+    print('Before reorder: _habits length: ${_habits.length}, oldIndex: $oldIndex, newIndex: $newIndex');
+
+    if (oldIndex < 0 || oldIndex >= _habits.length || newIndex < 0 || newIndex >= _habits.length) {
       print('Invalid indices: oldIndex = $oldIndex, newIndex = $newIndex');
       return;
     }
 
-    print('Before reorder: $_filteredHabits');
-    print('Reordering from index $oldIndex to index $newIndex');
+    // Создаем изменяемую копию списка _habits
+    List<Map<String, dynamic>> updatedHabits = List.from(_habits);
 
+    // Удаляем привычку из старой позиции и вставляем в новую
+    final habit = updatedHabits.removeAt(oldIndex); // Удаляем привычку
+    updatedHabits.insert(newIndex, habit); // Вставляем в новое место
+
+    // Обновляем состояние с новым списком
     setState(() {
-      // Если перемещение сверху вниз, смещаем индекс нового положения
-      if (oldIndex < newIndex) {
-        newIndex--; // Уменьшаем индекс, если перемещение вниз
-      }
-
-      // Удаляем и вставляем привычку в новую позицию
-      final habit = _filteredHabits.removeAt(oldIndex);
-      _filteredHabits.insert(newIndex, habit);
-
-      // Обновляем основное состояние
-      _habits = List.from(_filteredHabits); // Обновляем _habits
-
-      print('After reorder: $_filteredHabits');
-      // Сохраняем изменения в базе данных или SharedPreferences
-      _saveHabits(); // Убедитесь, что вы сохраняете обновленный список привычек
+      _habits = updatedHabits;
     });
+
+    // Сохраняем обновленные позиции в базе данных
+    await _updateHabitPositionsInDb();
+  }
+
+
+
+
+  Future<void> _updateHabitPositionsInDb() async {
+    DatabaseHelper dbHelper = DatabaseHelper.instance;
+
+    for (int i = 0; i < _habits.length; i++) {
+      Map<String, dynamic> habit = _habits[i];
+      // Обновляем позицию в базе данных
+      await dbHelper.updateHabitPosition(habit['id'], i);
+    }
   }
 
 
@@ -475,19 +542,27 @@ class _HomePageState extends State<HomePage> {
       items: [
         PopupMenuItem<String>(
           value: 'Completed first',
-          child: Text('Completed first', style: TextStyle(color: _selectedFilter == 'Completed first' ? Color(0xFF5F33E1) : Colors.black)),
+          child: Text('Completed first',
+              style: TextStyle(
+                  color: _selectedFilter == 'Completed first'
+                      ? Color(0xFF5F33E1)
+                      : Colors.black)),
         ),
         PopupMenuItem<String>(
           value: 'Not completed at first',
-          child: Text('Not completed at first', style: TextStyle(color: _selectedFilter == 'Not completed at first' ? Color(0xFF5F33E1) : Colors.black)),
+          child: Text('Not completed at first',
+              style: TextStyle(
+                  color: _selectedFilter == 'Not completed at first'
+                      ? Color(0xFF5F33E1)
+                      : Colors.black)),
         ),
         PopupMenuItem<String>(
           value: 'Custom',
-          child: Text('Custom', style: TextStyle(color: _selectedFilter == 'Custom' ? Color(0xFF5F33E1) : Colors.black)),
-        ),
-        PopupMenuItem<String>(
-          value: 'Reset',
-          child: Text('Reset Filters', style: TextStyle(color: Colors.red)),
+          child: Text('Custom',
+              style: TextStyle(
+                  color: _selectedFilter == 'Custom'
+                      ? Color(0xFF5F33E1)
+                      : Colors.black)),
         ),
       ],
       color: Colors.white,
@@ -499,29 +574,64 @@ class _HomePageState extends State<HomePage> {
         setState(() {
           if (value == 'Reset') {
             _selectedFilter = null; // Сброс фильтра
-            _filteredHabits = List.from(_habits); // Показываем все привычки
+            // Сброс индексов
             print('Фильтр сброшен');
           } else {
             _selectedFilter = value; // Применяем новый фильтр
-            _filterHabits(); // Важно: фильтрация привычек после выбора
             print('Выбран фильтр: $_selectedFilter');
           }
         });
-
-        _saveSelectedFilter(value); // Сохраняем выбранный фильтр
       }
     });
   }
 
-  Future<void> _saveSelectedFilter(String filter) async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    await prefs.setString('selectedFilter', filter); // Сохраняем выбранный фильтр
+  List<int> _getFilteredIndices() {
+    // Получение списка индексов привычек на основе выбранного фильтра
+    List<int> filteredIndices = [];
+
+    for (int i = 0; i < _habits.length; i++) {
+      bool shouldInclude = false;
+
+      if (_selectedFilter == null) {
+        shouldInclude = true; // Если фильтр сброшен, добавляем все
+      } else if (_selectedFilter == 'Completed first') {
+        shouldInclude = _habits[i]['currentProgress'] == 1; // Добавляем только завершенные
+      } else if (_selectedFilter == 'Not completed at first') {
+        shouldInclude = _habits[i]['currentProgress'] == 0; // Добавляем только незавершенные
+      }
+
+      if (shouldInclude) {
+        filteredIndices.add(i); // Сохраняем индекс привычки
+      }
+    }
+
+    return filteredIndices;
   }
 
-  Future<String?> _loadSelectedFilter() async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    return prefs.getString('selectedFilter'); // Загружаем выбранный фильтр
+  Widget _buildHabitList() {
+    // Получаем индексы отфильтрованных привычек
+    List<int> filteredIndices = _getFilteredIndices();
+
+    return ListView.builder(
+      itemCount: filteredIndices.length,
+      itemBuilder: (context, index) {
+        final habitIndex = filteredIndices[index]; // Получаем оригинальный индекс привычки
+        final habit = _habits[habitIndex]; // Получаем привычку по оригинальному индексу
+        return _buildHabitItem(
+          habit['name'],
+          habit['currentProgress'] == 1,
+              () {
+            // Логика обработки нажатия на элемент привычки
+          },
+          habit['id'],
+        );
+      },
+    );
   }
+
+
+
+
 
   Widget _buildNavItem(int index, String assetPath, {bool isSelected = false}) {
     return GestureDetector(
@@ -548,156 +658,329 @@ class _HomePageState extends State<HomePage> {
   }
 
   // Функция для создания карточки привычки
-  Widget _buildHabitItem(String title, bool checked, VoidCallback onTap, {Key? key}) {
+  Widget _buildHabitItem(String title, bool isCompleted, VoidCallback onTap, int habitId, {Key? key}) {
+    // Проверяем, выполнена ли привычка
+    bool isChecked = isCompleted;
+
     return _buildCard(
       key: key,
-      child: ListTile(
-        title: Text(title),
-        trailing: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // Иконка галочки, если задача выполнена
-            if (checked)
-              Padding(
-                padding: const EdgeInsets.only(right: 8.0), // Отступ справа от галочки
-                child: const Icon(Icons.check, color: Colors.green, size: 28), // Увеличиваем размер иконки
-              ),
-            // Кнопка с троеточием
-            Transform.rotate(
-              angle: -90 * (3.141592653589793238 / 180),
-              child: PopupMenuButton<String>(
-                onSelected: (value) {
-                  if (value == 'Delete') {
-                    _showDeleteDialog(context, title, () {});
-                  } else {
-                    print('Selected: $value');
-                  }
-                },
-                itemBuilder: (BuildContext context) {
-                  return [
-                    const PopupMenuItem<String>(
-                      value: 'Archive',
-                      child: Padding(
-                        padding: EdgeInsets.symmetric(vertical: 4),
-                        child: Text('Archive'),
-                      ),
+      child: GestureDetector(
+        onTap: onTap, // При нажатии обновляем состояние привычки
+        child: Container(
+          color: Colors.white,
+          child: ListTile(
+            title: Text(title),
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Если привычка выполнена - показываем галочку
+                if (isChecked)
+                  Padding(
+                    padding: const EdgeInsets.only(right: 8.0),
+                    child: const Icon(Icons.check, color: Colors.green, size: 28),
+                  )
+                // Если привычка не выполнена в конце дня - показываем крестик
+                else if (DateTime.now().hour >= 23)  // Крестик если день закончился
+                  Padding(
+                    padding: const EdgeInsets.only(right: 8.0),
+                    child: const Icon(Icons.close, color: Colors.red, size: 28),
+                  ),
+                // Иначе показываем пустое место для нажатия
+                Transform.rotate(
+                  angle: -90 * (3.141592653589793238 / 180),
+                  child: PopupMenuButton<String>(
+                    onSelected: (value) {
+                      if (value == 'Delete') {
+                        _showDeleteDialog(context, title, habitId, () {});
+                      } else if (value == 'Archive') {
+                        _archiveHabit(habitId);
+                      } else {
+                        print('Selected: $value');
+                      }
+                    },
+                    itemBuilder: (BuildContext context) {
+                      return [
+                        const PopupMenuItem<String>(
+                          value: 'Archive',
+                          child: Padding(
+                            padding: EdgeInsets.symmetric(vertical: 4),
+                            child: Text('Archive'),
+                          ),
+                        ),
+                        const PopupMenuItem<String>(
+                          value: 'Edit',
+                          child: Padding(
+                            padding: EdgeInsets.symmetric(vertical: 4),
+                            child: Text('Edit'),
+                          ),
+                        ),
+                        const PopupMenuItem<String>(
+                          value: 'Delete',
+                          child: Padding(
+                            padding: EdgeInsets.symmetric(vertical: 4),
+                            child: Text('Delete', style: TextStyle(color: Colors.red)),
+                          ),
+                        ),
+                      ];
+                    },
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
                     ),
-                    const PopupMenuItem<String>(
-                      value: 'Edit',
-                      child: Padding(
-                        padding: EdgeInsets.symmetric(vertical: 4),
-                        child: Text('Edit'),
-                      ),
-                    ),
-                    const PopupMenuItem<String>(
-                      value: 'Delete',
-                      child: Padding(
-                        padding: EdgeInsets.symmetric(vertical: 4),
-                        child: Text('Delete', style: TextStyle(color: Colors.red)),
-                      ),
-                    ),
-                  ];
-                },
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
+                    color: Colors.white,
+                  ),
                 ),
-                color: Colors.white,
-              ),
+              ],
             ),
-          ],
+          ),
         ),
-        onTap: onTap,
       ),
     );
   }
 
-// Функция для создания карточки с количеством выполнений
+
+
+// И аналогичные изменения для _buildCountItem
   Widget _buildCountItem(String title, int count, int maxCount,
-      VoidCallback onIncrement, VoidCallback onDecrement, VoidCallback onDelete, {Key? key}) {
-    bool isCompleted = count >= maxCount; // Измените на >=, чтобы учитывать завершенные привычки
+      VoidCallback onIncrement, VoidCallback onDecrement, VoidCallback onDelete,
+      int habitId, {Key? key}) {
+
+    bool isCompleted = count >= maxCount;
+
     return _buildCard(
       key: key,
       child: GestureDetector(
         onTap: () => onIncrement(),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            ListTile(
-              title: Text(title),
-              trailing: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    '$count/$maxCount', // Показываем текущее количество и максимум
-                    style: TextStyle(
-                      fontSize: 20,
-                      color: isCompleted ? Colors.green : Colors.red,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Transform.rotate(
-                    angle: -90 * (3.141592653589793238 / 180),
-                    child: PopupMenuButton<String>(
-                      onSelected: (value) {
-                        if (value == 'Delete') {
-                          _showDeleteDialog(context, title, () {});
-                        } else {
-                          print('Selected: $value');
-                        }
-                      },
-                      itemBuilder: (BuildContext context) {
-                        return [
-                          const PopupMenuItem<String>(
-                            value: 'Archive',
-                            child: Padding(
-                              padding: EdgeInsets.symmetric(vertical: 4),
-                              child: Text('Archive'),
-                            ),
-                          ),
-                          const PopupMenuItem<String>(
-                            value: 'Edit',
-                            child: Padding(
-                              padding: EdgeInsets.symmetric(vertical: 4),
-                              child: Text('Edit'),
-                            ),
-                          ),
-                          const PopupMenuItem<String>(
-                            value: 'Delete',
-                            child: Padding(
-                              padding: EdgeInsets.symmetric(vertical: 4),
-                              child: Text('Delete', style: TextStyle(color: Colors.red)),
-                            ),
-                          ),
-                        ];
-                      },
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          color: Colors.white,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              ListTile(
+                title: Text(title),
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Если привычка выполнена - показываем галочку
+                    if (isCompleted)
+                      Padding(
+                        padding: const EdgeInsets.only(right: 8.0),
+                        child: const Icon(Icons.check, color: Colors.green, size: 28),
+                      )
+                    // Если день закончился и привычка не выполнена - показываем крестик
+                    else if (DateTime.now().hour >= 23 && count < maxCount)
+                      Padding(
+                        padding: const EdgeInsets.only(right: 8.0),
+                        child: const Icon(Icons.close, color: Colors.red, size: 28),
+                      )
+                    // Если привычка в процессе выполнения - показываем цифры прогресса
+                    else
+                      Text(
+                        '$count/$maxCount',
+                        style: TextStyle(
+                          fontSize: 20,
+                          color: isCompleted ? Colors.green : Colors.red,
+                        ),
                       ),
-                      color: Colors.white,
-                    ),
-                  )
-                ],
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.only(left: 10.0, bottom: 2.0),
-              child: TextButton(
-                onPressed: count > 0 ? onDecrement : null, // Деактивируем кнопку, если count равно 0
-                style: TextButton.styleFrom(
-                  backgroundColor: const Color(0xFF5F33E1),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(30),
-                  ),
-                  foregroundColor: Colors.white,
+                    const SizedBox(height: 8),
+                    Transform.rotate(
+                      angle: -90 * (3.141592653589793238 / 180),
+                      child: PopupMenuButton<String>(
+                        onSelected: (value) {
+                          if (value == 'Delete') {
+                            _showDeleteDialog(context, title, habitId, onDelete);
+                          } else if (value == 'Archive') {
+                            _archiveHabit(habitId);
+                          }
+                        },
+                        itemBuilder: (BuildContext context) {
+                          return [
+                            const PopupMenuItem<String>(
+                              value: 'Archive',
+                              child: Padding(
+                                padding: EdgeInsets.symmetric(vertical: 4),
+                                child: Text('Archive'),
+                              ),
+                            ),
+                            const PopupMenuItem<String>(
+                              value: 'Edit',
+                              child: Padding(
+                                padding: EdgeInsets.symmetric(vertical: 4),
+                                child: Text('Edit'),
+                              ),
+                            ),
+                            const PopupMenuItem<String>(
+                              value: 'Delete',
+                              child: Padding(
+                                padding: EdgeInsets.symmetric(vertical: 4),
+                                child: Text('Delete', style: TextStyle(color: Colors.red)),
+                              ),
+                            ),
+                          ];
+                        },
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        color: Colors.white,
+                      ),
+                    )
+                  ],
                 ),
-                child: const Text("Cancel"),
               ),
-            ),
-          ],
+              Padding(
+                padding: const EdgeInsets.only(left: 10.0, bottom: 2.0),
+                child: TextButton(
+                  onPressed: count > 0 ? onDecrement : null,
+                  style: TextButton.styleFrom(
+                    backgroundColor: const Color(0xFF5F33E1),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(30),
+                    ),
+                    foregroundColor: Colors.white,
+                  ),
+                  child: const Text("Cancel"),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
+
+
+
+
+
+  Widget _buildPressCountHabit(Map<String, dynamic> habit,
+      VoidCallback onIncrement, VoidCallback onDecrement,
+      VoidCallback onEdit, VoidCallback onDelete, int habitId, {Key? key}) {
+
+    String title = habit['name'];
+    double currentProgress = habit['currentProgress'] ?? 0.0;
+    double maxProgress = habit['volume_specified'] ?? 1.0;
+    bool isCompleted = currentProgress >= maxProgress;
+
+    return _buildCard(
+      key: key,
+      child: GestureDetector(
+        onTap: onIncrement,
+        child: Container(
+          color: Colors.white,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              ListTile(
+                title: Text(title),
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Галочка при достижении цели
+                    if (isCompleted)
+                      Padding(
+                        padding: const EdgeInsets.only(right: 8.0),
+                        child: const Icon(Icons.check, color: Colors.green, size: 28),
+                      )
+                    // Крестик при окончании дня и недостижении цели
+                    else if (DateTime.now().hour >= 23 && currentProgress < maxProgress)
+                      Padding(
+                        padding: const EdgeInsets.only(right: 8.0),
+                        child: const Icon(Icons.close, color: Colors.red, size: 28),
+                      )
+                    // Прогресс до достижения цели
+                    else
+                      Text(
+                        '${currentProgress.toStringAsFixed(1)}/${maxProgress.toStringAsFixed(1)}',
+                        style: TextStyle(
+                          fontSize: 20,
+                          color: isCompleted ? Colors.green : Colors.red,
+                        ),
+                      ),
+                    const SizedBox(height: 8),
+                    Transform.rotate(
+                      angle: -90 * (3.141592653589793238 / 180), // Поворот для отображения меню
+                      child: PopupMenuButton<String>(
+                        onSelected: (value) {
+                           if (value == 'Archive') {
+                          _archiveHabit(habitId); // Передаем habitId в функцию архивирования
+                          }
+                           else if (value == 'Delete') {
+                            _showDeleteDialog(context, title,habitId, onDelete);
+                          } else if (value == 'Edit') {
+                            onEdit(); // Открываем форму для редактирования
+                          }
+                        },
+                        itemBuilder: (BuildContext context) {
+                          return [
+                            const PopupMenuItem<String>(
+                              value: 'Archive',
+                              child: Padding(
+                                padding: EdgeInsets.symmetric(vertical: 4),
+                                child: Text('Archive'),
+                              ),
+                            ),
+                            const PopupMenuItem<String>(
+                              value: 'Edit',
+                              child: Padding(
+                                padding: EdgeInsets.symmetric(vertical: 4),
+                                child: Text('Edit'),
+                              ),
+                            ),
+                            const PopupMenuItem<String>(
+                              value: 'Delete',
+                              child: Padding(
+                                padding: EdgeInsets.symmetric(vertical: 4),
+                                child: Text('Delete', style: TextStyle(color: Colors.red)),
+                              ),
+                            ),
+
+                          ];
+                        },
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        color: Colors.white,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.only(left: 10.0, bottom: 2.0),
+                child: TextButton(
+                  onPressed: currentProgress > 0 ? onDecrement : null, // Уменьшаем прогресс
+                  style: TextButton.styleFrom(
+                    backgroundColor: const Color(0xFF5F33E1), // Фон кнопки
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(30),
+                    ),
+                    foregroundColor: Colors.white, // Цвет текста
+                  ),
+                  child: const Text("Cancel"),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4.0),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _archiveHabit(int habitId) async {
+        DatabaseHelper db = DatabaseHelper.instance; // Получаем экземпляр вашего помощника по базе данных
+
+        // Обновляем привычку в базе данных, устанавливая archived в 1
+        await db.updateHabit({'id': habitId, 'archived': 1}); // Архивируем привычку
+
+        // Обновляем состояние
+        setState(() {
+          // Создаем новый список на основе существующего, чтобы избежать ошибок с изменяемыми объектами
+          _habits = List.from(_habits)..removeWhere((habit) => habit['id'] == habitId);
+          _loadHabits();
+        });
+      }
 
 
 
@@ -739,26 +1022,19 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  void _filterHabits() {
+  Future<void> _deleteHabit(int habitId) async {
+    DatabaseHelper db = DatabaseHelper.instance; // Получаем экземпляр вашего помощника по базе данных
+
+    // Удаляем привычку из базы данных
+    await db.deleteHabit(habitId);
+
     setState(() {
-      if (_selectedFilter == null || _selectedFilter!.isEmpty) {
-        _filteredHabits = List.from(_habits);
-        print('Фильтр не установлен, показываем все привычки: $_filteredHabits');
-      } else if (_selectedFilter == 'Completed first') {
-        _filteredHabits = _habits.where((habit) => habit['type'] == 1).toList();
-        print('Применен фильтр: Completed first, привычки: $_filteredHabits');
-      } else if (_selectedFilter == 'Not completed at first') {
-        _filteredHabits = _habits.where((habit) => habit['type'] == 2).toList();
-        print('Применен фильтр: Not completed at first, привычки: $_filteredHabits');
-      } else if (_selectedFilter == 'Custom') {
-        _filteredHabits = _habits.where((habit) => habit['type'] == 3).toList();
-        print('Применен фильтр: Custom, привычки: $_filteredHabits');
-      }
+      _habits = List.from(_habits)..removeWhere((habit) => habit['id'] == habitId);
+      _loadHabits();
+      habitReminderService.cancelAllReminders(habitId);
     });
+
   }
-
-
-
 
   Widget _buildBottomDateSelector() {
     // Форматируем дату в виде "July, 15" с учетом локализации

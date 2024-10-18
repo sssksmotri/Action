@@ -45,7 +45,8 @@ class DatabaseHelper {
         end_date TEXT,
         days_of_week TEXT,
         notifications_enabled INTEGER DEFAULT 0,
-        archived INTEGER DEFAULT 0
+        archived INTEGER DEFAULT 0,
+        position INTEGER NOT NULL DEFAULT 0
       )
     ''');
 
@@ -71,7 +72,7 @@ class DatabaseHelper {
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         habit_id INTEGER NOT NULL,
         date TEXT NOT NULL,
-        status TEXT NOT NULL,
+        status TEXT ,
         progress INTEGER,
         FOREIGN KEY (habit_id) REFERENCES $tableHabits (id) ON DELETE CASCADE
       )
@@ -92,16 +93,50 @@ class DatabaseHelper {
   // CRUD операции (например, вставка новой привычки)
   Future<int> insertHabit(Map<String, dynamic> row) async {
     Database db = await instance.database;
+
+    // Получаем максимальное значение позиции
+    final maxPositionResult = await db.rawQuery('SELECT MAX(position) as max_position FROM $tableHabits');
+    int maxPosition = maxPositionResult.first['max_position'] != null ? maxPositionResult.first['max_position'] as int : 0;
+
+    // Устанавливаем следующую позицию для новой привычки
+    row['position'] = maxPosition + 1;
+
     return await db.insert(tableHabits, row);
+  }
+
+  Future<int> updateHabitPosition(int habitId, int newPosition) async {
+    final db = await database;
+    return await db.update(
+      'Habits', // Таблица
+      {'position': newPosition}, // Новое значение позиции
+      where: 'id = ?', // Обновляем по id
+      whereArgs: [habitId],
+    );
   }
 
   // Получение всех привычек
   Future<List<Map<String, dynamic>>> queryAllHabits() async {
-    Database db = await instance.database;
-    List<Map<String, dynamic>> habits = await db.query(tableHabits);
-    print('Queried habits: $habits'); // Логирование полученных привычек
-    return habits;
+    final db = await database;
+    return await db.query('Habits', orderBy: 'position ASC'); // Сортировка по полю position
   }
+
+  Future<List<Map<String, dynamic>>> queryActiveHabits() async {
+    final db = await database;
+    // Запрос для получения привычек с archived = 0
+    return await db.query(
+        'Habits', // Таблица привычек
+        where: 'archived = ?', // Условие отбора
+        whereArgs: [0], // Значение для поля archived
+        orderBy: 'position ASC' // Сортируем по позиции
+    );
+  }
+
+  Future<List<Map<String, dynamic>>> getArchivedHabits() async {
+    final db = await database; // Получаем базу данных
+    return await db.query('habits', where: 'archived = ?', whereArgs: [1]); // Получаем архивированные привычки
+  }
+
+
   Future<Map<String, dynamic>> queryHabitById(int id) async {
     final Database db = await database; // Используйте await database для получения базы данных
     final List<Map<String, dynamic>> maps = await db.query(
@@ -123,6 +158,19 @@ class DatabaseHelper {
     int id = row['id'];
     return await db.update(tableHabits, row, where: 'id = ?', whereArgs: [id]);
   }
+
+  Future<int> updateHabitQuantity(int habitId, int newQuantity) async {
+    final db = await database;
+
+    // Обновляем поле quantity для конкретной привычки по её id
+    return await db.update(
+      tableHabits, // Имя таблицы
+      {'quantity': newQuantity}, // Обновляемое значение
+      where: 'id = ?', // Условие
+      whereArgs: [habitId], // Значение для условия
+    );
+  }
+
 
   // Удаление привычки
   Future<int> deleteHabit(int id) async {
@@ -190,4 +238,78 @@ class DatabaseHelper {
       return null;  // Если напоминание не найдено
     }
   }
+
+  Future<int> insertHabitNote(Map<String, dynamic> noteData) async {
+    Database db = await instance.database;
+    return await db.insert(tableHabitNotes, noteData);
+  }
+
+  Future<void> updateHabitProgress(int habitId, double newProgress, String date) async {
+    final db = await database;
+
+    // Проверяем, есть ли запись для данной привычки в HabitLog
+    final List<Map<String, dynamic>> results = await db.query(
+      'HabitLog',
+      where: 'habit_id = ? AND date = ?',
+      whereArgs: [habitId, date],
+    );
+
+    if (results.isNotEmpty) {
+      // Если запись существует, обновляем её
+      await db.update(
+        'HabitLog',
+        {'progress': newProgress},
+        where: 'habit_id = ? AND date = ?',
+        whereArgs: [habitId, date],
+      );
+    } else {
+      // Если запись не существует, создаем новую
+      await db.insert(
+        'HabitLog',
+        {
+          'habit_id': habitId,
+          'date': date,
+          'progress': newProgress,
+        },
+      );
+    }
+  }
+  Future<Map<int, double>> getHabitsProgress(List<int> habitIds) async {
+    final db = await database;
+
+    // Подготовка строки запроса для IN
+    final placeholders = List.generate(habitIds.length, (_) => '?').join(', ');
+    final List<Map<String, dynamic>> results = await db.rawQuery(
+      'SELECT habit_id, SUM(progress) as total_progress FROM HabitLog WHERE habit_id IN ($placeholders) GROUP BY habit_id',
+      habitIds,
+    );
+
+    // Создаем карту с прогрессом
+    Map<int, double> progressMap = {};
+    for (var row in results) {
+      progressMap[row['habit_id']] = row['total_progress']?.toDouble() ?? 0.0;
+    }
+    return progressMap;
+  }
+  Future<Map<int, double>> getHabitsProgressForDay(List<int> habitIds, String date) async {
+    final db = await database;
+
+    // Подготовка строки запроса для IN
+    final placeholders = List.generate(habitIds.length, (_) => '?').join(', ');
+    final List<Map<String, dynamic>> results = await db.rawQuery(
+      'SELECT habit_id, progress FROM HabitLog WHERE habit_id IN ($placeholders) AND date = ?',
+      [...habitIds, date], // Передаем список идентификаторов привычек и дату
+    );
+
+    // Создаем карту с прогрессом
+    Map<int, double> progressMap = {};
+    for (var row in results) {
+      progressMap[row['habit_id']] = row['progress']?.toDouble() ?? 0.0;
+    }
+    return progressMap;
+  }
+
+
+
+
 }
