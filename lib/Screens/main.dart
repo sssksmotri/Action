@@ -68,12 +68,13 @@ class _HomePageState extends State<HomePage> {
   DateTime _today = DateTime.now();
   final HabitReminderService habitReminderService = HabitReminderService();
 
-
   @override
   void initState() {
     super.initState();
     _loadHabits();
     habitReminderService.initializeReminders();// Фильтруем привычки при инициализации
+    DatabaseHelper db = DatabaseHelper.instance;
+    db.archiveExpiredHabits();
   }
 
   void _onItemTapped(int index) {
@@ -488,8 +489,6 @@ class _HomePageState extends State<HomePage> {
 
 
 
-
-
   void _onReorder(int oldIndex, int newIndex) async {
     // Корректируем индекс, если перемещение сверху вниз
     if (oldIndex < newIndex) {
@@ -514,13 +513,12 @@ class _HomePageState extends State<HomePage> {
     // Обновляем состояние с новым списком
     setState(() {
       _habits = updatedHabits;
+      _selectedFilter='Custom';
     });
 
     // Сохраняем обновленные позиции в базе данных
     await _updateHabitPositionsInDb();
   }
-
-
 
 
   Future<void> _updateHabitPositionsInDb() async {
@@ -572,63 +570,39 @@ class _HomePageState extends State<HomePage> {
     ).then((value) {
       if (value != null) {
         setState(() {
-          if (value == 'Reset') {
-            _selectedFilter = null; // Сброс фильтра
-            // Сброс индексов
-            print('Фильтр сброшен');
-          } else {
-            _selectedFilter = value; // Применяем новый фильтр
-            print('Выбран фильтр: $_selectedFilter');
-          }
+          _selectedFilter = value; // Применяем новый фильтр
+          _filterHabits(); // Фильтруем привычки
+          print('Выбран фильтр: $_selectedFilter');
         });
       }
     });
   }
 
-  List<int> _getFilteredIndices() {
-    // Получение списка индексов привычек на основе выбранного фильтра
-    List<int> filteredIndices = [];
 
-    for (int i = 0; i < _habits.length; i++) {
-      bool shouldInclude = false;
-
-      if (_selectedFilter == null) {
-        shouldInclude = true; // Если фильтр сброшен, добавляем все
-      } else if (_selectedFilter == 'Completed first') {
-        shouldInclude = _habits[i]['currentProgress'] == 1; // Добавляем только завершенные
-      } else if (_selectedFilter == 'Not completed at first') {
-        shouldInclude = _habits[i]['currentProgress'] == 0; // Добавляем только незавершенные
-      }
-
-      if (shouldInclude) {
-        filteredIndices.add(i); // Сохраняем индекс привычки
-      }
+  void _filterHabits() {
+    if (_selectedFilter == 'Completed first') {
+      _habits.sort((a, b) {
+        bool aCompleted = a['currentProgress'] == 1;
+        bool bCompleted = b['currentProgress'] == 1;
+        return aCompleted ? (bCompleted ? 0 : -1) : (bCompleted ? 1 : 0);
+      });
+    } else if (_selectedFilter == 'Not completed at first') {
+      _habits.sort((a, b) {
+        bool aCompleted = a['currentProgress'] == 1;
+        bool bCompleted = b['currentProgress'] == 1;
+        // Сначала незавершенные (false) должны идти выше завершенных (true)
+        if (!aCompleted && bCompleted) {
+          return -1; // a выше b
+        } else if (aCompleted && !bCompleted) {
+          return 1; // b выше a
+        } else {
+          return 0; // Оба имеют одинаковый статус завершенности
+        }
+      });
+    } else if (_selectedFilter == 'Custom') {
+      // Добавьте свою логику для "Custom" фильтра
     }
-
-    return filteredIndices;
   }
-
-  Widget _buildHabitList() {
-    // Получаем индексы отфильтрованных привычек
-    List<int> filteredIndices = _getFilteredIndices();
-
-    return ListView.builder(
-      itemCount: filteredIndices.length,
-      itemBuilder: (context, index) {
-        final habitIndex = filteredIndices[index]; // Получаем оригинальный индекс привычки
-        final habit = _habits[habitIndex]; // Получаем привычку по оригинальному индексу
-        return _buildHabitItem(
-          habit['name'],
-          habit['currentProgress'] == 1,
-              () {
-            // Логика обработки нажатия на элемент привычки
-          },
-          habit['id'],
-        );
-      },
-    );
-  }
-
 
 
 
@@ -737,8 +711,6 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-
-
 // И аналогичные изменения для _buildCountItem
   Widget _buildCountItem(String title, int count, int maxCount,
       VoidCallback onIncrement, VoidCallback onDecrement, VoidCallback onDelete,
@@ -846,9 +818,6 @@ class _HomePageState extends State<HomePage> {
       ),
     );
   }
-
-
-
 
 
   Widget _buildPressCountHabit(Map<String, dynamic> habit,

@@ -309,7 +309,35 @@ class DatabaseHelper {
     return progressMap;
   }
 
+  Future<void> archiveExpiredHabits() async {
+    final db = await database;
 
+    // Получаем текущую дату в формате, который используется в базе данных
+    String currentDate = DateTime.now().toIso8601String().split('T').first;
 
+    // Обновляем привычки, срок которых истек (end_date меньше текущей даты)
+    await db.update(
+      tableHabits, // Название таблицы
+      {'archived': 1}, // Устанавливаем флаг архивирования
+      where: 'end_date < ? AND archived = 0', // Условие: дата завершения меньше текущей и привычка не архивирована
+      whereArgs: [currentDate],
+    );
+  }
+
+  Future<List<Map<String, dynamic>>> getHabitsWithProgressForDate(String date) async {
+    final db = await database;
+
+    // Запрашиваем привычки и их прогресс за выбранную дату
+    final List<Map<String, dynamic>> habits = await db.rawQuery('''
+    SELECT h.*, hl.progress 
+    FROM $tableHabits h
+    LEFT JOIN $tableHabitLog hl 
+    ON h.id = hl.habit_id AND hl.date = ?
+    WHERE h.archived = 0
+    ORDER BY h.position ASC
+  ''', [date]);
+
+    return habits;
+  }
 
 }
