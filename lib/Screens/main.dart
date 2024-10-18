@@ -302,7 +302,9 @@ class _HomePageState extends State<HomePage> {
                     return _buildHabitItem(
                       habit['name'], // Название привычки
                       isCompleted, // Завершена ли привычка
-                          () async {  // Функция обработки нажатия
+                          () async {  if (!isSameDay(_selectedDate, _today)) {
+                            return;
+                          }
                         // Переключаем состояние завершения привычки
                         int newProgress = isCompleted ? 0 : 1; // Устанавливаем новое состояние: 0 - не завершено, 1 - завершено
 
@@ -334,6 +336,9 @@ class _HomePageState extends State<HomePage> {
                       currentProgress, // Отображаем текущий прогресс
                       maxProgress,
                           () async {
+                            if (!isSameDay(_selectedDate, _today)) {
+                              return;
+                            }
                         if (currentProgress < maxProgress) {
                           int newProgress = currentProgress + 1; // Увеличиваем прогресс на 1
                           await DatabaseHelper.instance.updateHabitProgress(
@@ -349,6 +354,9 @@ class _HomePageState extends State<HomePage> {
                         }
                       },
                           () async {
+                            if (!isSameDay(_selectedDate, _today)) {
+                              return;
+                            }
                         if (currentProgress > 0) {
                           int newProgress = currentProgress - 1; // Уменьшаем прогресс на 1
                           await DatabaseHelper.instance.updateHabitProgress(
@@ -378,6 +386,9 @@ class _HomePageState extends State<HomePage> {
                     return _buildPressCountHabit(
                       habit,
                           () async {
+                            if (!isSameDay(_selectedDate, _today)) {
+                              return;
+                            }
                         if (currentProgress < maxProgress) {
                           double newProgress = currentProgress + (habit['volume_per_press'] ?? 0.1);
                           await DatabaseHelper.instance.updateHabitProgress(
@@ -394,6 +405,9 @@ class _HomePageState extends State<HomePage> {
                         }
                       },
                           () async {
+                            if (!isSameDay(_selectedDate, _today)) {
+                              return;
+                            }
                         if (currentProgress > 0) {
                           double newProgress = currentProgress - (habit['volume_per_press'] ?? 0.1);
                           await DatabaseHelper.instance.updateHabitProgress(
@@ -487,6 +501,62 @@ class _HomePageState extends State<HomePage> {
     });
   }
 
+  Future<void> _loadHabitsForSelectedDate() async {
+    // Создаем экземпляр DatabaseHelper для работы с базой данных
+    DatabaseHelper dbHelper = DatabaseHelper.instance;
+
+    // Получаем все активные привычки
+    List<Map<String, dynamic>> habits = await dbHelper.queryActiveHabits();
+
+    // Получаем список id всех привычек
+    List<int> habitIds = habits.map((habit) => habit['id'] as int).toList();
+
+    // Получаем прогресс привычек из таблицы HabitLog за выбранную дату (_selectedDate)
+    String selectedDate = _selectedDate.toIso8601String().split('T')[0];
+    Map<int, double> habitProgress = await dbHelper.getHabitsProgressForDay(habitIds, selectedDate);
+
+    // Фильтруем привычки, чтобы показывать только те, которые активны в выбранный день
+    List<Map<String, dynamic>> filteredHabits = habits.where((habit) {
+      // Проверяем наличие startDate и endDate
+      String? startDateStr = habit['start_date'];
+      String? endDateStr = habit['end_date'];
+
+      // Если нет даты начала, игнорируем эту привычку
+      if (startDateStr == null) return false;
+
+      // Парсим startDate
+      DateTime startDate = DateTime.parse(startDateStr);
+
+      // Если endDate есть, парсим её, если нет, оставляем как null
+      DateTime? endDate = endDateStr != null ? DateTime.parse(endDateStr) : null;
+
+      // Проверяем, входит ли выбранная дата в период действия привычки
+      if (_selectedDate.isAfter(startDate) || isSameDay(_selectedDate, startDate)) {
+        if (endDate == null || _selectedDate.isBefore(endDate) || isSameDay(_selectedDate, endDate)) {
+          return true; // Привычка должна отображаться
+        }
+      }
+      return false; // Привычка не показывается
+    }).toList();
+
+    // Обновляем состояние приложения с привычками и их прогрессом за выбранную дату
+    setState(() {
+      _habits = filteredHabits.map((habit) {
+        int habitId = habit['id'] as int;
+        double currentProgress = habitProgress[habitId] ?? 0.0;
+        return {
+          ...habit,
+          'currentProgress': currentProgress,  // Прогресс за выбранный день
+        };
+      }).toList();
+    });
+  }
+
+
+
+  bool isSameDay(DateTime date1, DateTime date2) {
+    return DateUtils.isSameDay(date1, date2);
+  }
 
 
   void _onReorder(int oldIndex, int newIndex) async {
@@ -1011,7 +1081,7 @@ class _HomePageState extends State<HomePage> {
 
     return GestureDetector(
       onTap: () {
-        _showCalendarDialog();
+        _showCalendarDialog(); // Показываем календарь при нажатии на область с датой
       },
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 10),
@@ -1028,6 +1098,7 @@ class _HomePageState extends State<HomePage> {
               onPressed: () {
                 setState(() {
                   _selectedDate = _selectedDate.subtract(const Duration(days: 1));
+                  _loadHabitsForSelectedDate();  // Загружаем привычки за новый выбранный день
                 });
               },
             ),
@@ -1045,17 +1116,18 @@ class _HomePageState extends State<HomePage> {
             // Правая стрелка
             IconButton(
               icon: const Icon(Icons.chevron_right, color: Color(0xFF5F33E1)),
-              onPressed: () {
-                if (_selectedDate.isBefore(_today)) {
-                  setState(() {
-                    _selectedDate = _selectedDate.add(const Duration(days: 1));
-                  });
-                }
+              onPressed: isSameDay(_selectedDate, _today)
+                  ? null  // Блокируем стрелку, если выбранная дата — сегодняшняя
+                  : () {
+                setState(() {
+                  _selectedDate = _selectedDate.add(const Duration(days: 1));
+                  _loadHabitsForSelectedDate();  // Загружаем привычки за новый выбранный день
+                });
               },
             ),
 
-            // Кнопка "назад", если дата не сегодняшняя
-            if (_selectedDate != _today) // Появление кнопки "назад" только если дата не сегодня
+            // Кнопка возврата к сегодняшней дате, если выбранная дата не сегодняшняя
+            if (!isSameDay(_selectedDate, _today))
               Container(
                 width: 35,
                 height: 35,
@@ -1071,7 +1143,8 @@ class _HomePageState extends State<HomePage> {
                   ),
                   onPressed: () {
                     setState(() {
-                      _selectedDate = _today; // Возвращаем сегодняшнюю дату при нажатии
+                      _selectedDate = _today; // Возвращаем сегодняшнюю дату
+                      _loadHabitsForSelectedDate();  // Перезагружаем привычки для сегодняшнего дня
                     });
                   },
                 ),
@@ -1081,6 +1154,7 @@ class _HomePageState extends State<HomePage> {
       ),
     );
   }
+
 
   // Функция для показа календаря в виде прозрачного окна
   void _showCalendarDialog() {
@@ -1142,6 +1216,7 @@ class _HomePageState extends State<HomePage> {
                             if (selectedDay.isBefore(_today)) {
                               setState(() {
                                 _selectedDate = selectedDay;
+                                _loadHabitsForSelectedDate();
                               });
                               // Закрываем диалог сразу после выбора даты
                               Navigator.pop(context);
