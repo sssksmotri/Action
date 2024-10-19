@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'main.dart';
-import 'note.dart';
-import 'addpage.dart';
+import 'package:easy_localization/easy_localization.dart';
 import 'settings_screen.dart';
 import 'notes.dart';
 import 'add.dart';
 import 'stat.dart';
+import 'stat_tabl.dart';
 import 'package:action_notes/Service/database_helper.dart'; // Импортируйте свой класс для работы с БД
 
 class ArchivePage extends StatefulWidget {
@@ -88,7 +88,7 @@ class _ArchivePageState extends State<ArchivePage> {
               RichText(
                 textAlign: TextAlign.center,
                 text: TextSpan(
-                  text: "Are you sure you want to delete ",
+                  text: "are_you_sure".tr(),
                   style: const TextStyle(
                     color: Colors.black,
                     fontSize: 18,
@@ -127,8 +127,8 @@ class _ArchivePageState extends State<ArchivePage> {
                       ),
                       padding: const EdgeInsets.symmetric(vertical: 15),
                     ),
-                    child: const Text(
-                      "No, leave it",
+                    child:  Text(
+                      "no_leave_it".tr(),
                       style: TextStyle(
                         color: Color(0xFF5F33E1),
                         fontWeight: FontWeight.bold,
@@ -150,8 +150,8 @@ class _ArchivePageState extends State<ArchivePage> {
                       ),
                       padding: const EdgeInsets.symmetric(vertical: 15),
                     ),
-                    child: const Text(
-                      "Yes, delete",
+                    child:  Text(
+                      "yes_delete".tr(),
                       style: TextStyle(
                         color: Colors.white,
                         fontWeight: FontWeight.bold,
@@ -187,7 +187,7 @@ class _ArchivePageState extends State<ArchivePage> {
             Row(
               children: [
                 Text(
-                  'Archive',
+                  'archive'.tr(),
                   style: TextStyle(
                     fontSize: 24,
                     fontWeight: FontWeight.bold,
@@ -205,7 +205,9 @@ class _ArchivePageState extends State<ArchivePage> {
                     width: 32,
                     height: 32,
                   ),
-                  onPressed: () {},
+                  onPressed: () {
+                    Navigator.push(context, MaterialPageRoute(builder: (context) => ChartScreen()));
+                  },
                 ),
                 Container(
                   width: 32,
@@ -336,18 +338,18 @@ class _ArchivePageState extends State<ArchivePage> {
                   },
                   itemBuilder: (BuildContext context) {
                     return [
-                      const PopupMenuItem<String>(
+                       PopupMenuItem<String>(
                         value: 'Edit',
                         child: Padding(
                           padding: EdgeInsets.symmetric(vertical: 4),
-                          child: Text('Edit'),
+                          child: Text(tr('edit')),
                         ),
                       ),
-                      const PopupMenuItem<String>(
+                       PopupMenuItem<String>(
                         value: 'Delete',
                         child: Padding(
                           padding: EdgeInsets.symmetric(vertical: 4),
-                          child: Text('Delete', style: TextStyle(color: Colors.red)),
+                          child: Text(tr('delete'), style: TextStyle(color: Colors.red)),
                         ),
                       ),
                     ];

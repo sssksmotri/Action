@@ -134,7 +134,7 @@ class _HomePageState extends State<HomePage> {
               RichText(
                 textAlign: TextAlign.center,
                 text: TextSpan(
-                  text: "Are you sure you want to delete ",
+                  text: "are_you_sure".tr(),
                   style: const TextStyle(
                     color: Colors.black,
                     fontSize: 18,
@@ -176,8 +176,8 @@ class _HomePageState extends State<HomePage> {
                       ),
                       padding: const EdgeInsets.symmetric(vertical: 15),
                     ),
-                    child: const Text(
-                      "No, leave it",
+                    child:  Text(
+                      "no_leave_it".tr(),
                       style: TextStyle(
                         color: Color(0xFF5F33E1), // Фиолетовый текст
                         fontWeight: FontWeight.bold,
@@ -200,8 +200,8 @@ class _HomePageState extends State<HomePage> {
                       ),
                       padding: const EdgeInsets.symmetric(vertical: 15),
                     ),
-                    child: const Text(
-                      "Yes, delete",
+                    child:  Text(
+                      "yes_delete".tr(),
                       style: TextStyle(
                         color: Colors.white, // Белый текст
                         fontWeight: FontWeight.bold,
@@ -229,7 +229,7 @@ class _HomePageState extends State<HomePage> {
             Row(
               children: [
                 Text(
-                  'Actions',
+                  tr('actions'),
                   style: TextStyle(
                     fontWeight: FontWeight.bold,
                   ),
@@ -646,7 +646,7 @@ class _HomePageState extends State<HomePage> {
       items: [
         PopupMenuItem<String>(
           value: 'Completed first',
-          child: Text('Completed first',
+          child: Text(tr('completed_first'),
               style: TextStyle(
                   color: _selectedFilter == 'Completed first'
                       ? Color(0xFF5F33E1)
@@ -654,7 +654,7 @@ class _HomePageState extends State<HomePage> {
         ),
         PopupMenuItem<String>(
           value: 'Not completed at first',
-          child: Text('Not completed at first',
+          child: Text(tr('not_completed_first'),
               style: TextStyle(
                   color: _selectedFilter == 'Not completed at first'
                       ? Color(0xFF5F33E1)
@@ -662,7 +662,7 @@ class _HomePageState extends State<HomePage> {
         ),
         PopupMenuItem<String>(
           value: 'Custom',
-          child: Text('Custom',
+          child: Text(tr('custom'),
               style: TextStyle(
                   color: _selectedFilter == 'Custom'
                       ? Color(0xFF5F33E1)

@@ -5,6 +5,7 @@ import 'main.dart';
 import 'stat.dart';
 import 'add.dart';
 import 'package:action_notes/Service/database_helper.dart';
+import 'package:easy_localization/easy_localization.dart';
 
 class NoteAddPage extends StatefulWidget {
   final int habitId;
@@ -24,12 +25,13 @@ class _NoteAddPageState extends State<NoteAddPage> {
   int _selectedIndex = 0;
 
   final List<String> _options = [
-    'Why would I do that?',
-    'How will I feel when I receive it?',
-    'How will it contribute to the lives of others?',
-    'How will my life change after a long time from doing this regular action?',
-    'Free Note',
+    tr('why_would_I_do_that'), // локализованная строка
+    tr('how_will_I_feel_when_I_receive_it'), // локализованная строка
+    tr('how_will_it_contribute_to_the_lives_of_others'), // локализованная строка
+    tr('how_will_my_life_change'), // локализованная строка
+    tr('free_note'), // локализованная строка
   ];
+
 
   @override
   void initState() {
@@ -75,7 +77,7 @@ class _NoteAddPageState extends State<NoteAddPage> {
       _loadNotes(); // Перезагружаем заметки из базы данных
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Please select a question and enter a note.')),
+        SnackBar(content: Text(tr('Please_select_a_question_and_enter_a_note'))),
       );
     }
   }
@@ -163,7 +165,7 @@ class _NoteAddPageState extends State<NoteAddPage> {
           Expanded(
             child: DropdownButtonHideUnderline(
               child: DropdownButton<String>(
-                hint: Text("What do I want to get?"),
+                hint: Text(tr("What_do_I_want_to_get")),
                 value: _selectedOption,
                 isExpanded: true,
                 onChanged: (String? newValue) {
@@ -190,7 +192,7 @@ class _NoteAddPageState extends State<NoteAddPage> {
                 });
               } else {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Please select a question first.')),
+                  SnackBar(content: Text(tr('Please_select_a_question_first'))),
                 );
               }
             },
@@ -243,7 +245,7 @@ class _NoteAddPageState extends State<NoteAddPage> {
           TextField(
             controller: _noteController,
             decoration: InputDecoration(
-              hintText: 'Your note',
+              hintText: tr('Your_note'),
               filled: true, // Включаем заполнение
               fillColor: Color(0xFFF8F9F9), // Устанавливаем цвет фона
               border: InputBorder.none, // Убираем обводку
@@ -265,7 +267,7 @@ class _NoteAddPageState extends State<NoteAddPage> {
                     ),
                   ),
                   child: Text(
-                    'Save',
+                    'save'.tr(),
                     style: TextStyle(
                       color: Colors.white,
                       fontSize: 16,

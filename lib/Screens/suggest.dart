@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'main.dart';
 import 'settings_screen.dart';
+import 'package:easy_localization/easy_localization.dart';
 
 class SuggestPage extends StatefulWidget {
   const SuggestPage({Key? key}) : super(key: key);
@@ -45,8 +46,8 @@ class _SuggestPageState extends State<SuggestPage> {
           content: Column(
             mainAxisSize: MainAxisSize.min, // Adjust the size of the dialog
             children: [
-              const Text(
-                'Your offer has been successfully submitted!',
+               Text(
+                tr('yourOfferSubmitted'),
                 style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
                 textAlign: TextAlign.center,
               ),
@@ -65,8 +66,8 @@ class _SuggestPageState extends State<SuggestPage> {
                     Navigator.of(context).pop(); // Close the dialog
                     Navigator.of(context).pop(); // Return to previous screen
                   },
-                  child: const Text(
-                    'Home',
+                  child:  Text(
+                    'home'.tr(),
                     style: TextStyle(
                       fontWeight: FontWeight.bold, // Bold text
                       color: Colors.white, // White text
@@ -98,8 +99,8 @@ class _SuggestPageState extends State<SuggestPage> {
           },
         ),
         elevation: 0,
-        title: const Text(
-          'Suggest Improvements',
+        title:  Text(
+          'suggest_improvements'.tr(),
           style: TextStyle(
             fontWeight: FontWeight.bold, // Bold text
           ),
@@ -130,14 +131,14 @@ class _SuggestPageState extends State<SuggestPage> {
                   // Text field for Name
                   _buildTextField(
                     controller: _nameController,
-                    hintText: 'Name',
+                    hintText: 'name'.tr(),
                   ),
                   const SizedBox(height: 10), // Space between fields
 
                   // Text field for Email
                   _buildTextField(
                     controller: _emailController,
-                    hintText: 'E-mail*',
+                    hintText: tr('email'),
                     suffixText: 'not necessary', // Suffix for not necessary
                   ),
                   const SizedBox(height: 10), // Space between fields
@@ -145,7 +146,7 @@ class _SuggestPageState extends State<SuggestPage> {
                   // Text field for Suggestions
                   _buildTextField(
                     controller: _suggestionController,
-                    hintText: 'Your suggestion',
+                    hintText: 'your_suggestion'.tr(),
                     maxLines: 4, // Allow multiple lines
                   ),
                 ],
@@ -171,8 +172,8 @@ class _SuggestPageState extends State<SuggestPage> {
                 // Show submission dialog
                 _showSubmissionDialog();
               },
-              child: const Text(
-                'Send',
+              child:  Text(
+                'send'.tr(),
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
                   color: Colors.white, // White text
@@ -183,8 +184,8 @@ class _SuggestPageState extends State<SuggestPage> {
             const SizedBox(height: 24), // Space between button and text
 
             // Information text
-            const Text(
-              '*The answer will be provided to the specified mail',
+             Text(
+              'answerProvided'.tr(),
               style: TextStyle(
                 fontSize: 16,
                 color: Colors.black54,

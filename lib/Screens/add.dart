@@ -7,6 +7,7 @@ import 'notes.dart';
 import 'main.dart';
 import 'stat.dart';
 import 'package:action_notes/Service/HabitReminderService.dart';
+import 'package:easy_localization/easy_localization.dart';
 
 class AddActionPage extends StatefulWidget {
   const AddActionPage({Key? key}) : super(key: key);
@@ -83,7 +84,7 @@ class _AddActionPageState extends State<AddActionPage> {
     }
   }
 
-  void _showDeleteDialog(BuildContext context, String taskTitle,
+  _showDeleteDialog(BuildContext context, String taskTitle,
       Function() onDelete) {
     showDialog(
       context: context,
@@ -122,7 +123,7 @@ class _AddActionPageState extends State<AddActionPage> {
                 Expanded(
                   child: TextButton(
                     onPressed: () {
-                      Navigator.of(context).pop(); // Закрыть диалог
+                      Navigator.push(context, MaterialPageRoute(builder: (context) => HomePage())); // Вызов метода удаления
                     },
                     style: TextButton.styleFrom(
                       backgroundColor: const Color(0xFFFFFFF),
@@ -146,8 +147,8 @@ class _AddActionPageState extends State<AddActionPage> {
                 Expanded(
                   child: TextButton(
                     onPressed: () {
-                      Navigator.of(context).pop(); // Закрыть диалог
-                      onDelete(); // Вызов метода удаления
+                      Navigator.of(context).pop();
+
                     },
                     style: TextButton.styleFrom(
                       backgroundColor: Color(0xFF5F33E1), // Красный фон
@@ -181,8 +182,8 @@ class _AddActionPageState extends State<AddActionPage> {
         automaticallyImplyLeading: false,
         backgroundColor: Colors.white,
         elevation: 0,
-        title: const Text(
-          'Add Action',
+        title:  Text(
+          tr('add_action'),
           style: TextStyle(
             fontSize: 24,
             fontWeight: FontWeight.bold,
@@ -300,7 +301,7 @@ class _AddActionPageState extends State<AddActionPage> {
             decoration: InputDecoration(
               filled: true,
               fillColor: Color(0xFFF8F9F9),
-              labelText: 'Название действия',
+              labelText: tr('label_action_name'),
               labelStyle: const TextStyle(color: Colors.grey),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(8),
@@ -345,18 +346,18 @@ class _AddActionPageState extends State<AddActionPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Type of fulfilment',
+           Text(
+            tr('type_of_fulfilment'),
             style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 16),
           Column(
             children: [
-              _buildCustomCheckbox('One-off execution', 0),
+              _buildCustomCheckbox(tr('one_off_execution'), 0),
               const SizedBox(height: 16),
-              _buildCustomCheckbox('Execute a certain number of times', 1),
+              _buildCustomCheckbox(tr('execute_certain_times'), 1),
               const SizedBox(height: 16),
-              _buildCustomCheckbox('Perform a certain volume', 2),
+              _buildCustomCheckbox(tr('perform_certain_volume'), 2),
             ],
           ),
           const SizedBox(height: 16),
@@ -439,7 +440,7 @@ class _AddActionPageState extends State<AddActionPage> {
           decoration: InputDecoration(
             filled: true,
             fillColor: Colors.grey[200],
-            labelText: 'Specify the quantity',
+            labelText: tr('label_specify_quantity'),
             labelStyle: const TextStyle(color: Colors.grey),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
@@ -469,7 +470,7 @@ class _AddActionPageState extends State<AddActionPage> {
           decoration: InputDecoration(
             filled: true,
             fillColor: Colors.grey[200],
-            labelText: 'Specify the volume',
+            labelText: tr('label_specify_volume'),
             labelStyle: const TextStyle(color: Colors.grey),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
@@ -499,7 +500,7 @@ class _AddActionPageState extends State<AddActionPage> {
           decoration: InputDecoration(
             filled: true,
             fillColor: Colors.grey[200],
-            labelText: 'What volume does one press equal?',
+            labelText: tr('label_volume_per_press'),
             labelStyle: const TextStyle(color: Colors.grey),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
@@ -576,17 +577,19 @@ class _AddActionPageState extends State<AddActionPage> {
                     if (isStartDate) {
                       // Если это выбор начальной даты
                       if (endDate != null && selectedDay.isAfter(endDate!)) {
-                        _showError("Start date cannot be later than end date.");
+                        _showError(tr("error_start_date_later_than_end"));
                       } else {
                         onDateSelected(selectedDay);
+                        dateError = null;
                         _resetInvalidDays(); // Сбрасываем чекбоксы после выбора начальной даты
                       }
                     } else {
                       // Если это выбор конечной даты
                       if (startDate != null && selectedDay.isBefore(startDate!)) {
-                        _showError("End date cannot be earlier than start date.");
+                        _showError(tr("error_end_date_earlier_than_start"));
                       } else {
                         onDateSelected(selectedDay);
+                        dateError = null;
                         _resetInvalidDays(); // Сбрасываем чекбоксы после выбора конечной даты
                       }
                     }
@@ -665,17 +668,17 @@ class _AddActionPageState extends State<AddActionPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      'Start Date', // Заголовок для поля начальной даты
+                     Text(
+                      tr('start_date'), // Заголовок для поля начальной даты
                       style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                     ),
                     const SizedBox(height: 8),
                     // Отступ между заголовком и полем
                     _buildDatePicker(
-                      'Start Date',
+                      tr('start_date'),
                       startDate != null
                           ? DateFormat('dd.MM.yy').format(startDate!)
-                          : 'From', // Отображаем "From" если дата не выбрана
+                          : tr('from'), // Отображаем "From" если дата не выбрана
                       true, // Это начальная дата
                           (pickedDate) {
                         setState(() {
@@ -692,17 +695,17 @@ class _AddActionPageState extends State<AddActionPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      'End Date', // Заголовок для поля конечной даты
+                     Text(
+                      tr('end_date'), // Заголовок для поля конечной даты
                       style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                     ),
                     const SizedBox(height: 8),
                     // Отступ между заголовком и полем
                     _buildDatePicker(
-                      'End Date',
+                      tr('end_date'),
                       endDate != null
                           ? DateFormat('dd.MM.yy').format(endDate!)
-                          : 'To', // Отображаем "To" если дата не выбрана
+                          : tr('to'), // Отображаем "To" если дата не выбрана
                       false, // Это конечная дата
                           (pickedDate) {
                         setState(() {
@@ -826,7 +829,15 @@ class _AddActionPageState extends State<AddActionPage> {
 
 
   Widget _buildDaysOfWeekCheckboxes() {
-    List<String> days = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
+    List<String> days = [
+      tr('days.sunday'),
+      tr('days.monday'),
+      tr('days.tuesday'),
+      tr('days.wednesday'),
+      tr('days.thursday'),
+      tr('days.friday'),
+      tr('days.saturday'),
+    ];
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -852,17 +863,17 @@ class _AddActionPageState extends State<AddActionPage> {
 
                       // Если текущий чекбокс выбран и это единственный выбранный день
                       if (selectedDays[index] && selectedCount == 1) {
-                        _showError('Должен быть выбран хотя бы один день');
+                        _showError(tr('error_days_selection'));
                       } else {
                         // Либо переключаем чекбокс, если есть другие выбранные дни
                         if (startDate != null && endDate != null) {
                           if (_isWithinDateRange(startDate!, endDate!, index)) {
                             selectedDays[index] = !selectedDays[index];
                           } else {
-                            _showError('Выбранный день не входит в диапазон');
+                            _showError(tr('error_selected_day_out_of_range'));
                           }
                         } else {
-                          _showError('Пожалуйста, выберите даты начала и окончания');
+                          _showError(tr('error_select_start_end_dates'));
                         }
                       }
                     });
@@ -906,7 +917,15 @@ class _AddActionPageState extends State<AddActionPage> {
   }
 
   Widget _buildDaysOfWeekCheckboxesNot(int index) {
-    List<String> days = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
+    List<String> days = [
+      tr('days.sunday'),
+      tr('days.monday'),
+      tr('days.tuesday'),
+      tr('days.wednesday'),
+      tr('days.thursday'),
+      tr('days.friday'),
+      tr('days.saturday'),
+    ];
     List<bool> selectedDays = notificationWidgets[index]['days'];
 
     return Column(
@@ -932,13 +951,13 @@ class _AddActionPageState extends State<AddActionPage> {
                       setState(() {
                         int selectedCount = selectedDays.where((day) => day).length;
                         if (selectedDays[dayIndex] && selectedCount == 1) {
-                          _showError('Должен быть выбран хотя бы один день');
+                          _showError(tr('error_days_selection'));
                         } else {
                           selectedDays[dayIndex] = !selectedDays[dayIndex];
                         }
                       });
                     } else {
-                      _showError('Выбранный день не входит в диапазон');
+                      _showError(tr('error_selected_day_out_of_range'));
                     }
                   },
                   child: Container(
@@ -1095,8 +1114,8 @@ class _AddActionPageState extends State<AddActionPage> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text(
-                  'Notifications',
+                 Text(
+                  tr('notifications'),
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
@@ -1123,7 +1142,7 @@ class _AddActionPageState extends State<AddActionPage> {
                     });
                   }
                       : (bool value) {
-                    _showError('Пожалуйста, выберите даты начала и окончания.'); // Показываем ошибку
+                    _showError(tr('error_select_start_end_dates')); // Показываем ошибку
                   },
                   activeColor: Color(0xFFFFFFFF),
                   activeTrackColor: Color(0xFF5F33E1),
@@ -1164,9 +1183,9 @@ class _AddActionPageState extends State<AddActionPage> {
           borderRadius: BorderRadius.circular(20),
         ),
       ),
-      child: const Center(
+      child:  Center(
         child: Text(
-          'Create an action',
+          tr('create_action'),
           style: TextStyle(
             color: Colors.white,
             fontWeight: FontWeight.bold,
@@ -1221,21 +1240,21 @@ class _AddActionPageState extends State<AddActionPage> {
     setState(() {
       // Валидация типа выполнения
       if (selectedType == -1) {
-        typeError = 'Необходимо выбрать тип выполнения';
+        typeError = tr('error_action_type_required');
       } else {
         typeError = null;
       }
 
       // Валидация названия действия
       nameError = actionName.isEmpty || actionName.length < 2
-          ? 'Имя должно содержать не менее 2 символов'
+          ? tr('error_name_too_short')
           : null;
 
       // Валидация дат
       if (startDate == null || endDate == null) {
-        dateError = 'Выберите начальную и конечную дату';
+        dateError = tr('error_date_selection');
       } else if (endDate!.isBefore(startDate!)) {
-        dateError = 'Дата завершения не может быть раньше даты начала';
+        dateError = tr('error_end_date_before_start');
       } else {
         dateError = null;
       }
@@ -1244,11 +1263,11 @@ class _AddActionPageState extends State<AddActionPage> {
       if (selectedType == 1) {
         String quantityText = quantityController.text.trim();
         if (quantityText.isEmpty) {
-          quantityError = 'Количество должно быть целым числом';
+          quantityError = tr('error_quantity_integer');
         } else {
           int? quantityValue = int.tryParse(quantityText);
           if (quantityValue == null) {
-            quantityError = 'Количество должно быть целым числом';
+            quantityError = tr('error_quantity_integer');
           } else {
             quantityError = null; // Если всё в порядке, сбрасываем ошибку
           }
@@ -1260,7 +1279,7 @@ class _AddActionPageState extends State<AddActionPage> {
         double? volumePerPress = double.tryParse(volumePerPressController.text);
         double? volumeSpecified = double.tryParse(volumeSpecifiedController.text);
         if (volumePerPress == null || volumeSpecified == null) {
-          volumeError = 'Поля объема должны содержать допустимые числа';
+          volumeError = tr('error_volume_valid_numbers');
         } else {
           volumeError = null;
         }
@@ -1285,19 +1304,17 @@ class _AddActionPageState extends State<AddActionPage> {
           }
 
           if (!anyDaySelected) {
-            periodError = 'Должен быть выбран хотя бы один день';
+            periodError = tr('error_days_selection');
           } else if (invalidDaySelected) {
-            periodError = 'Выбраны недопустимые дни для выбранного периода';
+            periodError = tr('error_invalid_days_for_period');
           } else {
             periodError = null; // Сброс ошибки, если всё в порядке
           }
         }
       }
 
-      // Если даты не выбраны
-      if (startDate == null || endDate == null) {
-        periodError = 'Необходимо выбрать даты начала и завершения';
-      }
+
+
     });
 
     // Проверка ошибок перед добавлением привычки

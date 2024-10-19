@@ -1,6 +1,7 @@
+import 'package:action_notes/Screens/suggest.dart';
 import 'package:flutter/material.dart';
 import 'main.dart';
-
+import 'package:easy_localization/easy_localization.dart';
 class FeedbackPage extends StatefulWidget {
   const FeedbackPage({Key? key}) : super(key: key);
 
@@ -40,8 +41,8 @@ class _FeedbackPageState extends State<FeedbackPage> {
           },
         ),
         elevation: 0,
-        title: const Text(
-          'FeedBack',
+        title: Text(
+          'feedback'.tr(),
           style: TextStyle(
             fontWeight: FontWeight.bold,
           ),
@@ -55,25 +56,24 @@ class _FeedbackPageState extends State<FeedbackPage> {
           children: [
             // First set of text and button
             _buildFeedbackSection(
-              'If you liked everything, please ',
-              'leave a review',
-              ' in the AppStore.',
-              'AppStore',
+              'appstore_review'.tr(),  // Локализованная часть "If you liked everything, please "
+              'leave_a_review'.tr(),  // Локализованная часть "leave a review"
+              'in_the_AppStore'.tr(),  // Локализованная часть "in the AppStore."
+              'appstore'.tr(),  // Локализованное название кнопки "AppStore"
                   () {
-                // TODO: Add your action for the AppStore button here
+                // TODO: Добавьте действие для кнопки AppStore здесь
               },
             ),
-            const SizedBox(height: 40), // Space between sections
-            // Second set of text and button
+            const SizedBox(height: 40), // Пробел между секциями
             _buildFeedbackSection(
-              'If you are dissatisfied with something, ',
-              ' write to us, ',
-              'we will fix the error.',
-              'Suggest imrovements',
+              'contact_us_part1'.tr(),  // Локализованная часть "If you are dissatisfied with something, "
+              'write_to_us'.tr(),  // Локализованная часть "write to us"
+              'we_will_fix'.tr(),  // Локализованная часть "we will fix the error."
+              'suggest_improvements'.tr(),  // Локализованная кнопка "Suggest improvements"
                   () {
-                // TODO: Add your action for the Suggest button here
+                Navigator.push(context, MaterialPageRoute(builder: (context) => SuggestPage()));
               },
-              isSecondSection: true, // Indicate it's the second section for styling
+              isSecondSection: true,  // Указывает, что это вторая секция для стилизации
             ),
           ],
         ),

@@ -10,6 +10,7 @@ import 'archive.dart';
 import 'package:action_notes/Service/database_helper.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:table_calendar/table_calendar.dart';
+import 'package:easy_localization/easy_localization.dart';
 
 class StatsPage extends StatefulWidget {
   const StatsPage({Key? key}) : super(key: key);
@@ -228,8 +229,8 @@ class _StatsPageState extends State<StatsPage> {
         title: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            const Text(
-              'Statistics',
+             Text(
+              tr('statistics'),
               style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
             ),
             Row(
@@ -347,7 +348,7 @@ class _StatsPageState extends State<StatsPage> {
               DropdownButtonHideUnderline(
                 child: DropdownButton<String>(
                   value: _selectedPeriod,
-                  items: <String>['Week', '2 weeks', 'Month', 'Another Period']
+                  items: <String>[tr('week'), tr('two_weeks'), tr('month'), tr('another_period')]
                       .map<DropdownMenuItem<String>>((String value) {
                     return DropdownMenuItem<String>(
                       value: value,
@@ -540,7 +541,7 @@ class _StatsPageState extends State<StatsPage> {
           child: Container(
             padding: const EdgeInsets.all(8), // Отступы для удобства
             child: Text(
-              'Ascending',
+              tr('ascending'),
               style: TextStyle(
                 color: _selectedFilter == 'Ascending' ? Color(0xFF5F33E1) : Colors.black,
                 fontWeight: _selectedFilter == 'Ascending' ? FontWeight.bold : FontWeight.normal,
@@ -553,7 +554,7 @@ class _StatsPageState extends State<StatsPage> {
           child: Container(
             padding: const EdgeInsets.all(8), // Отступы для удобства
             child: Text(
-              'Descending',
+              tr('descending'),
               style: TextStyle(
                 color: _selectedFilter == 'Descending' ? Color(0xFF5F33E1) : Colors.black,
                 fontWeight: _selectedFilter == 'Descending' ? FontWeight.bold : FontWeight.normal,
@@ -566,7 +567,7 @@ class _StatsPageState extends State<StatsPage> {
           child: Container(
             padding: const EdgeInsets.all(8), // Отступы для удобства
             child: Text(
-              'Custom',
+              tr('custom'),
               style: TextStyle(
                 color: _selectedFilter == 'Custom' ? Color(0xFF5F33E1) : Colors.black,
                 fontWeight: _selectedFilter == 'Custom' ? FontWeight.bold : FontWeight.normal,
@@ -686,50 +687,5 @@ class _StatsPageState extends State<StatsPage> {
     );
   }
 
-  // Выбор периода (всплывающее меню)
-  void _showPeriodSelectionDialog() {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('Select period'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: <Widget>[
-              ListTile(
-                title: const Text('Week'),
-                onTap: () {
-                  setState(() {
-                    _selectedPeriod = 'Week';
-                    _updateDates();
-                  });
-                  Navigator.of(context).pop();
-                },
-              ),
-              ListTile(
-                title: const Text('Two weeks'),
-                onTap: () {
-                  setState(() {
-                    _selectedPeriod = '2 weeks';
-                    _updateDates();
-                  });
-                  Navigator.of(context).pop();
-                },
-              ),
-              ListTile(
-                title: const Text('Month'),
-                onTap: () {
-                  setState(() {
-                    _selectedPeriod = 'Month';
-                    _updateDates();
-                  });
-                  Navigator.of(context).pop();
-                },
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
+
 }

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'main.dart';
+import 'package:easy_localization/easy_localization.dart';
 
 class legalPage extends StatefulWidget {
   const legalPage({Key? key}) : super(key: key);
@@ -43,8 +44,8 @@ class _legalPageState extends State<legalPage> {
         elevation: 0,
         title: Row(
           children: [
-            const Text(
-              'Legal information',
+             Text(
+              'legal_information'.tr(),
               style: TextStyle(
                 fontWeight: FontWeight.bold, // Жирный текст
               ),

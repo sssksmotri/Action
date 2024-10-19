@@ -9,6 +9,7 @@ import 'package:action_notes/Screens/notes.dart';
 import 'package:action_notes/Screens/settings_screen.dart';
 import 'package:action_notes/Screens/add.dart';
 import 'package:action_notes/Screens/stat.dart';
+import 'package:easy_localization/easy_localization.dart';
 class ChartScreen extends StatefulWidget {
   @override
   _ChartScreenState createState() => _ChartScreenState();
@@ -190,7 +191,7 @@ class _ChartScreenState extends State<ChartScreen> {
             Row(
               children: [
                 Text(
-                  'Chart',
+                  tr('chart'),
                   style: TextStyle(
                     fontSize: 24,
                     fontWeight: FontWeight.bold,
@@ -473,7 +474,7 @@ class _ChartScreenState extends State<ChartScreen> {
             children: [
               // Изображение, отображающее выбранный график
               Text(
-                'Chart',
+                tr('chart'),
                 style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
               ),
               Row(
@@ -552,7 +553,7 @@ class _ChartScreenState extends State<ChartScreen> {
                     });
                   },
                   child: Text(
-                    'Quantity', // Кнопка для количества
+                    tr('quantity'), // Кнопка для количества
                     style: TextStyle(
                       fontSize: 18, // Увеличенный размер шрифта
                       fontWeight: FontWeight.bold, // Жирный шрифт
@@ -574,7 +575,7 @@ class _ChartScreenState extends State<ChartScreen> {
                     });
                   },
                   child: Text(
-                    'Percent', // Кнопка для процентов
+                    tr('percent'), // Кнопка для процентов
                     style: TextStyle(
                       fontSize: 18, // Увеличенный размер шрифта
                       fontWeight: FontWeight.bold, // Жирный шрифт

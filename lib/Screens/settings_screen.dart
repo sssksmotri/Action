@@ -1,17 +1,13 @@
-import 'package:action_notes/Screens/notifications_screen.dart';
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'feedback.dart';
 import 'notifications_screen.dart';
-import 'main.dart';
 import 'legal.dart';
-import 'feedback.dart';
 import 'suggest.dart';
-import 'notes.dart';
+import 'main.dart';
 import 'add.dart';
+import 'notes.dart';
 import 'stat.dart';
-
-// Import other necessary pages
-
 
 class SettingsPage extends StatefulWidget {
   const SettingsPage({Key? key}) : super(key: key);
@@ -22,41 +18,36 @@ class SettingsPage extends StatefulWidget {
 
 class _SettingsPageState extends State<SettingsPage> {
   int _selectedIndex = 4;
-  bool isEnglish = true; // Track if the language is English
 
   void _onItemTapped(int index) {
     setState(() {
       _selectedIndex = index;
     });
+
     if (index == 0) {
       Navigator.push(
         context,
         MaterialPageRoute(builder: (context) => const HomePage()),
       );
-    }
-    if (index == 1) {
+    } else if (index == 1) {
       Navigator.push(
         context,
         MaterialPageRoute(builder: (context) => const NotesPage()),
       );
-    }
-
-    if (index == 4) {
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (context) => const SettingsPage()),
-      );
-    }
-    if (index == 2) {
+    } else if (index == 2) {
       Navigator.push(
         context,
         MaterialPageRoute(builder: (context) => const AddActionPage()),
       );
-    }
-    if (index == 3) {
+    } else if (index == 3) {
       Navigator.push(
         context,
         MaterialPageRoute(builder: (context) => const StatsPage()),
+      );
+    } else if (index == 4) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => const SettingsPage()),
       );
     }
   }
@@ -70,8 +61,8 @@ class _SettingsPageState extends State<SettingsPage> {
         title: Align(
           alignment: Alignment.centerLeft,
           child: Text(
-            'Settings',
-            style: TextStyle(
+            'Settings'.tr(), // Локализованный текст
+            style: const TextStyle(
               fontSize: 24,
               fontWeight: FontWeight.bold,
               color: Colors.black,
@@ -79,41 +70,34 @@ class _SettingsPageState extends State<SettingsPage> {
           ),
         ),
         actions: [
-          // Container for language toggle switch with labels
           Container(
             margin: const EdgeInsets.only(right: 16.0),
             child: Row(
               children: [
-                const Text(
-                  'Ru',
-                  style: TextStyle(
-                    fontSize: 16,
-                    color: Color(0xFF5F33E1),
-                  ),
+                Text(
+                  'Ru'.tr(), // Локализованная метка для русского
+                  style: const TextStyle(fontSize: 16),
                 ),
                 Switch(
-                  value: isEnglish,
+                  value: context.locale.languageCode == 'en',
                   onChanged: (bool value) {
                     setState(() {
-                      isEnglish = value;
+                      context.setLocale(value ? const Locale('en') : const Locale('ru'));
                     });
                   },
-                  activeColor: const Color(0xFF5F33E1),
+                  activeColor: Colors.white,
+                  activeTrackColor: const Color(0xFF5F33E1),
                   inactiveThumbColor: const Color(0xFF5F33E1),
-                  inactiveTrackColor: const Color(0xFFE0E0E0),
+                  inactiveTrackColor: const Color(0xFFEEE9FF),
                 ),
-                const Text(
-                  'En',
-                  style: TextStyle(
-                    fontSize: 16,
-                    color: Color(0xFF5F33E1),
-                  ),
+                Text(
+                  'En'.tr(), // Локализованная метка для английского
+                  style: const TextStyle(fontSize: 16),
                 ),
               ],
             ),
           ),
         ],
-        elevation: 0,
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -128,7 +112,7 @@ class _SettingsPageState extends State<SettingsPage> {
                   ),
                 );
               },
-              child: _buildSettingContainer('Notifications'),
+              child: _buildSettingContainer('notifications'.tr()),
             ),
             GestureDetector(
               onTap: () {
@@ -139,7 +123,7 @@ class _SettingsPageState extends State<SettingsPage> {
                   ),
                 );
               },
-              child: _buildSettingContainer('Legal Information'),
+              child: _buildSettingContainer('legal_information'.tr()),
             ),
             GestureDetector(
               onTap: () {
@@ -150,7 +134,7 @@ class _SettingsPageState extends State<SettingsPage> {
                   ),
                 );
               },
-              child: _buildSettingContainer('Feedback'),
+              child: _buildSettingContainer('feedback'.tr()),
             ),
             GestureDetector(
               onTap: () {
@@ -161,13 +145,12 @@ class _SettingsPageState extends State<SettingsPage> {
                   ),
                 );
               },
-              child: _buildSettingContainer('Suggest Improvements'),
+              child: _buildSettingContainer('suggest_improvements'.tr()),
             ),
           ],
         ),
       ),
       backgroundColor: Colors.white,
-
       bottomNavigationBar: Container(
         margin: const EdgeInsets.only(bottom: 30, right: 16, left: 16),
         decoration: BoxDecoration(
@@ -195,7 +178,6 @@ class _SettingsPageState extends State<SettingsPage> {
       ),
     );
   }
-
   Widget _buildSettingContainer(String title) {
     return Container(
       padding: const EdgeInsets.all(12),
@@ -233,7 +215,6 @@ class _SettingsPageState extends State<SettingsPage> {
       ),
     );
   }
-
   Widget _buildNavItem(int index, String assetPath, {bool isSelected = false}) {
     return GestureDetector(
       onTap: () => _onItemTapped(index),

@@ -5,7 +5,7 @@ import 'add.dart';
 import 'stat.dart';
 import 'addpage.dart';
 import 'package:action_notes/Service/database_helper.dart'; // Импортируйте ваш класс DatabaseHelper
-
+import 'package:easy_localization/easy_localization.dart';
 class NotesPage extends StatefulWidget {
   const NotesPage({Key? key}) : super(key: key);
 
@@ -77,7 +77,7 @@ class _NotesPageState extends State<NotesPage> {
         title: Align(
           alignment: Alignment.centerLeft,
           child: Text(
-            'Notes',
+            tr('Notes'),
             style: TextStyle(
               fontSize: 24,
               fontWeight: FontWeight.bold,

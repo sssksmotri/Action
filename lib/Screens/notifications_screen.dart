@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'main.dart';
 import 'package:action_notes/Service/database_helper.dart';
 import 'package:action_notes/Service/HabitReminderService.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:easy_localization/easy_localization.dart';
 
 class NotificationsPage extends StatefulWidget {
   const NotificationsPage({Key? key}) : super(key: key);
@@ -70,8 +70,8 @@ class _NotificationsPageState extends State<NotificationsPage> {
           },
         ),
         elevation: 0,
-        title: const Text(
-          'Notifications',
+        title: Text(
+          'notifications'.tr(),
           style: TextStyle(fontWeight: FontWeight.bold),
         ),
       ),
@@ -184,8 +184,8 @@ class _NotificationsPageState extends State<NotificationsPage> {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            const Text(
-              "All notifications",
+              Text(
+              "All_Notifications".tr(),
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black),
             ),
             Switch(
