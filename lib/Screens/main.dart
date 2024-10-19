@@ -40,7 +40,7 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: 'Flutter Localization Demo',
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.purple),
+        colorScheme: ColorScheme.fromSeed(seedColor: Colors.white),
         useMaterial3: true,
       ),
       localizationsDelegates: context.localizationDelegates,
@@ -67,11 +67,11 @@ class _HomePageState extends State<HomePage> {
   DateTime _selectedDate = DateTime.now();
   DateTime _today = DateTime.now();
   final HabitReminderService habitReminderService = HabitReminderService();
-
+  bool _showDragHint = true;
   @override
   void initState() {
     super.initState();
-    _loadHabits();
+    _loadHabitsForSelectedDate();
     habitReminderService.initializeReminders();// Фильтруем привычки при инициализации
     DatabaseHelper db = DatabaseHelper.instance;
     db.archiveExpiredHabits();
@@ -296,17 +296,20 @@ class _HomePageState extends State<HomePage> {
                   int habitType = int.parse(habit['type'].toString());
 
                   // Для привычек с типом "одно действие" (habitType == 0)
+                  // Для привычек с типом "одно действие" (habitType == 0)
                   if (habitType == 0) {
                     bool isCompleted = habit['currentProgress'] == 1;
 
                     return _buildHabitItem(
                       habit['name'], // Название привычки
                       isCompleted, // Завершена ли привычка
-                          () async {  if (!isSameDay(_selectedDate, _today)) {
-                            return;
-                          }
+                          () async {
+                        if (!isSameDay(_selectedDate, _today)) {
+                          return;
+                        }
+
                         // Переключаем состояние завершения привычки
-                        int newProgress = isCompleted ? 0 : 1; // Устанавливаем новое состояние: 0 - не завершено, 1 - завершено
+                        int newProgress = isCompleted ? 0 : 1; // 0 - не завершено, 1 - завершено
 
                         await DatabaseHelper.instance.updateHabitProgress(
                           habit['id'],
@@ -314,38 +317,55 @@ class _HomePageState extends State<HomePage> {
                           DateTime.now().toIso8601String().split('T')[0],
                         );
 
+                        if (newProgress == 1) {
+                          // Если привычка завершена, обновляем статус в БД
+                          await DatabaseHelper.instance.updateHabitStatus(
+                            habit['id'],
+                            'completed',
+                          );
+                        }
+
                         setState(() {
                           _habits = List.from(_habits);
                           _habits[index] = Map<String, dynamic>.from(_habits[index])
                             ..['currentProgress'] = newProgress; // Обновляем текущий прогресс
                         });
                       },
-                      habit['id'], // Добавленный недостающий аргумент habitId
-                      key: ValueKey(habit['id']), // Опциональный ключ
+                      habit['id'],
+                      key: ValueKey(habit['id']),
                     );
                   }
 
-
                   // Для привычек с количеством (habitType == 1)
                   else if (habitType == 1) {
-                    int currentProgress = (habit['currentProgress'] ?? 0).toInt(); // Начальное значение текущего прогресса
-                    int maxProgress = (habit['quantity'] ?? 10).toInt(); // Максимальное значение прогресса
+                    int currentProgress = (habit['currentProgress'] ?? 0).toInt();
+                    int maxProgress = (habit['quantity'] ?? 10).toInt();
 
                     return _buildCountItem(
                       habit['name'],
                       currentProgress, // Отображаем текущий прогресс
                       maxProgress,
                           () async {
-                            if (!isSameDay(_selectedDate, _today)) {
-                              return;
-                            }
+                        if (!isSameDay(_selectedDate, _today)) {
+                          return;
+                        }
                         if (currentProgress < maxProgress) {
                           int newProgress = currentProgress + 1; // Увеличиваем прогресс на 1
+
                           await DatabaseHelper.instance.updateHabitProgress(
                             habit['id'],
                             newProgress.toDouble(),
                             DateTime.now().toIso8601String().split('T')[0],
                           );
+
+                          if (newProgress == maxProgress) {
+                            // Если достигнут максимальный прогресс, обновляем статус
+                            await DatabaseHelper.instance.updateHabitStatus(
+                              habit['id'],
+                              'completed',
+                            );
+                          }
+
                           setState(() {
                             _habits = List.from(_habits);
                             _habits[index] = Map<String, dynamic>.from(_habits[index])
@@ -354,16 +374,18 @@ class _HomePageState extends State<HomePage> {
                         }
                       },
                           () async {
-                            if (!isSameDay(_selectedDate, _today)) {
-                              return;
-                            }
+                        if (!isSameDay(_selectedDate, _today)) {
+                          return;
+                        }
                         if (currentProgress > 0) {
                           int newProgress = currentProgress - 1; // Уменьшаем прогресс на 1
+
                           await DatabaseHelper.instance.updateHabitProgress(
                             habit['id'],
                             newProgress.toDouble(),
                             DateTime.now().toIso8601String().split('T')[0],
                           );
+
                           setState(() {
                             _habits = List.from(_habits);
                             _habits[index] = Map<String, dynamic>.from(_habits[index])
@@ -378,26 +400,37 @@ class _HomePageState extends State<HomePage> {
                       key: ValueKey(habit['id']),
                     );
                   }
+
+                  // Для привычек с объёмом (habitType == 2)
                   // Для привычек с объёмом (habitType == 2)
                   else if (habitType == 2) {
                     double currentProgress = habit['currentProgress'] ?? 0.0;
-                    double maxProgress = habit['volume_specified'] ?? 1.0; // Общий объем
+                    double maxProgress = habit['volume_specified'] ?? 1.0;
 
                     return _buildPressCountHabit(
                       habit,
                           () async {
-                            if (!isSameDay(_selectedDate, _today)) {
-                              return;
-                            }
+                        if (!isSameDay(_selectedDate, _today)) {
+                          return;
+                        }
                         if (currentProgress < maxProgress) {
                           double newProgress = currentProgress + (habit['volume_per_press'] ?? 0.1);
+
                           await DatabaseHelper.instance.updateHabitProgress(
                             habit['id'],
                             newProgress.toDouble(),
                             DateTime.now().toIso8601String().split('T')[0],
                           );
+
+                          if (newProgress >= maxProgress) {
+                            // Обновляем статус, если достигнут максимальный прогресс
+                            await DatabaseHelper.instance.updateHabitStatus(
+                              habit['id'],
+                              'completed',
+                            );
+                          }
+
                           setState(() {
-                            // Создаем копию и обновляем прогресс
                             _habits = List.from(_habits);
                             _habits[index] = Map<String, dynamic>.from(_habits[index])
                               ..['currentProgress'] = newProgress;
@@ -405,18 +438,19 @@ class _HomePageState extends State<HomePage> {
                         }
                       },
                           () async {
-                            if (!isSameDay(_selectedDate, _today)) {
-                              return;
-                            }
+                        if (!isSameDay(_selectedDate, _today)) {
+                          return;
+                        }
                         if (currentProgress > 0) {
                           double newProgress = currentProgress - (habit['volume_per_press'] ?? 0.1);
+
                           await DatabaseHelper.instance.updateHabitProgress(
                             habit['id'],
                             newProgress.toDouble(),
                             DateTime.now().toIso8601String().split('T')[0],
                           );
+
                           setState(() {
-                            // Создаем копию и обновляем прогресс
                             _habits = List.from(_habits);
                             _habits[index] = Map<String, dynamic>.from(_habits[index])
                               ..['currentProgress'] = newProgress;
@@ -427,17 +461,19 @@ class _HomePageState extends State<HomePage> {
                         // Логика редактирования привычки
                       },
                           () {
-                        _showDeleteDialog(context, habit['name'],habit['id'], () {});
+                        _showDeleteDialog(context, habit['name'], habit['id'], () {});
                       },
                       habit['id'],
                       key: ValueKey(habit['id']),
                     );
-                  } else {
+                  }
+                  else {
                     return Container(); // Для других типов
                   }
                 },
               ),
             ),
+
             _buildBottomDateSelector(),
           ],
         ),
@@ -506,7 +542,7 @@ class _HomePageState extends State<HomePage> {
     DatabaseHelper dbHelper = DatabaseHelper.instance;
 
     // Получаем все активные привычки
-    List<Map<String, dynamic>> habits = await dbHelper.queryActiveHabits();
+    List<Map<String, dynamic>> habits = await dbHelper.queryAllHabits();
 
     // Получаем список id всех привычек
     List<int> habitIds = habits.map((habit) => habit['id'] as int).toList();
@@ -724,7 +760,7 @@ class _HomePageState extends State<HomePage> {
                     child: const Icon(Icons.check, color: Colors.green, size: 28),
                   )
                 // Если привычка не выполнена в конце дня - показываем крестик
-                else if (DateTime.now().hour >= 23)  // Крестик если день закончился
+                else if (DateTime.now().hour == 23 && DateTime.now().minute > 55)  // Крестик если день закончился
                   Padding(
                     padding: const EdgeInsets.only(right: 8.0),
                     child: const Icon(Icons.close, color: Colors.red, size: 28),
@@ -809,7 +845,7 @@ class _HomePageState extends State<HomePage> {
                         child: const Icon(Icons.check, color: Colors.green, size: 28),
                       )
                     // Если день закончился и привычка не выполнена - показываем крестик
-                    else if (DateTime.now().hour >= 23 && count < maxCount)
+                    else if (DateTime.now().hour == 23 && DateTime.now().minute < 55 && count < maxCount)
                       Padding(
                         padding: const EdgeInsets.only(right: 8.0),
                         child: const Icon(Icons.close, color: Colors.red, size: 28),
@@ -920,7 +956,7 @@ class _HomePageState extends State<HomePage> {
                         child: const Icon(Icons.check, color: Colors.green, size: 28),
                       )
                     // Крестик при окончании дня и недостижении цели
-                    else if (DateTime.now().hour >= 23 && currentProgress < maxProgress)
+                    else if (DateTime.now().hour == 23 && DateTime.now().minute < 55 && currentProgress < maxProgress)
                       Padding(
                         padding: const EdgeInsets.only(right: 8.0),
                         child: const Icon(Icons.close, color: Colors.red, size: 28),

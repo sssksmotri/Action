@@ -13,7 +13,7 @@ class NotificationsPage extends StatefulWidget {
 
 class _NotificationsPageState extends State<NotificationsPage> {
   int _selectedIndex = 4;
-  bool allNotificationsEnabled = true; // Статус всех уведомлений
+  bool allNotificationsEnabled = false; // Статус всех уведомлений
   List<Map<String, dynamic>> habits = []; // Список привычек
   List<Map<String, dynamic>> notificationTimes = []; // Времена уведомлений для каждой привычки
   final HabitReminderService habitReminderService = HabitReminderService();
@@ -27,7 +27,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
 
   Future<void> _fetchHabits() async {
     final dbHelper = DatabaseHelper.instance;
-    List<Map<String, dynamic>> fetchedHabits = await dbHelper.queryAllHabits();
+    List<Map<String, dynamic>> fetchedHabits = await dbHelper.queryActiveHabits();
 
     setState(() {
       habits = fetchedHabits;
@@ -170,14 +170,14 @@ class _NotificationsPageState extends State<NotificationsPage> {
       child: Container(
         padding: const EdgeInsets.all(12.0),
         decoration: BoxDecoration(
-          color: Colors.white, // Белый фон для контейнера
+          color: Colors.white,
           borderRadius: BorderRadius.circular(12.0),
           boxShadow: [
             BoxShadow(
               color: Colors.grey.withOpacity(0.2),
               spreadRadius: 2,
               blurRadius: 5,
-              offset: const Offset(0, 3), // Смещение тени
+              offset: const Offset(0, 3),
             ),
           ],
         ),
@@ -185,7 +185,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             const Text(
-              "Все уведомления",
+              "All notifications",
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black),
             ),
             Switch(
@@ -194,18 +194,19 @@ class _NotificationsPageState extends State<NotificationsPage> {
                 setState(() {
                   allNotificationsEnabled = value;
 
+
                   habits = habits.map((habit) {
                     return {
                       ...habit,
-                      'active': value ? 0 : 1,
+                      'notifications_enabled': value ? 1 : 0, // Обновляем состояние привычек
                     };
                   }).toList();
+                  print('значение $value');
 
                   _updateAllHabitsNotificationState(value);
 
                   if (value) {
                     for (var habit in habits) {
-                      _showNotificationDaysMenu(habit);
                       HabitReminderService().initializeReminders();
                     }
                   } else {
@@ -216,9 +217,9 @@ class _NotificationsPageState extends State<NotificationsPage> {
                 });
               },
               activeColor: Colors.white,
-              activeTrackColor: const Color(0xFF5F33E1), // Цвет фона при включении
-              inactiveTrackColor: const Color(0xFFEEE9FF), // Цвет фона при выключении
-              inactiveThumbColor: const Color(0xFF5F33E1), // Цвет кнопки при выключении
+              activeTrackColor: const Color(0xFF5F33E1),
+              inactiveTrackColor: const Color(0xFFEEE9FF),
+              inactiveThumbColor: const Color(0xFF5F33E1),
             ),
           ],
         ),
@@ -254,10 +255,17 @@ class _NotificationsPageState extends State<NotificationsPage> {
                     setState(() {
                       habit['notifications_enabled'] = value ? 1 : 0;
                       _updateHabitInDatabase(habit);
+                      // Обновляем состояние основного тумблера
+                      if (value && !allNotificationsEnabled) {
+                        allNotificationsEnabled = true;
+
+                      } else if (!value && habits.every((h) => h['notifications_enabled'] == 0)) {
+                        allNotificationsEnabled = false;
+
+                      }
                     });
 
                     if (value) {
-                      _showNotificationDaysMenu(habit);
                       await habitReminderService.initializeReminders();
                     } else {
                       await habitReminderService.cancelAllReminders(habit['id']);
@@ -287,12 +295,41 @@ class _NotificationsPageState extends State<NotificationsPage> {
 
 
   Widget _buildNotificationSettings(Map<String, dynamic> habit) {
+    // Получаем диапазон дат привычки
+    DateTime startDate = DateTime.parse(habit['start_date']);
+    DateTime endDate = habit['end_date'] != null
+        ? DateTime.parse(habit['end_date'])
+        : startDate.add(Duration(days: 6)); // Если endDate не задан, используем 6 дней после startDate
+
+    // Генерация напоминаний с учетом диапазона дней
     List<Map<String, dynamic>> habitReminders = notificationTimes
         .where((reminder) => reminder['habitId'] == habit['id'])
         .toList();
 
+    // Если нет напоминаний, создаем одно с временем по умолчанию и днями недели в пределах диапазона
     if (habitReminders.isEmpty) {
-      habitReminders = [{'time': '08:00', 'days': List<bool>.filled(7, false)}];
+      // Инициализируем дни, которые входят в диапазон, как выбранные
+      List<bool> defaultDays = List.generate(7, (dayIndex) {
+        // Используем DateTime.now().weekday (1=понедельник, 7=воскресенье) для точного определения индекса дня недели
+        int currentDay = (startDate.add(Duration(days: dayIndex)).weekday - 1) % 7;
+        bool isSelected = currentDay >= startDate.weekday - 1 && currentDay <= endDate.weekday - 1;
+        print("Day index: $dayIndex, isSelected: $isSelected"); // Логируем индексы и значения
+        return isSelected; // Выбираем только дни в диапазоне
+      });
+
+      print("Default days for new reminder: $defaultDays"); // Логируем результат
+
+      habitReminders = [
+        {
+          'time': '08:00',
+          'days': defaultDays, // Все дни, попадающие в диапазон, выбраны
+          'habitId': habit['id'], // Привязываем уведомление к привычке
+        }
+      ];
+
+      setState(() {
+        notificationTimes.addAll(habitReminders);
+      });
     }
 
     return Column(
@@ -307,21 +344,22 @@ class _NotificationsPageState extends State<NotificationsPage> {
     );
   }
 
+
+
   Widget _buildTimePicker(Map<String, dynamic> reminder, Map<String, dynamic> habit, int index) {
     String selectedTime = reminder['time'];
     List<String> timeParts = selectedTime.split(":");
     int selectedHour = int.parse(timeParts[0]);
     int selectedMinute = int.parse(timeParts[1]);
 
-    // Получаем id привычки из объекта habit
-    int habitId = habit['id'];
+    TextEditingController hourController = TextEditingController(text: selectedHour.toString().padLeft(2, '0'));
+    TextEditingController minuteController = TextEditingController(text: selectedMinute.toString().padLeft(2, '0'));
 
-    // Фильтруем уведомления для конкретной привычки
+    int habitId = habit['id'];
     List<Map<String, dynamic>> notificationsForHabit = notificationTimes
         .where((entry) => entry['habitId'] == habitId)
         .toList();
 
-    // Проверка на последнее уведомление
     bool isLastNotification = notificationsForHabit.length == 1;
 
     return Column(
@@ -338,23 +376,13 @@ class _NotificationsPageState extends State<NotificationsPage> {
                 borderRadius: BorderRadius.circular(8),
               ),
               child: TextFormField(
+                controller: hourController, // Используем контроллер
                 textAlign: TextAlign.center,
-                initialValue: selectedHour.toString().padLeft(2, '0'),
                 keyboardType: TextInputType.number,
                 decoration: InputDecoration(border: InputBorder.none),
                 style: TextStyle(fontSize: 20, color: Colors.black),
-                onChanged: (String value) {
-                  setState(() {
-                    int? hour = int.tryParse(value);
-                    if (hour != null && hour >= 0 && hour < 24) {
-                      reminder['time'] =
-                      '${hour.toString().padLeft(2, '0')}:${selectedMinute.toString().padLeft(2, '0')}';
-                      _updateReminderInDatabase(reminder['id'], newTime: reminder['time']);
-
-                    } else {
-                      print("Invalid hour input.");
-                    }
-                  });
+                onFieldSubmitted: (String value) {
+                  _updateHour(reminder, habit, hourController, minuteController);
                 },
               ),
             ),
@@ -369,27 +397,17 @@ class _NotificationsPageState extends State<NotificationsPage> {
                 borderRadius: BorderRadius.circular(8),
               ),
               child: TextFormField(
+                controller: minuteController, // Используем контроллер
                 textAlign: TextAlign.center,
-                initialValue: selectedMinute.toString().padLeft(2, '0'),
                 keyboardType: TextInputType.number,
                 decoration: InputDecoration(border: InputBorder.none),
                 style: TextStyle(fontSize: 20, color: Colors.black),
-                onChanged: (String value) {
-                  setState(() {
-                    int? minute = int.tryParse(value);
-                    if (minute != null && minute >= 0 && minute < 60) {
-                      reminder['time'] =
-                      '${selectedHour.toString().padLeft(2, '0')}:${minute.toString().padLeft(2, '0')}';
-                      _updateReminderInDatabase(reminder['id'], newTime: reminder['time']);
-
-                    } else {
-                      print("Invalid minute input.");
-                    }
-                  });
+                onFieldSubmitted: (String value) {
+                  _updateHour(reminder, habit, hourController, minuteController);
                 },
               ),
             ),
-            SizedBox(width: 12), // Отступ между полем времени и кнопкой "+"
+            SizedBox(width: 12),
             // Кнопка "+" для добавления уведомления
             GestureDetector(
               onTap: () async {
@@ -412,7 +430,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
                 onTap: () async {
                   _removeNotification(reminder);
                   setState(() {
-                    notificationTimes.removeAt(index);
+                    notificationTimes.removeWhere((entry) => entry['id'] == reminder['id']);
                   });
                 },
                 child: Container(
@@ -427,10 +445,31 @@ class _NotificationsPageState extends State<NotificationsPage> {
               ),
           ],
         ),
-        const SizedBox(height: 12), // Увеличение отступа между временем и днями недели
+        const SizedBox(height: 12),
         _buildDaysOfWeekCheckboxes(reminder, habit),
       ],
     );
+  }
+
+// Обновление времени при завершении ввода
+  void _updateHour(Map<String, dynamic> reminder, Map<String, dynamic> habit, TextEditingController hourController, TextEditingController minuteController) {
+    setState(() {
+      int? hour = int.tryParse(hourController.text);
+      int? minute = int.tryParse(minuteController.text);
+
+      if (hour != null && hour >= 0 && hour < 24 && minute != null && minute >= 0 && minute < 60) {
+        // Обновляем копию списка
+        notificationTimes = notificationTimes.map((entry) {
+          if (entry['id'] == reminder['id']) {
+            return {...entry, 'time': '${hour.toString().padLeft(2, '0')}:${minute.toString().padLeft(2, '0')}'};
+          }
+          return entry;
+        }).toList();
+        _updateReminderInDatabase(reminder['id'], newTime: '${hour.toString().padLeft(2, '0')}:${minute.toString().padLeft(2, '0')}');
+      } else {
+        print("Invalid time input.");
+      }
+    });
   }
 
 
@@ -439,7 +478,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
     DateTime startDate = DateTime.parse(habit['start_date']);
     DateTime endDate = habit['end_date'] != null
         ? DateTime.parse(habit['end_date'])
-        : startDate.add(Duration(days: 6)); // Предположим, если endDate не задан, то это 6 дней после startDate
+        : startDate.add(Duration(days: 6)); // Если endDate не задан, используем 6 дней после startDate
 
     // Убедимся, что 'days' инициализирован как список булевых значений
     List<bool> selectedDays = reminder['days'] != null
@@ -448,13 +487,13 @@ class _NotificationsPageState extends State<NotificationsPage> {
 
     List<String> days = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
 
-    // Сбрасываем недопустимые дни
+    // Устанавливаем начальные и конечные даты для диапазона
     _resetInvalidDays(startDate, endDate, selectedDays, reminder);
 
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: List.generate(7, (dayIndex) {
-        // Проверяем, входит ли день в диапазон привычки
+        // Проверяем, можно ли выбрать день в соответствии с диапазоном
         bool isWithinRange = _isWithinDateRange(startDate, endDate, dayIndex);
 
         return Column(
@@ -474,8 +513,20 @@ class _NotificationsPageState extends State<NotificationsPage> {
               onTap: isWithinRange // Если день вне диапазона, не разрешаем его выбирать
                   ? () {
                 setState(() {
-                  selectedDays[dayIndex] = !selectedDays[dayIndex];  // Меняем состояние выбранного дня
-                  _updateReminderInDatabase(reminder['id'], selectedDays: selectedDays);
+                  int selectedCount = selectedDays.where((day) => day).length;
+
+                  // Проверяем, остается ли хотя бы один выбранный день
+                  if (selectedDays[dayIndex] && selectedCount == 1) {
+                    // Показываем ошибку, если пытаются снять последний день
+                    _showError('Должен быть выбран хотя бы один день');
+                  } else {
+                    // Мгновенное обновление состояния чекбокса
+                    selectedDays[dayIndex] = !selectedDays[dayIndex];
+                    reminder['days'] = selectedDays;
+
+                    // Обновляем напоминание в базе данных асинхронно
+                    _updateReminderInDatabase(reminder['id'], selectedDays: selectedDays);
+                  }
                 });
               }
                   : null, // Если день не входит в диапазон, отключаем нажатие
@@ -507,11 +558,29 @@ class _NotificationsPageState extends State<NotificationsPage> {
     );
   }
 
+  void _showError(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Colors.red,
+      ),
+    );
+  }
+
+
+
   void _resetInvalidDays(DateTime startDate, DateTime endDate, List<bool> selectedDays, Map<String, dynamic> reminder) {
+    final int totalDaysRange = endDate.difference(startDate).inDays;
+
+    // Если диапазон больше недели, все дни можно выбрать, не сбрасываем
+    if (totalDaysRange >= 7) {
+      return;
+    }
+
     final int startDayIndex = startDate.weekday % 7;
     final int endDayIndex = endDate.weekday % 7;
 
-    // Сбрасываем дни вне диапазона
+    // Сбрасываем дни вне диапазона (если диапазон меньше недели)
     for (int i = 0; i < 7; i++) {
       if (i < startDayIndex || i > endDayIndex) {
         selectedDays[i] = false; // Сбрасываем дни вне диапазона
@@ -524,14 +593,12 @@ class _NotificationsPageState extends State<NotificationsPage> {
     });
   }
 
-
-
-
+// Проверяем, находится ли выбранный индекс дня недели в пределах диапазона
   bool _isWithinDateRange(DateTime start, DateTime end, int selectedIndex) {
-    final int difference = end.difference(start).inDays;
+    final int totalDaysRange = end.difference(start).inDays;
 
-    // Если период больше недели, все дни доступны для выбора
-    if (difference >= 7) {
+    // Если диапазон больше недели, возвращаем true для всех дней
+    if (totalDaysRange >= 7) {
       return true;
     }
 
@@ -539,12 +606,9 @@ class _NotificationsPageState extends State<NotificationsPage> {
     final int startDayIndex = start.weekday % 7;
     final int endDayIndex = end.weekday % 7;
 
-    // Возвращаем true, если день находится в диапазоне
+    // Возвращаем true, если день находится в диапазоне, иначе false
     return selectedIndex >= startDayIndex && selectedIndex <= endDayIndex;
   }
-
-
-
 
   Future<void> _loadNotifications() async {
     try {
@@ -575,14 +639,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
     }
   }
 
-  void _showNotificationDaysMenu(Map<String, dynamic> habit) {
-    final existingNotifications = notificationTimes.where((entry) => entry['habitId'] == habit['id']).toList();
 
-    if (existingNotifications.isNotEmpty) {
-    } else {
-      _addNewReminder(habit);
-    }
-  }
 
 
 
@@ -636,7 +693,19 @@ class _NotificationsPageState extends State<NotificationsPage> {
 
   Future<void> _addNewReminder(Map<String, dynamic> habit) async {
     String defaultTime = '08:00'; // Время по умолчанию
-    List<bool> defaultDays = List<bool>.filled(7, false); // Все дни по умолчанию выключены
+
+    // Получаем диапазон дат привычки
+    DateTime startDate = DateTime.parse(habit['start_date']);
+    DateTime endDate = habit['end_date'] != null
+        ? DateTime.parse(habit['end_date'])
+        : startDate.add(Duration(days: 6)); // Если endDate не задан, используем 6 дней после startDate
+
+    // Инициализируем дни по умолчанию: только те, которые входят в диапазон дат привычки, будут включены
+    List<bool> defaultDays = List.generate(7, (dayIndex) {
+      return _isWithinDateRange(startDate, endDate, dayIndex);
+    });
+
+    print("Default days for new reminder: $defaultDays"); // Логируем результат
 
     // Добавляем новое напоминание в БД
     await habitReminderService.addNewReminder(habit['id'], defaultTime, defaultDays);
@@ -644,6 +713,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
     // Перезагружаем уведомления
     await _loadNotifications();
   }
+
   Future<void> _updateHabitInDatabase(Map<String, dynamic> habit) async {
     await DatabaseHelper.instance.updateHabit(habit);
     print('Привычка обновлена: ${habit['name']}');

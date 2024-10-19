@@ -758,54 +758,69 @@ class _AddActionPageState extends State<AddActionPage> {
     );
   }
 
-  // Чекбоксы дней недели
-  // Метод для проверки, попадает ли выбранный день в диапазон дат
-  bool _isWithinDateRange(DateTime start, DateTime end, int selectedIndex) {
-    final difference = end.difference(start).inDays;
 
-    // Если разница больше 7 дней, разрешаем все дни
-    if (difference > 7) {
+
+  bool _isWithinDateRange(DateTime start, DateTime end, int selectedIndex) {
+    // Получаем индексы дня недели (0 - понедельник, 6 - воскресенье)
+    final int startDayIndex = start.weekday ; // Преобразуем weekday в индекс (1=понедельник -> 0)
+    final int endDayIndex = end.weekday ;     // Преобразуем weekday в индекс
+
+    // Если начальная и конечная дата совпадают, разрешаем выбрать только этот день
+    if (start.isAtSameMomentAs(end)) {
+      return selectedIndex == startDayIndex;
+    }
+
+    // Если диапазон больше 7 дней, разрешаем выбрать любые дни
+    if (end.difference(start).inDays >= 7) {
       return true;
     }
 
-    // Иначе проверяем, входит ли день в диапазон
-    final int startDayIndex = start.weekday - 1;
-    final int endDayIndex = end.weekday - 1;
+    // Если диапазон находится в пределах одной недели
+    if (start.isBefore(end) && startDayIndex <= endDayIndex) {
+      return selectedIndex >= startDayIndex && selectedIndex <= endDayIndex;
+    }
 
-    return selectedIndex >= startDayIndex && selectedIndex <= endDayIndex;
+    // Если диапазон пересекает неделю (например, с пятницы по понедельник)
+    if (start.isBefore(end) && startDayIndex > endDayIndex) {
+      return selectedIndex >= startDayIndex || selectedIndex <= endDayIndex;
+    }
+
+    return false;
   }
+
 
   void _resetInvalidDays() {
     if (startDate != null && endDate != null) {
-      final int startDayIndex = startDate!.weekday - 1; // Понедельник - 0, Воскресенье - 6
-      final int endDayIndex = endDate!.weekday - 1;
+      final int startDayIndex = startDate!.weekday; // Индекс дня начала (понедельник - 1)
+      final int endDayIndex = endDate!.weekday;     // Индекс дня конца
       final int periodLength = endDate!.difference(startDate!).inDays;
 
       setState(() {
-        // Сбрасываем все дни в чекбоксах уведомлений
-        for (var widget in notificationWidgets) {
-          List<bool> selectedDays = widget['days'];
-
-          if (periodLength > 7) {
-            // Если период больше 7 дней, оставляем выбранные дни без изменений
-          } else {
-            for (int i = 0; i < 7; i++) {
-              if (i < startDayIndex || i > endDayIndex) {
-                selectedDays[i] = false; // Сбрасываем дни вне диапазона
-              }
-            }
-          }
-        }
-
-        // Сбрасываем выбранные дни для основного чекбокса
         for (int i = 0; i < 7; i++) {
-          if (i < startDayIndex || i > endDayIndex) {
-            selectedDays[i] = false; // Сбрасываем дни вне диапазона
+          if (periodLength >= 7) {
+            // Если диапазон больше 7 дней, не сбрасываем чекбоксы
+            selectedDays[i] = true;  // Разрешаем все дни
+            notificationWidgets.forEach((widget) {
+              widget['days'][i] = true; // Сбрасываем чекбоксы уведомлений
+            });
+          } else {
+            if (startDayIndex <= endDayIndex) {
+              selectedDays[i] = i >= startDayIndex && i <= endDayIndex;
+              notificationWidgets.forEach((widget) {
+                widget['days'][i] = i >= startDayIndex && i <= endDayIndex; // Сбрасываем чекбоксы уведомлений
+              });
+            } else {
+              selectedDays[i] = i >= startDayIndex || i <= endDayIndex;
+              notificationWidgets.forEach((widget) {
+                widget['days'][i] = i >= startDayIndex || i <= endDayIndex; // Сбрасываем чекбоксы уведомлений
+              });
+            }
           }
         }
       });
     }
   }
+
 
 
 
@@ -832,14 +847,23 @@ class _AddActionPageState extends State<AddActionPage> {
                 GestureDetector(
                   onTap: () {
                     setState(() {
-                      if (startDate != null && endDate != null) {
-                        if (_isWithinDateRange(startDate!, endDate!, index)) {
-                          selectedDays[index] = !selectedDays[index];
-                        } else {
-                          _showError('Выбранный день не входит в диапазон');
-                        }
+                      // Проверяем, выбраны ли уже другие чекбоксы
+                      int selectedCount = selectedDays.where((day) => day).length;
+
+                      // Если текущий чекбокс выбран и это единственный выбранный день
+                      if (selectedDays[index] && selectedCount == 1) {
+                        _showError('Должен быть выбран хотя бы один день');
                       } else {
-                        _showError('Пожалуйста, выберите даты начала и окончания');
+                        // Либо переключаем чекбокс, если есть другие выбранные дни
+                        if (startDate != null && endDate != null) {
+                          if (_isWithinDateRange(startDate!, endDate!, index)) {
+                            selectedDays[index] = !selectedDays[index];
+                          } else {
+                            _showError('Выбранный день не входит в диапазон');
+                          }
+                        } else {
+                          _showError('Пожалуйста, выберите даты начала и окончания');
+                        }
                       }
                     });
                   },
@@ -875,6 +899,7 @@ class _AddActionPageState extends State<AddActionPage> {
     );
   }
 
+
   // Тумблер для включения/выключения уведомлений
   bool _isValidTime(int hour, int minute) {
     return hour >= 0 && hour < 24 && minute >= 0 && minute < 60;
@@ -890,6 +915,7 @@ class _AddActionPageState extends State<AddActionPage> {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: List.generate(7, (dayIndex) {
+            bool isInRange = startDate != null && endDate != null && _isWithinDateRange(startDate!, endDate!, dayIndex);
             return Column(
               children: [
                 Text(
@@ -902,40 +928,32 @@ class _AddActionPageState extends State<AddActionPage> {
                 const SizedBox(height: 8),
                 GestureDetector(
                   onTap: () {
-                    setState(() {
-                      if (startDate != null && endDate != null) {
-                        if (_isWithinDateRange(startDate!, endDate!, dayIndex)) {
-                          // Изменяем состояние только для этого чекбокса
-                          selectedDays[dayIndex] = !selectedDays[dayIndex];
+                    if (isInRange) {
+                      setState(() {
+                        int selectedCount = selectedDays.where((day) => day).length;
+                        if (selectedDays[dayIndex] && selectedCount == 1) {
+                          _showError('Должен быть выбран хотя бы один день');
                         } else {
-                          _showError('Выбранный день не входит в диапазон');
+                          selectedDays[dayIndex] = !selectedDays[dayIndex];
                         }
-                      } else {
-                        _showError('Пожалуйста, выберите даты начала и окончания');
-                      }
-                    });
+                      });
+                    } else {
+                      _showError('Выбранный день не входит в диапазон');
+                    }
                   },
                   child: Container(
                     width: 24,
                     height: 24,
                     decoration: BoxDecoration(
-                      color: selectedDays[dayIndex]
-                          ? const Color(0xFF5F33E1)
-                          : Colors.transparent,
+                      color: selectedDays[dayIndex] ? const Color(0xFF5F33E1) : Colors.transparent,
                       borderRadius: BorderRadius.circular(5),
                       border: Border.all(
-                        color: selectedDays[dayIndex]
-                            ? const Color(0xFF5F33E1)
-                            : Colors.grey,
+                        color: isInRange ? (selectedDays[dayIndex] ? const Color(0xFF5F33E1) : Colors.grey) : Colors.grey.shade300,
                         width: 1,
                       ),
                     ),
                     child: selectedDays[dayIndex]
-                        ? const Icon(
-                      Icons.check,
-                      size: 18,
-                      color: Colors.white,
-                    )
+                        ? const Icon(Icons.check, size: 18, color: Colors.white)
                         : null,
                   ),
                 ),
@@ -946,6 +964,122 @@ class _AddActionPageState extends State<AddActionPage> {
       ],
     );
   }
+
+  Widget _buildTimePicker(int index) {
+    final timeEntry = notificationWidgets[index];
+    int selectedHour = timeEntry['hour'];
+    int selectedMinute = timeEntry['minute'];
+
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 24.0),
+          child: Row(
+            children: [
+              Container(
+                width: 80,
+                height: 50,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: Color(0xFFF8F9F9),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: TextFormField(
+                  textAlign: TextAlign.center,
+                  initialValue: selectedHour.toString().padLeft(2, '0'),
+                  keyboardType: TextInputType.number,
+                  decoration: InputDecoration(border: InputBorder.none),
+                  style: TextStyle(fontSize: 20, color: Colors.black),
+                  onChanged: (String value) {
+                    setState(() {
+                      int? hour = int.tryParse(value);
+                      if (hour != null && _isValidTime(hour, selectedMinute)) {
+                        notificationWidgets[index]['hour'] = hour;
+                        _resetInvalidDays();
+                      }
+                    });
+                  },
+                ),
+              ),
+              Text(' : ', style: TextStyle(fontSize: 24, color: Colors.black)),
+              Container(
+                width: 80,
+                height: 50,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: Color(0xFFF8F9F9),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: TextFormField(
+                  textAlign: TextAlign.center,
+                  initialValue: selectedMinute.toString().padLeft(2, '0'),
+                  keyboardType: TextInputType.number,
+                  decoration: InputDecoration(border: InputBorder.none),
+                  style: TextStyle(fontSize: 20, color: Colors.black),
+                  onChanged: (String value) {
+                    setState(() {
+                      int? minute = int.tryParse(value);
+                      if (minute != null && _isValidTime(selectedHour, minute)) {
+                        notificationWidgets[index]['minute'] = minute;
+                      }
+                    });
+                  },
+                ),
+              ),
+              SizedBox(width: 12),
+              GestureDetector(
+                onTap: () {
+                  setState(() {
+                    // Создаем новый элемент с доступными днями
+                    List<bool> newDays = List<bool>.generate(7, (dayIndex) {
+                      return _isWithinDateRange(startDate!, endDate!, dayIndex);
+                    });
+                    notificationWidgets.add({
+                      'hour': 8,
+                      'minute': 0,
+                      'days': newDays,
+                    });
+                  });
+                },
+                child: Container(
+                  width: 30,
+                  height: 30,
+                  decoration: BoxDecoration(
+                    color: Color(0xFFEEE9FF),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(Icons.add, color: Color(0xFF5F33E1), size: 24),
+                ),
+              ),
+              Spacer(),
+              if (notificationWidgets.length > 1)
+                GestureDetector(
+                  onTap: () {
+                    setState(() {
+                      if (notificationWidgets.length > 1) {
+                        notificationWidgets.removeAt(index);
+                      }
+                    });
+                  },
+                  child: Container(
+                    width: 30,
+                    height: 30,
+                    decoration: BoxDecoration(
+                      color: Color(0xFFFFE7E5),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(Icons.close, color: Color(0xFFFF3B30), size: 24),
+                  ),
+                ),
+            ],
+          ),
+        ),
+        _buildDaysOfWeekCheckboxesNot(index),
+      ],
+    );
+  }
+
+
 
   Widget _buildNotificationToggle() {
     return Card(
@@ -970,10 +1104,26 @@ class _AddActionPageState extends State<AddActionPage> {
                 ),
                 Switch(
                   value: notificationsEnabled,
-                  onChanged: (bool value) {
+                  onChanged: (startDate != null && endDate != null) // Проверяем, выбраны ли даты
+                      ? (bool value) {
                     setState(() {
                       notificationsEnabled = value;
+                      // Обновляем дни для всех уведомлений при включении тумблера
+                      if (notificationsEnabled) {
+                        for (var notification in notificationWidgets) {
+                          notification['days'] = List<bool>.generate(7, (dayIndex) {
+                            return _isWithinDateRange(startDate!, endDate!, dayIndex);
+                          });
+                        }
+                      } else {
+                        for (var notification in notificationWidgets) {
+                          notification['days'] = List<bool>.filled(7, false); // Сбрасываем дни, если уведомления выключены
+                        }
+                      }
                     });
+                  }
+                      : (bool value) {
+                    _showError('Пожалуйста, выберите даты начала и окончания.'); // Показываем ошибку
                   },
                   activeColor: Color(0xFFFFFFFF),
                   activeTrackColor: Color(0xFF5F33E1),
@@ -999,125 +1149,6 @@ class _AddActionPageState extends State<AddActionPage> {
     );
   }
 
-  Widget _buildTimePicker(int index) {
-    final timeEntry = notificationWidgets[index];
-    int selectedHour = timeEntry['hour'];
-    int selectedMinute = timeEntry['minute'];
-
-    return Column(
-      children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(vertical: 8.0),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              // Поле для ввода часов
-              Container(
-                width: 80,
-                height: 50,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: Color(0xFFF8F9F9),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: TextFormField(
-                  textAlign: TextAlign.center,
-                  initialValue: selectedHour.toString().padLeft(2, '0'),
-                  keyboardType: TextInputType.number,
-                  decoration: InputDecoration(
-                    border: InputBorder.none,
-                  ),
-                  style: TextStyle(fontSize: 20, color: Colors.black),
-                  onChanged: (String value) {
-                    setState(() {
-                      int? hour = int.tryParse(value);
-                      if (hour != null && _isValidTime(hour, selectedMinute)) {
-                        notificationWidgets[index]['hour'] = hour;
-                        _resetInvalidDays();
-                      }
-                    });
-                  },
-                ),
-              ),
-              Text(' : ', style: TextStyle(fontSize: 24, color: Colors.black)),
-              // Поле для ввода минут
-              Container(
-                width: 80,
-                height: 50,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: Color(0xFFF8F9F9),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: TextFormField(
-                  textAlign: TextAlign.center,
-                  initialValue: selectedMinute.toString().padLeft(2, '0'),
-                  keyboardType: TextInputType.number,
-                  decoration: InputDecoration(border: InputBorder.none),
-                  style: TextStyle(fontSize: 20, color: Colors.black),
-                  onChanged: (String value) {
-                    setState(() {
-                      int? minute = int.tryParse(value);
-                      if (minute != null && _isValidTime(selectedHour, minute)) {
-                        notificationWidgets[index]['minute'] = minute;
-                      }
-                    });
-                  },
-                ),
-              ),
-              // Отступ
-              SizedBox(width: 8),
-              // Кнопка "+"
-              GestureDetector(
-                onTap: () {
-                  setState(() {
-                    notificationWidgets.add({
-                      'hour': 8,
-                      'minute': 0,
-                      'days': List<bool>.filled(7, false)
-                    });
-                  });
-                },
-                child: Container(
-                  width: 30,
-                  height: 30,
-                  decoration: BoxDecoration(
-                    color: Color(0xFFEEE9FF),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Icon(Icons.add, color: Color(0xFF5F33E1), size: 24),
-                ),
-              ),
-              // Отступ
-              SizedBox(width: 8),
-              // Кнопка удаления, если это не последний элемент
-              if (notificationWidgets.length > 1)
-                GestureDetector(
-                  onTap: () {
-                    setState(() {
-                      if (notificationWidgets.length > 1) {
-                        notificationWidgets.removeAt(index);
-                      }
-                    });
-                  },
-                  child: Container(
-                    width: 30,
-                    height: 30,
-                    decoration: BoxDecoration(
-                      color: Color(0xFFFFE7E5),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Icon(Icons.close, color: Color(0xFFFF3B30), size: 24),
-                  ),
-                ),
-            ],
-          ),
-        ),
-        // Чекбоксы для дней недели
-        _buildDaysOfWeekCheckboxesNot(index),
-      ],
-    );
-  }
 
 
   //Кнопка
@@ -1146,10 +1177,15 @@ class _AddActionPageState extends State<AddActionPage> {
     );
   }
 
+  Future<int> _getMaxHabitPosition() async {
+    final List<Map<String, dynamic>> result = await habitService.queryActiveHabits();
+    if (result.isNotEmpty) {
+      return result.map((habit) => habit['position'] as int).reduce((a, b) => a > b ? a : b);
+    }
+    return 0; // Если привычек нет, возвращаем 0
+  }
 
   void _addNewNotification(Map<String, dynamic> habit) async {
-    List<bool> defaultDays = List.generate(7, (index) => true);
-    // Создаем множество для отслеживания уникальных временных значений
     Set<String> addedTimes = {};
 
     for (var timeEntry in notificationWidgets) {
@@ -1159,21 +1195,27 @@ class _AddActionPageState extends State<AddActionPage> {
       if (!addedTimes.contains(time)) {
         addedTimes.add(time);
 
-        // Получаем reminderId от метода addNewReminder
-        int reminderId = await habitReminderService.addNewReminder(habit['id'], time, defaultDays);
+        // Получаем дни из чекбоксов для текущего времени
+        List<bool> selectedDays = timeEntry['days'];
 
-        // Добавляем новое уведомление в список
-        setState(() {
-          notificationTimes.add({
-            'habitId': habit['id'],
-            'time': time,
-            'days': defaultDays,
-            'id': reminderId, // Используем полученный reminderId
+        // Добавляем новое уведомление в список только если хотя бы один день выбран
+        if (selectedDays.any((day) => day)) {
+          int reminderId = await habitReminderService.addNewReminder(habit['id'], time, selectedDays);
+
+          // Добавляем новое уведомление в список
+          setState(() {
+            notificationTimes.add({
+              'habitId': habit['id'],
+              'time': time,
+              'days': selectedDays,
+              'id': reminderId, // Используем полученный reminderId
+            });
           });
-        });
+        }
       }
     }
   }
+
 
   Future<void> _addHabit(String taskTitle) async {
     setState(() {
@@ -1268,7 +1310,7 @@ class _AddActionPageState extends State<AddActionPage> {
       int? quantity = int.tryParse(quantityController.text.trim());
       double? volumePerPress = double.tryParse(volumePerPressController.text);
       double? volumeSpecified = double.tryParse(volumeSpecifiedController.text);
-
+      int maxPosition = await _getMaxHabitPosition();
       Map<String, dynamic> newHabit = {
         'name': actionName,
         'type': selectedType.toString(),
@@ -1277,6 +1319,7 @@ class _AddActionPageState extends State<AddActionPage> {
         'quantity': selectedType == 1 ? quantity : null,
         'volume_per_press': selectedType == 2 ? volumePerPress : null,
         'volume_specified': selectedType == 2 ? volumeSpecified : null,
+        'position': maxPosition + 1,
       };
 
       // Логика добавления привычки в БД
@@ -1292,7 +1335,7 @@ class _AddActionPageState extends State<AddActionPage> {
 
             // Добавляем уведомление только если хотя бы один день выбран
             if (days.any((day) => day)) {
-               _addNewNotification({'id': habitId, 'time': time, 'days': days});
+              _addNewNotification({'id': habitId, 'time': time, 'days': days});
             }
           }
         }

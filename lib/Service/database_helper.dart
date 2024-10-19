@@ -67,22 +67,23 @@ class DatabaseHelper {
   )
 ''');
 
-    await db.execute('''
+    await db.execute(''' 
       CREATE TABLE $tableHabitLog (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        habit_id INTEGER NOT NULL,
-        date TEXT NOT NULL,
-        status TEXT ,
-        progress INTEGER,
-        FOREIGN KEY (habit_id) REFERENCES $tableHabits (id) ON DELETE CASCADE
-      )
-    ''');
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      habit_id INTEGER NOT NULL,
+      date TEXT NOT NULL,
+      status TEXT DEFAULT 'not_completed',  
+      progress INTEGER,
+      FOREIGN KEY (habit_id) REFERENCES $tableHabits (id) ON DELETE CASCADE
+    )
+''');
 
     await db.execute('''
       CREATE TABLE $tableHabitNotes (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         habit_id INTEGER NOT NULL,
         note TEXT NOT NULL,
+        question TEXT NOT NULL,
         created_at TEXT NOT NULL,
         FOREIGN KEY (habit_id) REFERENCES $tableHabits (id) ON DELETE CASCADE
       )
@@ -205,17 +206,16 @@ class DatabaseHelper {
   }
 
   // Добавляем метод для обновления состояния уведомлений конкретной привычки
-  Future<int> updateHabitNotificationState(int habitId, int isActive) async {
-    Database db = await instance.database;
-
-    // Обновляем поле active (0 - включено, 1 - выключено) для конкретной привычки
-    return await db.update(
-      tableHabits,
-      {'active': isActive}, // обновляем только поле активного уведомления
+  Future<void> updateHabitNotificationState(int id, int notificationsEnabled) async {
+    final db = await database;
+    await db.update(
+      'Habits',
+      {'notifications_enabled': notificationsEnabled},
       where: 'id = ?',
-      whereArgs: [habitId],
+      whereArgs: [id],
     );
   }
+
 
 
 
@@ -243,6 +243,7 @@ class DatabaseHelper {
     Database db = await instance.database;
     return await db.insert(tableHabitNotes, noteData);
   }
+
 
   Future<void> updateHabitProgress(int habitId, double newProgress, String date) async {
     final db = await database;
@@ -309,6 +310,16 @@ class DatabaseHelper {
     return progressMap;
   }
 
+  Future<void> updateHabitStatus(int id, String status) async {
+    final db = await database;
+    await db.update(
+      'HabitLog',
+      {'status': status},
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
   Future<void> archiveExpiredHabits() async {
     final db = await database;
 
@@ -324,20 +335,72 @@ class DatabaseHelper {
     );
   }
 
-  Future<List<Map<String, dynamic>>> getHabitsWithProgressForDate(String date) async {
+  Future<List<Map<String, dynamic>>> getHabitsForDateRange(String startDate, String endDate) async {
     final db = await database;
 
-    // Запрашиваем привычки и их прогресс за выбранную дату
-    final List<Map<String, dynamic>> habits = await db.rawQuery('''
-    SELECT h.*, hl.progress 
-    FROM $tableHabits h
-    LEFT JOIN $tableHabitLog hl 
-    ON h.id = hl.habit_id AND hl.date = ?
-    WHERE h.archived = 0
-    ORDER BY h.position ASC
-  ''', [date]);
-
-    return habits;
+    // Запрос всех привычек, которые активны в выбранный диапазон дат
+    return await db.query(
+      'Habits',
+      where: 'start_date <= ? AND end_date >= ?',
+      whereArgs: [endDate, startDate], // Привычки, которые активны в этот период
+      orderBy: 'start_date ASC', // Сортировка по дате
+    );
   }
 
+
+  Future<List<Map<String, dynamic>>> getHabitLogsForSelectedDate(String date) async {
+    final db = await database;
+
+    // Запрос для получения записей о привычках для выбранной даты
+    return await db.query(
+      tableHabitLog,
+      where: 'date = ?',
+      whereArgs: [date],
+    );
+  }
+  Future<List<Map<String, dynamic>>> queryNotesByHabitId(int habitId) async {
+    final db = await database;
+    return await db.query(
+      tableHabitNotes,
+      where: 'habit_id = ?',
+      whereArgs: [habitId],
+    );
+  }
+  Future<int> deleteHabitNote(int id) async {
+    Database db = await instance.database;
+    return await db.delete(tableHabitNotes, where: 'id = ?', whereArgs: [id]);
+  }
+  Future<List<Map<String, dynamic>>> getHabitLogsForDateRange(String startDate, String endDate) async {
+    final db = await database;
+
+    // Запрос данных из таблицы habit_logs за указанный диапазон дат
+    return await db.query(
+      'HabitLog',
+      where: 'date BETWEEN ? AND ?',
+      whereArgs: [startDate, endDate],
+      orderBy: 'date ASC', // Сортировка по дате
+    );
+  }
+  Future<List<Map<String, dynamic>>> getHabitNotes(int habitId) async {
+    final db = await database;
+    final List<Map<String, dynamic>> notes = await db.query(
+      tableHabitNotes,
+      where: 'habit_id = ?',
+      whereArgs: [habitId],
+    );
+
+    return notes.map((note) {
+      return {
+        'id': note['id'],
+        'habit_id': note['habit_id'],
+        'note': note['note'] ?? '', // Текст заметки
+        'question': note['question'] ?? '', // Вопрос
+        'created_at': note['created_at'] ?? '',
+      };
+    }).toList();
+  }
+
+
+
 }
+

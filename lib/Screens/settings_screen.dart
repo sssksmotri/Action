@@ -8,6 +8,7 @@ import 'feedback.dart';
 import 'suggest.dart';
 import 'notes.dart';
 import 'add.dart';
+import 'stat.dart';
 
 // Import other necessary pages
 
@@ -27,11 +28,23 @@ class _SettingsPageState extends State<SettingsPage> {
     setState(() {
       _selectedIndex = index;
     });
-
     if (index == 0) {
       Navigator.push(
         context,
         MaterialPageRoute(builder: (context) => const HomePage()),
+      );
+    }
+    if (index == 1) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => const NotesPage()),
+      );
+    }
+
+    if (index == 4) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => const SettingsPage()),
       );
     }
     if (index == 2) {
@@ -40,10 +53,10 @@ class _SettingsPageState extends State<SettingsPage> {
         MaterialPageRoute(builder: (context) => const AddActionPage()),
       );
     }
-    if (index == 1) {
+    if (index == 3) {
       Navigator.push(
         context,
-        MaterialPageRoute(builder: (context) => const NotesPage()),
+        MaterialPageRoute(builder: (context) => const StatsPage()),
       );
     }
   }
