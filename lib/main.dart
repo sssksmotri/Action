@@ -82,32 +82,32 @@ class _HomePageState extends State<HomePage> {
       _selectedIndex = index;
     });
     if (index == 0) {
-      Navigator.push(
+      Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (context) => const HomePage()),
       );
     }
     if (index == 1) {
-      Navigator.push(
+      Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (context) => const NotesPage()),
       );
     }
 
     if (index == 4) {
-      Navigator.push(
+      Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (context) => const SettingsPage()),
       );
     }
     if (index == 2) {
-      Navigator.push(
+      Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (context) => const AddActionPage()),
       );
     }
     if (index == 3) {
-      Navigator.push(
+      Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (context) => const StatsPage()),
       );
@@ -324,6 +324,13 @@ class _HomePageState extends State<HomePage> {
                             'completed',
                           );
                         }
+                        if (newProgress == 0) {
+                          // Если привычка завершена, обновляем статус в БД
+                          await DatabaseHelper.instance.updateHabitStatus(
+                            habit['id'],
+                            'not_completed',
+                          );
+                        }
 
                         setState(() {
                           _habits = List.from(_habits);
@@ -379,6 +386,10 @@ class _HomePageState extends State<HomePage> {
                         }
                         if (currentProgress > 0) {
                           int newProgress = currentProgress - 1; // Уменьшаем прогресс на 1
+                          await DatabaseHelper.instance.updateHabitStatus(
+                            habit['id'],
+                            'not_completed',
+                          );
 
                           await DatabaseHelper.instance.updateHabitProgress(
                             habit['id'],
@@ -401,8 +412,6 @@ class _HomePageState extends State<HomePage> {
                     );
                   }
 
-                  // Для привычек с объёмом (habitType == 2)
-                  // Для привычек с объёмом (habitType == 2)
                   else if (habitType == 2) {
                     double currentProgress = habit['currentProgress'] ?? 0.0;
                     double maxProgress = habit['volume_specified'] ?? 1.0;
@@ -443,7 +452,10 @@ class _HomePageState extends State<HomePage> {
                         }
                         if (currentProgress > 0) {
                           double newProgress = currentProgress - (habit['volume_per_press'] ?? 0.1);
-
+                          await DatabaseHelper.instance.updateHabitStatus(
+                            habit['id'],
+                            'not_completed',
+                          );
                           await DatabaseHelper.instance.updateHabitProgress(
                             habit['id'],
                             newProgress.toDouble(),

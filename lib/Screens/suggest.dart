@@ -25,13 +25,13 @@ class _SuggestPageState extends State<SuggestPage> {
     });
 
     if (index == 0) {
-      Navigator.push(
+      Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (context) => const HomePage()),
       );
     }
     if (index == 5) {
-      Navigator.push(
+      Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (context) => const SettingsPage()),
       );

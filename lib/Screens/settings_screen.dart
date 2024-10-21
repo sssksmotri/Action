@@ -25,27 +25,27 @@ class _SettingsPageState extends State<SettingsPage> {
     });
 
     if (index == 0) {
-      Navigator.push(
+      Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (context) => const HomePage()),
       );
     } else if (index == 1) {
-      Navigator.push(
+      Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (context) => const NotesPage()),
       );
     } else if (index == 2) {
-      Navigator.push(
+      Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (context) => const AddActionPage()),
       );
     } else if (index == 3) {
-      Navigator.push(
+      Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (context) => const StatsPage()),
       );
     } else if (index == 4) {
-      Navigator.push(
+      Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (context) => const SettingsPage()),
       );

@@ -62,66 +62,88 @@ class _ChartScreenState extends State<ChartScreen> {
       _selectedIndex = index;
     });
     if (index == 0) {
-      Navigator.push(
+      Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (context) => const HomePage()),
       );
     }
     if (index == 1) {
-      Navigator.push(
+      Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (context) => const NotesPage()),
       );
     }
 
     if (index == 4) {
-      Navigator.push(
+      Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (context) => const SettingsPage()),
       );
     }
     if (index == 2) {
-      Navigator.push(
+      Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (context) => const AddActionPage()),
       );
     }
     if (index == 3) {
-      Navigator.push(
+      Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (context) => const StatsPage()),
       );
     }
   }
+
+
+
   Future<List<_ChartData>> getDailyHabitCounts(String startDate, String endDate) async {
     DatabaseHelper dbHelper = DatabaseHelper.instance;
 
-    // Получаем все привычки за выбранный диапазон
+    // Получаем все привычки, которые активны хотя бы в один день в диапазоне
     final List<Map<String, dynamic>> habits = await dbHelper.getHabitsForDateRange(startDate, endDate);
 
     // Получаем логи привычек за выбранный диапазон
     final List<Map<String, dynamic>> habitLogs = await dbHelper.getHabitLogsForDateRange(startDate, endDate);
 
-    // Подсчет общего количества и выполненных привычек для каждого дня
+    // Подсчет общего количества и выполненных привычек для каждого дня в диапазоне
     Map<String, int> totalHabits = {};
     Map<String, int> completedHabits = {};
+    final habitLogs2 = await dbHelper.getHabitLogsForDateRange(startDate, endDate);
+    print('Loaded Habit Logs: $habitLogs2'); // Вывод логов привычек
 
+
+    // Проходим по каждой привычке
     for (var habit in habits) {
       String habitStartDate = habit['start_date'];
       DateTime habitStartDateTime = DateTime.parse(habitStartDate);
 
-      if (habitStartDateTime.isBefore(_selectedDateRangeEnd) && habitStartDateTime.isAfter(_selectedDateRangeStart)) {
-        String date = DateFormat('yyyy-MM-dd').format(habitStartDateTime);
+      // Привычка должна быть включена, если она началась до конца диапазона
+      if (habitStartDateTime.isBefore(DateTime.parse(endDate).add(Duration(days: 1)))) {
+        DateTime currentDate = DateTime.parse(startDate);
 
-        totalHabits[date] = (totalHabits[date] ?? 0) + 1;
+        while (currentDate.isBefore(DateTime.parse(endDate).add(Duration(days: 1)))) {
+          String date = DateFormat('yyyy-MM-dd').format(currentDate);
 
-        bool isCompleted = habitLogs.any((log) => log['habit_id'] == habit['id'] && log['status'] == 'completed');
-        if (isCompleted) {
-          completedHabits[date] = (completedHabits[date] ?? 0) + 1;
+          // Увеличиваем общее количество привычек на этот день
+          totalHabits[date] = (totalHabits[date] ?? 0) + 1;
+
+          // Фильтруем логи для конкретной привычки и конкретного дня
+          var logsForDay = habitLogs.where((log) => log['habit_id'] == habit['id'] && log['date'] == date).toList();
+
+          // Проверяем, есть ли лог с `completed` статусом
+          bool isCompleted = logsForDay.any((log) => log['status'] == 'completed');
+
+          if (isCompleted) {
+            completedHabits[date] = (completedHabits[date] ?? 0) + 1;
+          }
+
+          // Переходим к следующему дню
+          currentDate = currentDate.add(Duration(days: 1));
         }
       }
     }
 
+    // Формируем данные для графика
     List<_ChartData> chartData = [];
     totalHabits.forEach((date, total) {
       int completed = completedHabits[date] ?? 0;
@@ -137,14 +159,11 @@ class _ChartScreenState extends State<ChartScreen> {
       ));
     });
 
+    // Сортировка по датам
     chartData.sort((a, b) => a.day.compareTo(b.day));
 
     return chartData;
   }
-
-
-
-
 
 
   void _updateData(int tabIndex) {
@@ -334,9 +353,9 @@ class _ChartScreenState extends State<ChartScreen> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly, // Равномерное размещение кнопок
             children: [
-              _buildToggleButton(0, 'W'), // Первая кнопка
-              _buildToggleButton(1, '2W'), // Вторая кнопка
-              _buildToggleButton(2, 'M'),  // Третья кнопка
+              _buildToggleButton(0, tr('W')), // Первая кнопка
+              _buildToggleButton(1, tr('2W')), // Вторая кнопка
+              _buildToggleButton(2, tr('M')),  // Третья кнопка
             ],
           ),
         ),
@@ -400,6 +419,9 @@ class _ChartScreenState extends State<ChartScreen> {
 
   // Метод для создания ряда с овальными виджетами
   Widget _buildStatsRow() {
+    if (_selectedIndex == 1 || _selectedIndex == 2) {
+      return SizedBox.shrink();  // Возвращаем пустой контейнер, если выбран 1 или 2
+    }
     return Padding(
       padding: const EdgeInsets.only(bottom: 16.0),
       child: Row(
@@ -827,4 +849,8 @@ class _ChartData {
   final int quantity; // Общее количество привычек
   final int percent; // Процент выполнения
   final int completed; // Количество выполненных привычек
+  @override
+  String toString() {
+    return 'Day: $day, Quantity: $quantity, Completed: $completed, Percent: $percent%';
+  }
 }

@@ -47,7 +47,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
     });
 
     if (index == 0) {
-      Navigator.push(
+      Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (context) => const HomePage()),
       );

@@ -22,32 +22,32 @@ class _NotesPageState extends State<NotesPage> {
       _selectedIndex = index;
     });
     if (index == 0) {
-      Navigator.push(
+      Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (context) => const HomePage()),
       );
     }
     if (index == 1) {
-      Navigator.push(
+      Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (context) => const NotesPage()),
       );
     }
 
     if (index == 4) {
-      Navigator.push(
+      Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (context) => const SettingsPage()),
       );
     }
     if (index == 2) {
-      Navigator.push(
+      Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (context) => const AddActionPage()),
       );
     }
     if (index == 3) {
-      Navigator.push(
+      Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (context) => const StatsPage()),
       );

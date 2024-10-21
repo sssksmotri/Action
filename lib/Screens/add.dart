@@ -52,32 +52,32 @@ class _AddActionPageState extends State<AddActionPage> {
       _selectedIndex = index;
     });
     if (index == 0) {
-      Navigator.push(
+      Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (context) => const HomePage()),
       );
     }
     if (index == 1) {
-      Navigator.push(
+      Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (context) => const NotesPage()),
       );
     }
 
     if (index == 4) {
-      Navigator.push(
+      Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (context) => const SettingsPage()),
       );
     }
     if (index == 2) {
-      Navigator.push(
+      Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (context) => const AddActionPage()),
       );
     }
     if (index == 3) {
-      Navigator.push(
+      Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (context) => const StatsPage()),
       );
@@ -123,7 +123,7 @@ class _AddActionPageState extends State<AddActionPage> {
                 Expanded(
                   child: TextButton(
                     onPressed: () {
-                      Navigator.push(context, MaterialPageRoute(builder: (context) => HomePage())); // Вызов метода удаления
+                      Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => HomePage())); // Вызов метода удаления
                     },
                     style: TextButton.styleFrom(
                       backgroundColor: const Color(0xFFFFFFF),

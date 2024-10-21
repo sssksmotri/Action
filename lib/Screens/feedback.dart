@@ -18,7 +18,7 @@ class _FeedbackPageState extends State<FeedbackPage> {
     });
 
     if (index == 0) {
-      Navigator.push(
+      Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (context) => const HomePage()),
       );

@@ -23,7 +23,7 @@ class _StatsPageState extends State<StatsPage> {
   int _selectedIndex = 0;
   DateTime _selectedDate = DateTime.now();
   DateTime _today = DateTime.now();
-  String _selectedPeriod = 'Week';
+  String _selectedPeriod = tr('week');
   DateTime _startDate = DateTime.now().subtract(const Duration(days: 7));
   DateTime _endDate = DateTime.now();
   String? value;
@@ -41,20 +41,20 @@ class _StatsPageState extends State<StatsPage> {
 
   void _updateDates() {
     setState(() {
-      if (_selectedPeriod == 'Week') {
+      if (_selectedPeriod == 'week'.tr()) {
         _startDate = _today.subtract(const Duration(days: 6));  // 7-дневный период
         _endDate = _today;
         _loadTasks();
-      } else if (_selectedPeriod == '2 weeks') {
+      } else if (_selectedPeriod == 'two_weeks'.tr()) {
         _startDate = _today.subtract(const Duration(days: 13));  // 14-дневный период
         _endDate = _today;
         _loadTasks();
-      } else if (_selectedPeriod == 'Month') {
+      } else if (_selectedPeriod == 'month'.tr()) {
         // Для расчета месяца учитываем текущий месяц и его количество дней
         _startDate = DateTime(_today.year, _today.month - 1, _today.day);  // Минус 1 месяц от текущей даты
         _endDate = _today;
         _loadTasks();
-      } else if (_selectedPeriod == 'Another Period') {
+      } else if (_selectedPeriod == 'another_period'.tr()) {
         _loadTasks();
       }
     });
@@ -65,19 +65,19 @@ class _StatsPageState extends State<StatsPage> {
       _selectedIndex = index;
     });
     if (index == 0) {
-      Navigator.push(context, MaterialPageRoute(builder: (context) => const HomePage()));
+      Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const HomePage()));
     }
     if (index == 1) {
-      Navigator.push(context, MaterialPageRoute(builder: (context) => const NotesPage()));
+      Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const NotesPage()));
     }
     if (index == 4) {
-      Navigator.push(context, MaterialPageRoute(builder: (context) => const SettingsPage()));
+      Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const SettingsPage()));
     }
     if (index == 2) {
-      Navigator.push(context, MaterialPageRoute(builder: (context) => const AddActionPage()));
+      Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const AddActionPage()));
     }
     if (index == 3) {
-      Navigator.push(context, MaterialPageRoute(builder: (context) => const StatsPage()));
+      Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const StatsPage()));
     }
   }
 
@@ -85,31 +85,59 @@ class _StatsPageState extends State<StatsPage> {
   Future<void> _loadTasks() async {
     DatabaseHelper dbHelper = DatabaseHelper.instance;
 
+    // Загружаем привычки
     final habits = await dbHelper.getHabitsForDateRange(
       DateFormat('yyyy-MM-dd').format(_startDate),
       DateFormat('yyyy-MM-dd').format(_endDate),
     );
 
+    print('Loaded Habits: $habits'); // Вывод загруженных привычек
+
+    // Загружаем логи привычек
     final habitLogs = await dbHelper.getHabitLogsForDateRange(
       DateFormat('yyyy-MM-dd').format(_startDate),
       DateFormat('yyyy-MM-dd').format(_endDate),
     );
 
+    print('Loaded Habit Logs: $habitLogs'); // Вывод логов привычек
+
+    // Обновляем состояние
     setState(() {
       tasks.clear();
+
       for (var habit in habits) {
-        int completedCount = habitLogs.where((log) => log['habit_id'] == habit['id']).length;
+        // Вычисляем количество завершений для каждой привычки
+        int completedCount = habitLogs
+            .where((log) => log['habit_id'] == habit['id'] && log['status'] == 'completed')
+            .length; // Изменено, чтобы учитывать только завершенные задачи
         int totalDays = _endDate.difference(_startDate).inDays + 1;
 
+        // Генерация списка завершённых дней
+        List<bool> isCompleted = List<bool>.filled(totalDays, false);
+        for (var log in habitLogs) {
+          if (log['habit_id'] == habit['id'] && log['status'] == 'completed') {
+            DateTime logDate = DateTime.parse(log['date']);
+            int dayIndex = logDate.difference(_startDate).inDays;
+            isCompleted[dayIndex] = true;
+          }
+        }
+
+        // Добавляем задачи в список
         tasks.add({
           'task': habit['name'],
           'completedCount': completedCount,
           'totalDays': totalDays,
+          'isCompleted': isCompleted,
           'index': habit['id'],
         });
+
+        print('Task Added: ${habit['name']}, Completed: $completedCount/$totalDays'); // Вывод данных о задаче
       }
+
+      print('Final Tasks List: $tasks'); // Вывод финального списка задач
     });
   }
+
 
   // Форматирование диапазона дат
   String _formatDateRange() {
@@ -160,7 +188,7 @@ class _StatsPageState extends State<StatsPage> {
               ],
             ),
             const SizedBox(height: 10),
-            _buildProgressBar(task['completedCount'], task['totalDays']),
+            _buildProgressBar(task['completedCount'], task['totalDays'], task['isCompleted']),
           ],
         ),
       ),
@@ -168,7 +196,8 @@ class _StatsPageState extends State<StatsPage> {
   }
 
   // Прогресс-бар выполнения привычки (продолговатый вместо кругов)
-  Widget _buildProgressBar(int completed, int total) {
+  // Прогресс-бар выполнения привычки (продолговатый вместо кругов)
+  Widget _buildProgressBar(int completed, int total, List<bool> isCompleted) {
     // Рассчитываем максимальное количество элементов в строке и количество строк
     int maxItemsPerRow;
     int numberOfRows;
@@ -183,12 +212,9 @@ class _StatsPageState extends State<StatsPage> {
       maxItemsPerRow = (total / 2).ceil();  // Для 15-30 дней делим на 2 строки
       numberOfRows = 2;  // Две строки для 15-30 дней
     } else {
-      maxItemsPerRow = (total / 3).ceil();  // Элементы распределяются на 3 строки для 30+
+      maxItemsPerRow = (total / 3).ceil();  // Элементы распределяются на 3 строки для 30+ дней
       numberOfRows = 3;  // Три строки для 30+ дней
     }
-
-    // Рассчитываем количество заполненных точек
-    int filledDots = completed; // Используем просто количество завершенных дней
 
     return Column(
       children: List.generate(numberOfRows, (rowIndex) {
@@ -198,15 +224,22 @@ class _StatsPageState extends State<StatsPage> {
             int currentIndex = rowIndex * maxItemsPerRow + index;  // Рассчитываем текущий индекс элемента
             if (currentIndex >= total) return Container();  // Если индекс превышает общее число элементов, возвращаем пустое место
 
-            return Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 4.0, vertical: 4.0),  // Отступы между элементами
-              child: Container(
-                width: total > 14 ? 18 : 40,  // Уменьшаем шарики для 14+ дней
-                height: total > 14 ? 18 : 15,  // Одинаковая высота для всех элементов
-                decoration: BoxDecoration(
-                  color: currentIndex < filledDots ? Color(0xFF5F33E1) : Colors.grey[300],  // Цвет прогресса
-                  shape: total > 14 ? BoxShape.circle : BoxShape.rectangle,  // Круглые элементы для 15+ дней, прямоугольные для 14 и меньше
-                  borderRadius: total > 14 ? null : BorderRadius.circular(10),  // Закругленные углы для прямоугольных элементов
+            // Увеличиваем ширину элемента, если элементов мало (например, 2, 3, 4)
+            double elementWidth = (total <= 4) ? (MediaQuery.of(context).size.width - 32) / total - 8 : (total > 14 ? 18 : 40);
+
+            return Expanded(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4.0, vertical: 4.0),  // Отступы между элементами
+                child: Container(
+                  width: elementWidth,  // Изменяем ширину в зависимости от общего количества элементов
+                  height: total > 14 ? 18 : 15,  // Одинаковая высота для всех элементов
+                  decoration: BoxDecoration(
+                    color: isCompleted[currentIndex]
+                        ? Color(0xFF5F33E1)  // Оранжевый цвет для завершённых дней
+                        : Colors.grey[300],  // Серый цвет для пропущенных
+                    shape: total > 14 ? BoxShape.circle : BoxShape.rectangle,  // Круглые элементы для 15+ дней, прямоугольные для 14 и меньше
+                    borderRadius: total > 14 ? null : BorderRadius.circular(10),  // Закругленные углы для прямоугольных элементов
+                  ),
                 ),
               ),
             );
@@ -215,7 +248,6 @@ class _StatsPageState extends State<StatsPage> {
       }),
     );
   }
-
 
 
 
@@ -377,7 +409,7 @@ class _StatsPageState extends State<StatsPage> {
           ),
           const SizedBox(height: 10),
           // Добавьте здесь логику для "Another Period"
-          if (_selectedPeriod == 'Another Period') ...[
+          if (_selectedPeriod == tr('another_period')) ...[
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [

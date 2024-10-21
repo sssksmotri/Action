@@ -7,10 +7,10 @@
   "no_leave_it": "No, leave it",
   "yes_delete": "Yes, delete",
   "statistics": "Statistics",
-  "week": "week",
+  "week": "Week",
   "ascending": "Ascending",
   "descending": "Descending",
-  "another_period": "another period",
+  "another_period": "Another period",
   "month": "month",
   "chart": "Сhart",
   "percent": "Percent",
@@ -62,8 +62,6 @@
   "label_specify_quantity": "Specify the quantity",
   "label_specify_volume": "Specify the volume",
   "label_volume_per_press": "What volume does one press equal?",
-  "start_date": "Start Date",
-  "end_date": "End Date",
   "from": "From",
   "to": "Tо",
   "days": {
@@ -91,5 +89,8 @@
   "Notes": "Notes",
   "two_weeks": "2 weeks",
   "yourOfferSubmitted": "Your offer has been successfully submitted!",
-  "answerProvided": "The answer will be provided to the specified mail."
+  "answerProvided": "The answer will be provided to the specified mail.",
+  "W": "W",
+  "2W": "2W",
+  "M": "M"
 }
