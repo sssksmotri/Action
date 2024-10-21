@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'main.dart';
+import '../main.dart';
 import 'settings_screen.dart';
 
 class NotePage extends StatefulWidget {

@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'main.dart';
+import '../main.dart';
 import 'package:action_notes/Service/database_helper.dart';
 import 'package:action_notes/Service/HabitReminderService.dart';
 import 'package:easy_localization/easy_localization.dart';

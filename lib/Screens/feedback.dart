@@ -1,6 +1,6 @@
 import 'package:action_notes/Screens/suggest.dart';
 import 'package:flutter/material.dart';
-import 'main.dart';
+import '../main.dart';
 import 'package:easy_localization/easy_localization.dart';
 class FeedbackPage extends StatefulWidget {
   const FeedbackPage({Key? key}) : super(key: key);
@@ -69,7 +69,7 @@ class _FeedbackPageState extends State<FeedbackPage> {
               'contact_us_part1'.tr(),  // Локализованная часть "If you are dissatisfied with something, "
               'write_to_us'.tr(),  // Локализованная часть "write to us"
               'we_will_fix'.tr(),  // Локализованная часть "we will fix the error."
-              'suggest_improvements'.tr(),  // Локализованная кнопка "Suggest improvements"
+              'Suggest improvements',  // Локализованная кнопка "Suggest improvements"
                   () {
                 Navigator.push(context, MaterialPageRoute(builder: (context) => SuggestPage()));
               },

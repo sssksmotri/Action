@@ -4,7 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:table_calendar/table_calendar.dart';
 import 'package:action_notes/Service/database_helper.dart';
 import 'package:action_notes/Screens/archive.dart';
-import 'package:action_notes/Screens/main.dart';
+import 'package:action_notes/main.dart';
 import 'package:action_notes/Screens/notes.dart';
 import 'package:action_notes/Screens/settings_screen.dart';
 import 'package:action_notes/Screens/add.dart';

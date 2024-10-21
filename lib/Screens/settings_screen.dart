@@ -4,7 +4,7 @@ import 'feedback.dart';
 import 'notifications_screen.dart';
 import 'legal.dart';
 import 'suggest.dart';
-import 'main.dart';
+import '../main.dart';
 import 'add.dart';
 import 'notes.dart';
 import 'stat.dart';

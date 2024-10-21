@@ -4,7 +4,7 @@ import 'package:action_notes/Service/database_helper.dart';
 import 'package:intl/intl.dart';
 import 'settings_screen.dart';
 import 'notes.dart';
-import 'main.dart';
+import '../main.dart';
 import 'stat.dart';
 import 'package:action_notes/Service/HabitReminderService.dart';
 import 'package:easy_localization/easy_localization.dart';

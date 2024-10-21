@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'settings_screen.dart';
 import 'notes.dart';
-import 'main.dart';
+import '../main.dart';
 import 'add.dart';
 import 'stat_tabl.dart';
 import 'archive.dart';

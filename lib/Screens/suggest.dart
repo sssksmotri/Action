@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'main.dart';
+import 'package:action_notes/main.dart';
 import 'settings_screen.dart';
 import 'package:easy_localization/easy_localization.dart';
 
@@ -46,8 +46,8 @@ class _SuggestPageState extends State<SuggestPage> {
           content: Column(
             mainAxisSize: MainAxisSize.min, // Adjust the size of the dialog
             children: [
-               Text(
-                tr('yourOfferSubmitted'),
+              Text(
+                'yourOfferSubmitted'.tr(),
                 style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
                 textAlign: TextAlign.center,
               ),
@@ -66,7 +66,7 @@ class _SuggestPageState extends State<SuggestPage> {
                     Navigator.of(context).pop(); // Close the dialog
                     Navigator.of(context).pop(); // Return to previous screen
                   },
-                  child:  Text(
+                  child: Text(
                     'home'.tr(),
                     style: TextStyle(
                       fontWeight: FontWeight.bold, // Bold text
@@ -86,6 +86,7 @@ class _SuggestPageState extends State<SuggestPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      resizeToAvoidBottomInset: false, // Prevents UI shift when keyboard appears
       appBar: AppBar(
         backgroundColor: Colors.white,
         leading: IconButton(
@@ -99,100 +100,100 @@ class _SuggestPageState extends State<SuggestPage> {
           },
         ),
         elevation: 0,
-        title:  Text(
+        title: Text(
           'suggest_improvements'.tr(),
           style: TextStyle(
             fontWeight: FontWeight.bold, // Bold text
           ),
         ),
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.start,
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            // White card with shadow
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(15),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.1),
-                    blurRadius: 8,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: Column(
-                children: [
-                  // Text field for Name
-                  _buildTextField(
-                    controller: _nameController,
-                    hintText: 'name'.tr(),
-                  ),
-                  const SizedBox(height: 10), // Space between fields
-
-                  // Text field for Email
-                  _buildTextField(
-                    controller: _emailController,
-                    hintText: tr('email'),
-                    suffixText: 'not necessary', // Suffix for not necessary
-                  ),
-                  const SizedBox(height: 10), // Space between fields
-
-                  // Text field for Suggestions
-                  _buildTextField(
-                    controller: _suggestionController,
-                    hintText: 'your_suggestion'.tr(),
-                    maxLines: 4, // Allow multiple lines
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 24), // Space before button
-
-            // Suggest button
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF5F33E1), // Button color
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(30), // Rounded corners
+      body: SingleChildScrollView( // Allows content to scroll when keyboard is open
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(15),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.1),
+                      blurRadius: 8,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
                 ),
-                padding: const EdgeInsets.symmetric(vertical: 15, horizontal: 50), // Padding inside button
+                child: Column(
+                  children: [
+                    // Text field for Name
+                    _buildTextField(
+                      controller: _nameController,
+                      hintText: tr('name'),
+                    ),
+                    const SizedBox(height: 10), // Space between fields
+
+                    // Text field for Email
+                    _buildTextField(
+                      controller: _emailController,
+                      hintText: 'email'.tr(),
+                      suffixText: 'not necessary', // Suffix for not necessary
+                    ),
+                    const SizedBox(height: 10), // Space between fields
+
+                    // Text field for Suggestions
+                    _buildTextField(
+                      controller: _suggestionController,
+                      hintText: 'your_suggestion'.tr(),
+                      maxLines: 4, // Allow multiple lines
+                    ),
+                  ],
+                ),
               ),
-              onPressed: () {
-                // Handle button press (send suggestion)
-                // You can add your logic here
-                print('Name: ${_nameController.text}');
-                print('Email: ${_emailController.text}');
-                print('Suggestion: ${_suggestionController.text}');
-                // Show submission dialog
-                _showSubmissionDialog();
-              },
-              child:  Text(
-                'send'.tr(),
+              const SizedBox(height: 24), // Space before button
+
+              // Suggest button
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF5F33E1), // Button color
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(30), // Rounded corners
+                  ),
+                  padding: const EdgeInsets.symmetric(vertical: 15, horizontal: 50), // Padding inside button
+                ),
+                onPressed: () {
+                  // Handle button press (send suggestion)
+                  print('Name: ${_nameController.text}');
+                  print('Email: ${_emailController.text}');
+                  print('Suggestion: ${_suggestionController.text}');
+                  // Show submission dialog
+                  _showSubmissionDialog();
+                },
+                child: Text(
+                  'send'.tr(),
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white, // White text
+                    fontSize: 18,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 24), // Space between button and text
+
+              // Information text
+              Text(
+                'answerProvided'.tr(),
                 style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white, // White text
-                  fontSize: 18,
+                  fontSize: 16,
+                  color: Colors.black54,
                 ),
+                textAlign: TextAlign.center,
               ),
-            ),
-            const SizedBox(height: 24), // Space between button and text
-
-            // Information text
-             Text(
-              'answerProvided'.tr(),
-              style: TextStyle(
-                fontSize: 16,
-                color: Colors.black54,
-              ),
-              textAlign: TextAlign.center,
-            ),
-          ],
+            ],
+          ),
         ),
       ),
       backgroundColor: Colors.white,

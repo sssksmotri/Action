@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'settings_screen.dart';
 import 'notes.dart';
-import 'main.dart';
+import '../main.dart';
 import 'stat.dart';
 import 'add.dart';
 import 'package:action_notes/Service/database_helper.dart';
@@ -203,103 +203,104 @@ class _NoteAddPageState extends State<NoteAddPage> {
   }
 
   Widget _buildNoteInputCard() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.2),
-            blurRadius: 10,
-            offset: Offset(0, 5),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Отображаем выбранную тему сверху карточки
-          Container(
-            padding: const EdgeInsets.all(12), // Устанавливаем отступы
-            decoration: BoxDecoration(
-              color: Color(0xFFF8F9F9), // Цвет фона
-              borderRadius: BorderRadius.circular(12), // Закругленные углы
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.grey.withOpacity(0.2),
-                  blurRadius: 10,
+    return SingleChildScrollView(
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.grey.withOpacity(0.2),
+              blurRadius: 10,
+              offset: Offset(0, 5),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Color(0xFFF8F9F9),
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.grey.withOpacity(0.2),
+                    blurRadius: 10,
+                  ),
+                ],
+              ),
+              child: Text(
+                _selectedOption ?? '',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                ),
+              ),
+            ),
+
+            const SizedBox(height: 16),
+            TextField(
+              controller: _noteController,
+              decoration: InputDecoration(
+                hintText: tr('Your_note'),
+                filled: true,
+                fillColor: Color(0xFFF8F9F9),
+                border: InputBorder.none,
+                hintStyle: TextStyle(color: Colors.grey),
+              ),
+              maxLines: 5,
+            ),
+
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: _addNote,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Color(0xFF5F33E1),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: Text(
+                      'save'.tr(),
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                GestureDetector(
+                  onTap: () {
+                    setState(() {
+                      _isNoteInputVisible = false;
+                    });
+                  },
+                  child: Container(
+                    width: 30,
+                    height: 30,
+                    decoration: BoxDecoration(
+                      color: Color(0xFFFFE7E5),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(Icons.close, color: Color(0xFFFF3B30), size: 24),
+                  ),
                 ),
               ],
             ),
-            child: Text(
-              _selectedOption ?? '',
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 16,
-              ),
-            ),
-          ),
-
-          const SizedBox(height: 16),
-          TextField(
-            controller: _noteController,
-            decoration: InputDecoration(
-              hintText: tr('Your_note'),
-              filled: true, // Включаем заполнение
-              fillColor: Color(0xFFF8F9F9), // Устанавливаем цвет фона
-              border: InputBorder.none, // Убираем обводку
-              hintStyle: TextStyle(color: Colors.grey), // Цвет текста подсказки
-            ),
-            maxLines: 5, // Устанавливаем количество строк для ввода
-          ),
-
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              Expanded(
-                child: ElevatedButton(
-                  onPressed: _addNote,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Color(0xFF5F33E1),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  child: Text(
-                    'save'.tr(),
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-              ),
-
-              const SizedBox(width: 8),
-              GestureDetector(
-                onTap: () {
-                  setState(() {
-                    _isNoteInputVisible = false; // Закрываем карточку заметки
-                  });
-                },
-                child: Container(
-                  width: 30,
-                  height: 30,
-                  decoration: BoxDecoration(
-                    color: Color(0xFFFFE7E5),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Icon(Icons.close, color: Color(0xFFFF3B30), size: 24),
-                ),
-              ),
-            ],
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
+
 
 
   Widget _buildNoteCard(int index) {

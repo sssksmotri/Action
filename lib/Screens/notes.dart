@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'settings_screen.dart';
-import 'main.dart';
+import '../main.dart';
 import 'add.dart';
 import 'stat.dart';
 import 'addpage.dart';
