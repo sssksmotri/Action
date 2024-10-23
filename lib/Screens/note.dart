@@ -85,6 +85,7 @@ class _NotePageState extends State<NotePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      resizeToAvoidBottomInset: false,
       appBar: AppBar(
         backgroundColor: Colors.white,
         leading: IconButton(
@@ -259,17 +260,17 @@ class _NotePageState extends State<NotePage> {
         duration: const Duration(milliseconds: 300),
         curve: Curves.easeInOut,
         width: 50,
-        height: 50,
+        height: 40,
         decoration: BoxDecoration(
-          color: isSelected ? const Color(0xFF5F33E1) : Colors.transparent,
-          borderRadius: BorderRadius.circular(12),
+          color: isSelected ? Color(0xFF5F33E1) : Colors.transparent,
+          borderRadius: BorderRadius.circular(18),
         ),
         child: Center(
           child: Image.asset(
             assetPath,
-            width: 28,
-            height: 28,
-            color: isSelected ? Colors.white : const Color(0xFF5F33E1),
+            width: 24,
+            height: 24,
+            color: isSelected ? Colors.white : Color(0xFF5F33E1),
           ),
         ),
       ),

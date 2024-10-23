@@ -4,6 +4,7 @@ import 'package:easy_localization/easy_localization.dart';
 import 'settings_screen.dart';
 import 'notes.dart';
 import 'add.dart';
+import 'dart:ui';
 import 'stat.dart';
 import 'stat_tabl.dart';
 import 'package:action_notes/Service/database_helper.dart'; // Импортируйте свой класс для работы с БД
@@ -71,93 +72,107 @@ class _ArchivePageState extends State<ArchivePage> {
     }
   }
 
-  void _showDeleteDialog(BuildContext context, String taskTitle,
+  void _showDeleteDialog(BuildContext context, String taskTitle, int habitId,
       Function() onDelete) {
     showDialog(
       context: context,
+      barrierColor: Colors.black.withOpacity(0.1),
       builder: (BuildContext context) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
-          ),
-          contentPadding: const EdgeInsets.fromLTRB(24, 20, 24, 10),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              RichText(
-                textAlign: TextAlign.center,
-                text: TextSpan(
-                  text: "are_you_sure".tr(),
-                  style: const TextStyle(
-                    color: Colors.black,
-                    fontSize: 18,
-                  ),
-                  children: [
-                    TextSpan(
-                      text: taskTitle,
+        return Stack(
+          children: [
+            // Эффект размытия
+            BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5), // Эффект размытия
+              child: Container(
+                color: Colors.black.withOpacity(0), // Прозрачный контейнер для сохранения размытия
+              ),
+            ),
+            // Основное содержимое диалогового окна
+            AlertDialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+              ),
+              contentPadding: const EdgeInsets.fromLTRB(24, 20, 24, 10),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  RichText(
+                    textAlign: TextAlign.center,
+                    text: TextSpan(
+                      text: "are_you_sure".tr(),
                       style: const TextStyle(
-                        color: Color(0xFF5F33E1),
-                        fontWeight: FontWeight.bold,
+                        color: Colors.black,
+                        fontSize: 18,
+                      ),
+                      children: [
+                        TextSpan(
+                          text: taskTitle,
+                          style: const TextStyle(
+                            color: Color(0xFF5F33E1), // Фиолетовый цвет для названия задачи
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const TextSpan(
+                          text: "?",
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              actionsPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              actions: <Widget>[
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    // Кнопка "No, leave it"
+                    Expanded(
+                      child: TextButton(
+                        onPressed: () {
+                          Navigator.of(context).pop(); // Закрыть диалог
+                        },
+                        style: TextButton.styleFrom(
+                          backgroundColor: const Color(0xFFEEE9FF), // Легкий фиолетовый фон
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(24),
+                          ),
+                          padding: const EdgeInsets.symmetric(vertical: 15),
+                        ),
+                        child: Text(
+                          "no_leave_it".tr(),
+                          style: TextStyle(
+                            color: Color(0xFF5F33E1), // Фиолетовый текст
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                       ),
                     ),
-                    const TextSpan(
-                      text: "?",
+                    const SizedBox(width: 10), // Отступ между кнопками
+                    // Кнопка "Yes, delete"
+                    Expanded(
+                      child: TextButton(
+                        onPressed: () {
+                          Navigator.of(context).pop(); // Закрыть диалог
+                          _deleteHabit(habitId); // Вызов метода удаления
+                        },
+                        style: TextButton.styleFrom(
+                          backgroundColor: Colors.red, // Красный фон
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(24),
+                          ),
+                          padding: const EdgeInsets.symmetric(vertical: 15),
+                        ),
+                        child: Text(
+                          "yes_delete".tr(),
+                          style: TextStyle(
+                            color: Colors.white, // Белый текст
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
                     ),
                   ],
-                ),
-              ),
-            ],
-          ),
-          actionsPadding: const EdgeInsets.symmetric(
-              horizontal: 16, vertical: 10),
-          actions: <Widget>[
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Expanded(
-                  child: TextButton(
-                    onPressed: () {
-                      Navigator.of(context).pop(); // Закрыть диалог
-                    },
-                    style: TextButton.styleFrom(
-                      backgroundColor: const Color(0xFFEEE9FF),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(24),
-                      ),
-                      padding: const EdgeInsets.symmetric(vertical: 15),
-                    ),
-                    child:  Text(
-                      "no_leave_it".tr(),
-                      style: TextStyle(
-                        color: Color(0xFF5F33E1),
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: TextButton(
-                    onPressed: () {
-                      Navigator.of(context).pop(); // Закрыть диалог
-                      onDelete(); // Вызов метода удаления
-                    },
-                    style: TextButton.styleFrom(
-                      backgroundColor: Colors.red,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(24),
-                      ),
-                      padding: const EdgeInsets.symmetric(vertical: 15),
-                    ),
-                    child:  Text(
-                      "yes_delete".tr(),
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
                 ),
               ],
             ),
@@ -328,10 +343,7 @@ class _ArchivePageState extends State<ArchivePage> {
                 child: PopupMenuButton<String>(
                   onSelected: (value) {
                     if (value == 'Delete') {
-                      _showDeleteDialog(context, title, () {
-                        // Логика удаления привычки
-                       // Вызов метода удаления привычки
-                      });
+                      _showDeleteDialog(context, title, habitId, () {});
                     } else {
                       print('Selected: $value');
                     }
@@ -374,21 +386,35 @@ class _ArchivePageState extends State<ArchivePage> {
         duration: const Duration(milliseconds: 300),
         curve: Curves.easeInOut,
         width: 50,
-        height: 50,
+        height: 40,
         decoration: BoxDecoration(
           color: isSelected ? Color(0xFF5F33E1) : Colors.transparent,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(18),
         ),
         child: Center(
           child: Image.asset(
             assetPath,
-            width: 28,
-            height: 28,
+            width: 24,
+            height: 24,
             color: isSelected ? Colors.white : Color(0xFF5F33E1),
           ),
         ),
       ),
     );
+  }
+
+  Future<void> _deleteHabit(int habitId) async {
+    DatabaseHelper db = DatabaseHelper.instance; // Получаем экземпляр вашего помощника по базе данных
+
+    // Удаляем привычку из базы данных
+    await db.deleteHabit(habitId);
+
+    setState(() {
+      _archivedHabits = List.from(_archivedHabits)..removeWhere((habit) => habit['id'] == habitId);
+      _loadArchivedHabits();
+
+    });
+
   }
 
   void _activeHabit(int habitId) async {

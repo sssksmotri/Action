@@ -323,15 +323,27 @@ class DatabaseHelper {
     return progressMap;
   }
 
-  Future<void> updateHabitStatus(int id, String status) async {
+  Future<void> updateHabitStatus(int habitId, String status, String date) async {
     final db = await database;
+
+    // Печатаем информацию перед обновлением
+    print('Updating habit status...');
+    print('Habit ID: $habitId');
+    print('Status: $status');
+    print('Date: $date');
+
     await db.update(
       'HabitLog',
       {'status': status},
-      where: 'id = ?',
-      whereArgs: [id],
+      where: 'habit_id = ? AND date = ?',
+      whereArgs: [habitId, date],
     );
+
+    // Подтверждение успешного обновления
+    print('Status updated successfully for habit ID $habitId on date $date');
   }
+
+
 
   Future<void> archiveExpiredHabits() async {
     final db = await database;

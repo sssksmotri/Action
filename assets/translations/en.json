@@ -1,6 +1,6 @@
 {
-  "completed_first": "Completed first",
-  "not_completed_first": "Not completed at first",
+  "completed_first": "Сначала выполненные",
+  "not_completed_first": "Сначала невыполненные",
   "custom": "Custom",
   "actions": "Actions",
   "are_you_sure": "Are you sure you want to delete?",
@@ -10,7 +10,7 @@
   "week": "Week",
   "ascending": "Ascending",
   "descending": "Descending",
-  "another_period": "Another period",
+  "another_period": "Another",
   "month": "month",
   "chart": "Сhart",
   "percent": "Percent",
@@ -92,5 +92,6 @@
   "answerProvided": "The answer will be provided to the specified mail.",
   "W": "W",
   "2W": "2W",
-  "M": "M"
+  "M": "M",
+  "not_necessary": "Not necessary"
 }

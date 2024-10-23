@@ -3,7 +3,11 @@ import '../main.dart';
 import 'package:action_notes/Service/database_helper.dart';
 import 'package:action_notes/Service/HabitReminderService.dart';
 import 'package:easy_localization/easy_localization.dart';
-
+import 'package:shared_preferences/shared_preferences.dart';
+import 'stat.dart';
+import 'add.dart';
+import 'notes.dart';
+import 'settings_screen.dart';
 class NotificationsPage extends StatefulWidget {
   const NotificationsPage({Key? key}) : super(key: key);
 
@@ -21,9 +25,41 @@ class _NotificationsPageState extends State<NotificationsPage> {
   @override
   void initState() {
     super.initState();
-    _fetchHabits();
     _loadNotifications();
+    _fetchHabits().then((_) {
+      // Загружаем состояние основного тумблера
+      _loadToggleState('allNotificationsEnabled').then((value) {
+        setState(() {
+          allNotificationsEnabled = value;
+        });
+        print('Main toggle (All Notifications) state: $allNotificationsEnabled');
+      });
+
+      // Загружаем состояние каждого тумблера привычек
+      for (var habit in habits) {
+        _loadToggleState('habit_${habit['id']}_notifications_enabled').then((value) {
+          // Вместо изменения объекта habit, создаем новый объект привычки
+          setState(() {
+            // Обновляем список привычек с новым значением для конкретной привычки
+            habits = habits.map((h) {
+              if (h['id'] == habit['id']) {
+                return {
+                  ...h,
+                  'notifications_enabled': value ? 1 : 0, // Создаем копию объекта с обновленным полем
+                };
+              }
+              return h;
+            }).toList();
+          });
+          print('Habit "${habit['name']}" (ID: ${habit['id']}) notifications state: ${value ? 1 : 0}');
+        });
+      }
+    });
   }
+
+
+
+
 
   Future<void> _fetchHabits() async {
     final dbHelper = DatabaseHelper.instance;
@@ -45,11 +81,35 @@ class _NotificationsPageState extends State<NotificationsPage> {
     setState(() {
       _selectedIndex = index;
     });
-
     if (index == 0) {
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (context) => const HomePage()),
+      );
+    }
+    if (index == 1) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => const NotesPage()),
+      );
+    }
+
+    if (index == 4) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => const SettingsPage()),
+      );
+    }
+    if (index == 2) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => const AddActionPage()),
+      );
+    }
+    if (index == 3) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => const StatsPage()),
       );
     }
   }
@@ -147,17 +207,17 @@ class _NotificationsPageState extends State<NotificationsPage> {
         duration: const Duration(milliseconds: 300),
         curve: Curves.easeInOut,
         width: 50,
-        height: 50,
+        height: 40,
         decoration: BoxDecoration(
-          color: isSelected ? const Color(0xFF5F33E1) : Colors.transparent,
-          borderRadius: BorderRadius.circular(12),
+          color: isSelected ? Color(0xFF5F33E1) : Colors.transparent,
+          borderRadius: BorderRadius.circular(18),
         ),
         child: Center(
           child: Image.asset(
             assetPath,
-            width: 28,
-            height: 28,
-            color: isSelected ? Colors.white : const Color(0xFF5F33E1),
+            width: 24,
+            height: 24,
+            color: isSelected ? Colors.white : Color(0xFF5F33E1),
           ),
         ),
       ),
@@ -188,38 +248,72 @@ class _NotificationsPageState extends State<NotificationsPage> {
               "All_Notifications".tr(),
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black),
             ),
-            Switch(
-              value: allNotificationsEnabled,
-              onChanged: (bool value) {
-                setState(() {
-                  allNotificationsEnabled = value;
+            Padding(
+              padding: const EdgeInsets.all(4.0), // Прямые отступы вокруг переключателя
+              child: Container(
+                height: 30, // Высота контейнера
+                width: 50, // Ширина контейнера
+                decoration: BoxDecoration(
+                  color: Colors.transparent,
+                  border: Border.all(
+                    color: Colors.white, // Цвет ободка
+                    width: 2, // Ширина ободка
+                  ),
+                  borderRadius: BorderRadius.circular(15), // Скругление углов
+                ),
+                child: GestureDetector(
+                  onTap: () {
+                    setState(() {
+                      allNotificationsEnabled = !allNotificationsEnabled;
 
+                      habits = habits.map((habit) {
+                        return {
+                          ...habit,
+                          'notifications_enabled': allNotificationsEnabled ? 1 : 0, // Обновляем состояние привычек
+                        };
+                      }).toList();
 
-                  habits = habits.map((habit) {
-                    return {
-                      ...habit,
-                      'notifications_enabled': value ? 1 : 0, // Обновляем состояние привычек
-                    };
-                  }).toList();
-                  print('значение $value');
+                      print('значение $allNotificationsEnabled');
 
-                  _updateAllHabitsNotificationState(value);
+                      _updateAllHabitsNotificationState(allNotificationsEnabled);
 
-                  if (value) {
-                    for (var habit in habits) {
-                      HabitReminderService().initializeReminders();
-                    }
-                  } else {
-                    for (var habit in habits) {
-                      HabitReminderService().cancelAllReminders(habit['id']);
-                    }
-                  }
-                });
-              },
-              activeColor: Colors.white,
-              activeTrackColor: const Color(0xFF5F33E1),
-              inactiveTrackColor: const Color(0xFFEEE9FF),
-              inactiveThumbColor: const Color(0xFF5F33E1),
+                      if (allNotificationsEnabled) {
+                        for (var habit in habits) {
+                          HabitReminderService().initializeReminders();
+                        }
+                      } else {
+                        for (var habit in habits) {
+                          HabitReminderService().cancelAllReminders(habit['id']);
+                        }
+                      }
+                      _saveToggleState('allNotificationsEnabled', allNotificationsEnabled);
+                    });
+                  },
+                  child: Stack(
+                    children: [
+                      Container(
+                        decoration: BoxDecoration(
+                          color: allNotificationsEnabled ? const Color(0xFF5F33E1) : const Color(0xFFEEE9FF),
+                          borderRadius: BorderRadius.circular(15),
+                        ),
+                      ),
+                      Positioned(
+                        left: allNotificationsEnabled ? null : 2, // Отступ слева
+                        right: allNotificationsEnabled ? 2 : null, // Отступ справа
+                        top: 2, // Отступ сверху
+                        child: Container(
+                          width: 22, // Ширина шарика
+                          height: 22,
+                          decoration: BoxDecoration(
+                            color: allNotificationsEnabled ? const Color(0xFFFFFFFF) : const Color(0xFF5F33E1),
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             ),
           ],
         ),
@@ -249,32 +343,66 @@ class _NotificationsPageState extends State<NotificationsPage> {
                     ),
                   ),
                 ),
-                Switch(
-                  value: isHabitNotificationEnabled,
-                  onChanged: (bool value) async {
-                    setState(() {
-                      habit['notifications_enabled'] = value ? 1 : 0;
-                      _updateHabitInDatabase(habit);
-                      // Обновляем состояние основного тумблера
-                      if (value && !allNotificationsEnabled) {
-                        allNotificationsEnabled = true;
+                Padding(
+                  padding: const EdgeInsets.all(4.0), // Прямые отступы вокруг переключателя
+                  child: Container(
+                    height: 30, // Высота контейнера
+                    width: 50, // Ширина контейнера
+                    decoration: BoxDecoration(
+                      color: Colors.transparent,
+                      border: Border.all(
+                        color: Colors.white, // Цвет ободка
+                        width: 2, // Ширина ободка
+                      ),
+                      borderRadius: BorderRadius.circular(15), // Скругление углов
+                    ),
+                    child: GestureDetector(
+                      onTap: () async {
+                        bool newValue = !isHabitNotificationEnabled; // Переключаем значение
+                        setState(() {
+                          habit['notifications_enabled'] = newValue ? 1 : 0;
+                          _updateHabitInDatabase(habit);
 
-                      } else if (!value && habits.every((h) => h['notifications_enabled'] == 0)) {
-                        allNotificationsEnabled = false;
+                          // Обновляем состояние основного тумблера
+                          if (newValue && !allNotificationsEnabled) {
+                            allNotificationsEnabled = true;
+                          } else if (!newValue && habits.every((h) => h['notifications_enabled'] == 0)) {
+                            allNotificationsEnabled = false;
+                          }
+                        });
 
-                      }
-                    });
-
-                    if (value) {
-                      await habitReminderService.initializeReminders();
-                    } else {
-                      await habitReminderService.cancelAllReminders(habit['id']);
-                    }
-                  },
-                  activeColor: Colors.white,
-                  activeTrackColor: const Color(0xFF5F33E1),
-                  inactiveTrackColor: const Color(0xFFEEE9FF),
-                  inactiveThumbColor: const Color(0xFF5F33E1),
+                        if (newValue) {
+                          await habitReminderService.initializeReminders();
+                        } else {
+                          await habitReminderService.cancelAllReminders(habit['id']);
+                        }
+                        _saveToggleState('habit_${habit['id']}_notifications_enabled', newValue);
+                      },
+                      child: Stack(
+                        children: [
+                          Container(
+                            decoration: BoxDecoration(
+                              color: isHabitNotificationEnabled ? const Color(0xFF5F33E1) : const Color(0xFFEEE9FF),
+                              borderRadius: BorderRadius.circular(15),
+                            ),
+                          ),
+                          Positioned(
+                            left: isHabitNotificationEnabled ? null : 2, // Отступ слева
+                            right: isHabitNotificationEnabled ? 2 : null, // Отступ справа
+                            top: 2, // Отступ сверху
+                            child: Container(
+                              width: 22, // Ширина шарика
+                              height: 22,
+                              decoration: BoxDecoration(
+                                color: isHabitNotificationEnabled ? const Color(0xFFFFFFFF) : const Color(0xFF5F33E1),
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
                 ),
               ],
             ),
@@ -292,6 +420,8 @@ class _NotificationsPageState extends State<NotificationsPage> {
       ),
     );
   }
+
+
 
 
   Widget _buildNotificationSettings(Map<String, dynamic> habit) {
@@ -567,6 +697,15 @@ class _NotificationsPageState extends State<NotificationsPage> {
     );
   }
 
+  Future<void> _saveToggleState(String key, bool value) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(key, value);
+  }
+
+  Future<bool> _loadToggleState(String key) async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool(key) ?? false;
+  }
 
 
   void _resetInvalidDays(DateTime startDate, DateTime endDate, List<bool> selectedDays, Map<String, dynamic> reminder) {

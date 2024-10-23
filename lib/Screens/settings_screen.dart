@@ -78,18 +78,54 @@ class _SettingsPageState extends State<SettingsPage> {
                   'Ru'.tr(), // Локализованная метка для русского
                   style: const TextStyle(fontSize: 16),
                 ),
-                Switch(
-                  value: context.locale.languageCode == 'en',
-                  onChanged: (bool value) {
-                    setState(() {
-                      context.setLocale(value ? const Locale('en') : const Locale('ru'));
-                    });
-                  },
-                  activeColor: Colors.white,
-                  activeTrackColor: const Color(0xFF5F33E1),
-                  inactiveThumbColor: const Color(0xFF5F33E1),
-                  inactiveTrackColor: const Color(0xFFEEE9FF),
+                Padding(
+                  padding: const EdgeInsets.all(4.0), // Прямые отступы вокруг переключателя
+                  child: Container(
+                    height: 30, // Высота контейнера
+                    width: 50, // Ширина контейнера
+                    decoration: BoxDecoration(
+                      color: Colors.transparent,
+                      border: Border.all(
+                        color: Colors.white, // Цвет ободка
+                        width: 2, // Ширина ободка
+                      ),
+                      borderRadius: BorderRadius.circular(15), // Скругление углов
+                    ),
+                    child: GestureDetector(
+                      onTap: () {
+                        setState(() {
+                          // Переключение языка между английским и русским
+                          final isEnglish = context.locale.languageCode == 'en';
+                          context.setLocale(isEnglish ? const Locale('ru') : const Locale('en'));
+                        });
+                      },
+                      child: Stack(
+                        children: [
+                          Container(
+                            decoration: BoxDecoration(
+                              color: context.locale.languageCode == 'en' ? const Color(0xFF5F33E1) : const Color(0xFFEEE9FF),
+                              borderRadius: BorderRadius.circular(15),
+                            ),
+                          ),
+                          Positioned(
+                            left: context.locale.languageCode == 'en' ? null : 2, // Отступ слева
+                            right: context.locale.languageCode == 'en' ? 2 : null, // Отступ справа
+                            top: 2, // Отступ сверху
+                            child: Container(
+                              width: 22, // Ширина шарика
+                              height: 22,
+                              decoration: BoxDecoration(
+                                color: context.locale.languageCode == 'en' ? const Color(0xFFFFFFFF) : const Color(0xFF5F33E1),
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
                 ),
+
                 Text(
                   'En'.tr(), // Локализованная метка для английского
                   style: const TextStyle(fontSize: 16),
@@ -222,17 +258,17 @@ class _SettingsPageState extends State<SettingsPage> {
         duration: const Duration(milliseconds: 300),
         curve: Curves.easeInOut,
         width: 50,
-        height: 50,
+        height: 40,
         decoration: BoxDecoration(
-          color: isSelected ? const Color(0xFF5F33E1) : Colors.transparent,
-          borderRadius: BorderRadius.circular(12),
+          color: isSelected ? Color(0xFF5F33E1) : Colors.transparent,
+          borderRadius: BorderRadius.circular(18),
         ),
         child: Center(
           child: Image.asset(
             assetPath,
-            width: 28,
-            height: 28,
-            color: isSelected ? Colors.white : const Color(0xFF5F33E1),
+            width: 24,
+            height: 24,
+            color: isSelected ? Colors.white : Color(0xFF5F33E1),
           ),
         ),
       ),

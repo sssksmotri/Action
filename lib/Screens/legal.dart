@@ -29,7 +29,7 @@ class _legalPageState extends State<legalPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar:  AppBar(
+      appBar: AppBar(
         backgroundColor: Colors.white,
         leading: IconButton(
           icon: Image.asset(
@@ -44,10 +44,10 @@ class _legalPageState extends State<legalPage> {
         elevation: 0,
         title: Row(
           children: [
-             Text(
+            Text(
               'legal_information'.tr(),
               style: TextStyle(
-                fontWeight: FontWeight.bold, // Жирный текст
+                fontWeight: FontWeight.bold, // Bold text
               ),
             ),
           ],
@@ -68,17 +68,17 @@ class _legalPageState extends State<legalPage> {
             ),
           ],
         ),
-        child: const Text(
-          'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum. \n Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. \n Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur.',
-          style: TextStyle(
-            fontSize: 16,
-            color: Colors.black,
+        child: SingleChildScrollView( // Wrap the Text widget with SingleChildScrollView
+          child: const Text(
+            'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum. \n Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. \n Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur.',
+            style: TextStyle(
+              fontSize: 16,
+              color: Colors.black,
+            ),
           ),
         ),
-
       ),
       backgroundColor: Colors.white,
-
       bottomNavigationBar: Container(
         margin: const EdgeInsets.only(bottom: 30, right: 16, left: 16),
         decoration: BoxDecoration(
@@ -114,17 +114,17 @@ class _legalPageState extends State<legalPage> {
         duration: const Duration(milliseconds: 300),
         curve: Curves.easeInOut,
         width: 50,
-        height: 50,
+        height: 40,
         decoration: BoxDecoration(
-          color: isSelected ? const Color(0xFF5F33E1) : Colors.transparent,
-          borderRadius: BorderRadius.circular(12),
+          color: isSelected ? Color(0xFF5F33E1) : Colors.transparent,
+          borderRadius: BorderRadius.circular(18),
         ),
         child: Center(
           child: Image.asset(
             assetPath,
-            width: 28,
-            height: 28,
-            color: isSelected ? Colors.white : const Color(0xFF5F33E1),
+            width: 24,
+            height: 24,
+            color: isSelected ? Colors.white : Color(0xFF5F33E1),
           ),
         ),
       ),

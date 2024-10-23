@@ -85,58 +85,83 @@ class _StatsPageState extends State<StatsPage> {
   Future<void> _loadTasks() async {
     DatabaseHelper dbHelper = DatabaseHelper.instance;
 
+    // Приведение _startDate и _endDate к началу дня
+    DateTime startDate = DateTime(_startDate.year, _startDate.month, _startDate.day);
+    DateTime endDate = DateTime(_endDate.year, _endDate.month, _endDate.day);
+
     // Загружаем привычки
     final habits = await dbHelper.getHabitsForDateRange(
-      DateFormat('yyyy-MM-dd').format(_startDate),
-      DateFormat('yyyy-MM-dd').format(_endDate),
+      DateFormat('yyyy-MM-dd').format(startDate),
+      DateFormat('yyyy-MM-dd').format(endDate),
     );
 
-    print('Loaded Habits: $habits'); // Вывод загруженных привычек
+    print('Loaded Habits: $habits');
 
     // Загружаем логи привычек
     final habitLogs = await dbHelper.getHabitLogsForDateRange(
-      DateFormat('yyyy-MM-dd').format(_startDate),
-      DateFormat('yyyy-MM-dd').format(_endDate),
+      DateFormat('yyyy-MM-dd').format(startDate),
+      DateFormat('yyyy-MM-dd').format(endDate),
     );
 
-    print('Loaded Habit Logs: $habitLogs'); // Вывод логов привычек
+    print('Loaded Habit Logs: $habitLogs');
 
-    // Обновляем состояние
     setState(() {
       tasks.clear();
 
       for (var habit in habits) {
-        // Вычисляем количество завершений для каждой привычки
-        int completedCount = habitLogs
-            .where((log) => log['habit_id'] == habit['id'] && log['status'] == 'completed')
-            .length; // Изменено, чтобы учитывать только завершенные задачи
-        int totalDays = _endDate.difference(_startDate).inDays + 1;
+        // Количество дней в периоде
+        int totalDays = endDate.difference(startDate).inDays + 1;
 
-        // Генерация списка завершённых дней
+        // Если totalDays меньше или равно 0, продолжаем (избегаем ошибок с отрицательными значениями)
+        if (totalDays <= 0) {
+          print('Invalid totalDays: $totalDays');
+          continue;
+        }
+
+        // Инициализация isCompleted как списка из false
         List<bool> isCompleted = List<bool>.filled(totalDays, false);
+
+        // Заполняем isCompleted на основе логов
         for (var log in habitLogs) {
           if (log['habit_id'] == habit['id'] && log['status'] == 'completed') {
-            DateTime logDate = DateTime.parse(log['date']);
-            int dayIndex = logDate.difference(_startDate).inDays;
-            isCompleted[dayIndex] = true;
+            DateTime logDate = DateTime.parse(log['date']).toLocal();
+            logDate = DateTime(logDate.year, logDate.month, logDate.day);
+
+            // Индекс дня относительно _startDate
+            int dayIndex = logDate.difference(startDate).inDays;
+
+            // Проверка на допустимость индекса
+            if (dayIndex >= 0 && dayIndex < totalDays) {
+              isCompleted[dayIndex] = true;
+            } else {
+              print('Invalid dayIndex: $dayIndex');
+            }
           }
         }
 
-        // Добавляем задачи в список
+        // Проверяем, что isCompleted заполнен
+        print('isCompleted for task ${habit['name']}: $isCompleted');
+
+        // Вычисляем количество завершённых дней
+        int completedCount = isCompleted.where((completed) => completed).length;
+
+        // Добавляем задачу в список с корректно инициализированным isCompleted
         tasks.add({
           'task': habit['name'],
           'completedCount': completedCount,
           'totalDays': totalDays,
-          'isCompleted': isCompleted,
+          'isCompleted': List<bool>.from(isCompleted),
           'index': habit['id'],
         });
 
-        print('Task Added: ${habit['name']}, Completed: $completedCount/$totalDays'); // Вывод данных о задаче
+        print('Task Added: ${habit['name']}, Completed: $completedCount/$totalDays');
       }
 
-      print('Final Tasks List: $tasks'); // Вывод финального списка задач
+      print('Final Tasks List: $tasks');
     });
   }
+
+
 
 
   // Форматирование диапазона дат
@@ -146,6 +171,23 @@ class _StatsPageState extends State<StatsPage> {
 
   // Карточка с прогрессом выполнения привычки
   Widget _buildTaskCard(Map<String, dynamic> task) {
+    List<bool> isCompleted = task['isCompleted'] ?? [];
+
+    // Проверка длины списка
+    print('Building card for task: ${task['task']} with isCompleted: $isCompleted');
+
+    // Если isCompleted по-прежнему пустой, возвращаем заглушку
+    if (isCompleted.isEmpty) {
+      print('isCompleted is empty for task: ${task['task']}');
+      return Card(
+        child: Column(
+          children: [
+            Text(task['task']),
+            Text('No completion data available'),  // Заглушка на случай отсутствия данных
+          ],
+        ),
+      );
+    }
     return Card(
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(10),
@@ -195,8 +237,7 @@ class _StatsPageState extends State<StatsPage> {
     );
   }
 
-  // Прогресс-бар выполнения привычки (продолговатый вместо кругов)
-  // Прогресс-бар выполнения привычки (продолговатый вместо кругов)
+
   Widget _buildProgressBar(int completed, int total, List<bool> isCompleted) {
     // Рассчитываем максимальное количество элементов в строке и количество строк
     int maxItemsPerRow;
@@ -261,7 +302,7 @@ class _StatsPageState extends State<StatsPage> {
         title: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-             Text(
+            Text(
               tr('statistics'),
               style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
             ),
@@ -336,6 +377,7 @@ class _StatsPageState extends State<StatsPage> {
                         _startDate = _startDate!.subtract(Duration(days: 7));
                         _endDate = _endDate!.subtract(Duration(days: 7));
                       }
+                      _loadTasks();
                     });
                   },
                 ),
@@ -355,15 +397,21 @@ class _StatsPageState extends State<StatsPage> {
               // Правая стрелка
               Container(
                 child: IconButton(
-                  icon: const Icon(Icons.chevron_right, color: Color(0xFF5F33E1)),
-                  onPressed: () {
+                  icon: Icon(
+                    Icons.chevron_right,
+                    color: (_endDate != null && _endDate!.add(Duration(days: 7)).isBefore(DateTime.now().add(Duration(days: 1))))
+                        ? const Color(0xFF5F33E1) // Обычный цвет для активного состояния
+                        : const Color(0x4D5F33E1), // Полупрозрачный цвет для неактивного состояния
+                  ),
+                  onPressed: (_endDate != null && _endDate!.add(Duration(days: 7)).isBefore(DateTime.now().add(Duration(days: 1))))
+                      ? () {
                     setState(() {
-                      if (_endDate != null && _endDate!.add(Duration(days: 7)).isBefore(DateTime.now().add(Duration(days: 1)))) {
-                        _startDate = _startDate!.add(Duration(days: 7));
-                        _endDate = _endDate!.add(Duration(days: 7));
-                      }
+                      _startDate = _startDate!.add(Duration(days: 7));
+                      _endDate = _endDate!.add(Duration(days: 7));
+                      _loadTasks();
                     });
-                  },
+                  }
+                      : null, // Делаем кнопку недоступной, если условие не выполняется
                 ),
               ),
 
@@ -626,44 +674,74 @@ class _StatsPageState extends State<StatsPage> {
   Future<void> _updateTasks() async {
     DatabaseHelper dbHelper = DatabaseHelper.instance;
 
+    // Приведение _startDate и _endDate к началу дня
+    DateTime startDate = DateTime(_startDate.year, _startDate.month, _startDate.day);
+    DateTime endDate = DateTime(_endDate.year, _endDate.month, _endDate.day);
+
     final habits = await dbHelper.getHabitsForDateRange(
-      DateFormat('yyyy-MM-dd').format(_startDate),
-      DateFormat('yyyy-MM-dd').format(_endDate),
+      DateFormat('yyyy-MM-dd').format(startDate),
+      DateFormat('yyyy-MM-dd').format(endDate),
     );
 
     final habitLogs = await dbHelper.getHabitLogsForDateRange(
-      DateFormat('yyyy-MM-dd').format(_startDate),
-      DateFormat('yyyy-MM-dd').format(_endDate),
+      DateFormat('yyyy-MM-dd').format(startDate),
+      DateFormat('yyyy-MM-dd').format(endDate),
     );
 
     setState(() {
       tasks.clear();
-      for (var habit in habits) {
-        int completedCount = habitLogs.where((log) => log['habit_id'] == habit['id']).length;
-        int totalDays = _endDate.difference(_startDate).inDays + 1;
 
-        tasks.add({
-          'task': habit['name'],
-          'completedCount': completedCount,
-          'totalDays': totalDays,
-          'index': habit['id'],
-        });
+      // Используем Map для устранения дублирования
+      final taskMap = <int, Map<String, dynamic>>{};
+
+      for (var habit in habits) {
+        int totalDays = endDate.difference(startDate).inDays + 1;
+
+        // Приведение logDate к началу дня для корректного сравнения
+        List<bool> isCompleted = List<bool>.filled(totalDays, false);
+
+        for (var log in habitLogs) {
+          if (log['habit_id'] == habit['id'] && log['status'] == 'completed') {
+            DateTime logDate = DateTime.parse(log['date']).toLocal();
+            // Приведение logDate к началу дня для корректного расчёта
+            logDate = DateTime(logDate.year, logDate.month, logDate.day);
+
+            int dayIndex = logDate.difference(startDate).inDays;
+            if (dayIndex >= 0 && dayIndex < totalDays) {
+              isCompleted[dayIndex] = true;
+            }
+          }
+        }
+
+        int completedCount = isCompleted.where((completed) => completed).length;
+
+        // Убеждаемся, что задача добавляется только один раз
+        if (!taskMap.containsKey(habit['id'])) {
+          taskMap[habit['id']] = {
+            'task': habit['name'],
+            'completedCount': completedCount,
+            'totalDays': totalDays,
+            'isCompleted': List<bool>.from(isCompleted),
+            'index': habit['id'],
+          };
+        }
       }
+
+      // Добавляем задачи без дублирования
+      tasks.addAll(taskMap.values);
 
       // Применяем сортировку в зависимости от выбранного фильтра
       if (_selectedFilter == 'Ascending') {
-        tasks.sort((a, b) => a['completedCount'].compareTo(b['completedCount'])); // Сортировка по возрастанию
+        tasks.sort((a, b) => a['completedCount'].compareTo(b['completedCount']));
       } else if (_selectedFilter == 'Descending') {
-        tasks.sort((a, b) => b['completedCount'].compareTo(a['completedCount'])); // Сортировка по убыванию
+        tasks.sort((a, b) => b['completedCount'].compareTo(a['completedCount']));
       } else if (_selectedFilter == 'Custom') {
-        // Пример пользовательской сортировки: сортировка по названию задачи
-        tasks.sort((a, b) => a['task'].compareTo(b['task'])); // Сортировка по имени задачи
+        tasks.sort((a, b) => a['task'].compareTo(b['task']));
       }
+
+      print('Final Tasks List: $tasks');
     });
   }
-
-
-
 
   // Нижняя навигационная панель
   Widget _buildBottomNavigationBar() {
@@ -702,16 +780,16 @@ class _StatsPageState extends State<StatsPage> {
         duration: const Duration(milliseconds: 300),
         curve: Curves.easeInOut,
         width: 50,
-        height: 50,
+        height: 40,
         decoration: BoxDecoration(
           color: isSelected ? Color(0xFF5F33E1) : Colors.transparent,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(18),
         ),
         child: Center(
           child: Image.asset(
             assetPath,
-            width: 28,
-            height: 28,
+            width: 24,
+            height: 24,
             color: isSelected ? Colors.white : Color(0xFF5F33E1),
           ),
         ),

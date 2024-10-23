@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import 'settings_screen.dart';
 import 'notes.dart';
 import '../main.dart';
+import 'dart:ui';
 import 'stat.dart';
 import 'package:action_notes/Service/HabitReminderService.dart';
 import 'package:easy_localization/easy_localization.dart';
@@ -84,95 +85,109 @@ class _AddActionPageState extends State<AddActionPage> {
     }
   }
 
-  _showDeleteDialog(BuildContext context, String taskTitle,
-      Function() onDelete) {
+  void _showDeleteDialog(BuildContext context, String taskTitle, Function() onDelete) {
     showDialog(
       context: context,
+      barrierColor: Colors.black.withOpacity(0.1), // Легкое затемнение вместе с размытием
       builder: (BuildContext context) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
-          ),
-          contentPadding: const EdgeInsets.fromLTRB(24, 20, 24, 10),
-          // Паддинг для внутреннего контента
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              RichText(
-                textAlign: TextAlign.center,
-                text: TextSpan(
-                  text: "The action has been successfully created!",
-                  style: const TextStyle(
-                    color: Colors.black,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 24,
-                  ),
-
-                ),
+        return Stack(
+          children: [
+            BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5), // Эффект размытия
+              child: Container(
+                color: Colors.black.withOpacity(0), // Прозрачный контейнер для сохранения размытия
               ),
-            ],
-          ),
-          actionsPadding: const EdgeInsets.symmetric(
-              horizontal: 16, vertical: 10),
-          actions: <Widget>[
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                // Кнопка "No, leave it"
-                Expanded(
-                  child: TextButton(
-                    onPressed: () {
-                      Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => HomePage())); // Вызов метода удаления
-                    },
-                    style: TextButton.styleFrom(
-                      backgroundColor: const Color(0xFFFFFFF),
-                      // Легкий фиолетовый фон
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(24),
-                      ),
-                      padding: const EdgeInsets.symmetric(vertical: 15),
-                    ),
-                    child: const Text(
-                      "Home",
-                      style: TextStyle(
-                        color: Color(0xFF5F33E1), // Фиолетовый текст
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
+            ),
+            Center(
+              child: AlertDialog(
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20),
                 ),
-                const SizedBox(width: 10), // Отступ между кнопками
-                // Кнопка "Yes, delete"
-                Expanded(
-                  child: TextButton(
-                    onPressed: () {
-                      Navigator.of(context).pop();
-
-                    },
-                    style: TextButton.styleFrom(
-                      backgroundColor: Color(0xFF5F33E1), // Красный фон
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(24),
-                      ),
-                      padding: const EdgeInsets.symmetric(vertical: 15),
-                    ),
-                    child: const Text(
-                      "Create a new action",
-                      style: TextStyle(
-                        color: Colors.white, // Белый текст
-                        fontWeight: FontWeight.bold,
+                contentPadding: const EdgeInsets.fromLTRB(24, 20, 24, 10),
+                content: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    RichText(
+                      textAlign: TextAlign.center,
+                      text: TextSpan(
+                        text: "action_successful".tr(), // Локализованный текст
+                        style: const TextStyle(
+                          color: Colors.black,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 24,
+                        ),
                       ),
                     ),
-                  ),
+                  ],
                 ),
-              ],
+                actionsPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                actions: <Widget>[
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      // Кнопка "Home"
+                      Expanded(
+                        child: TextButton(
+                          onPressed: () {
+                            Navigator.of(context).pop();
+                            Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => HomePage()));
+                          },
+                          style: TextButton.styleFrom(
+                            backgroundColor: const Color(0xFFEEE9FF),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(24),
+                            ),
+                            padding: const EdgeInsets.symmetric(vertical: 15),
+                          ),
+                          child: Text(
+                            "home".tr(), // Локализованный текст
+                            style: const TextStyle(
+                              color: Color(0xFF5F33E1),
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 10), // Отступ между кнопками
+                      // Кнопка "Create a new action"
+                      Expanded(
+                        child: TextButton(
+                          onPressed: () {
+                            Navigator.of(context).pop();
+                            Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => AddActionPage()));
+                          },
+                          style: TextButton.styleFrom(
+                            backgroundColor: const Color(0xFF5F33E1),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(24),
+                            ),
+                            padding: const EdgeInsets.symmetric(vertical: 15, horizontal: 20),
+                          ),
+                          child: Text(
+                            "create_new_action".tr(), // Локализованный текст
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                            ),
+                            textAlign: TextAlign.center,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
           ],
         );
       },
     );
   }
+
+
 
   @override
   Widget build(BuildContext context) {
@@ -182,7 +197,7 @@ class _AddActionPageState extends State<AddActionPage> {
         automaticallyImplyLeading: false,
         backgroundColor: Colors.white,
         elevation: 0,
-        title:  Text(
+        title: Text(
           tr('add_action'),
           style: TextStyle(
             fontSize: 24,
@@ -191,26 +206,51 @@ class _AddActionPageState extends State<AddActionPage> {
           ),
         ),
         centerTitle: false, // Заголовок слева
+        actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: 16.0), // Отступ справа
+            child: GestureDetector(
+              onTap: () {
+                // Возврат на главную страницу и удаление всех предыдущих страниц
+                Navigator.of(context).pushAndRemoveUntil(
+                  MaterialPageRoute(builder: (context) => HomePage()), // Замените MainPage на ваш главный экран
+                      (Route<dynamic> route) => false, // Удаляем все предыдущие страницы
+                );
+              },
+              child: Container(
+                padding: const EdgeInsets.all(1.0), // Отступы вокруг крестика
+                decoration: BoxDecoration(
+                  color: const Color(0xFFEEE9FF), // Фоновый цвет вокруг крестика
+                  borderRadius: BorderRadius.circular(8), // Скругление углов
+                ),
+                child: Icon(
+                  Icons.close, // Иконка крестика
+                  color: const Color(0xFF5F33E1), // Цвет крестика
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
       body: SingleChildScrollView(
         child: Padding(
-          padding: const EdgeInsets.all(16.0),
+          padding: const EdgeInsets.all(12.0),
           child: Column(
             children: [
               _buildActionNameCard(),
               // Карточка с названием действия
-              const SizedBox(height: 24),
+              const SizedBox(height: 12),
               _buildTypeSelectionCard(),
               // Карточка с типом выполнения
-              const SizedBox(height: 24),
+              const SizedBox(height: 12),
               _buildDateSelectionCard(),
               // Карточка с выбором дат
-              const SizedBox(height: 24),
+              const SizedBox(height: 12),
               _buildDaysAndNotifications(),
               // Чекбоксы с днями и тумблер для уведомлений
-              const SizedBox(height: 24),
+              const SizedBox(height: 12),
               _buildNotificationToggle(),
-              const SizedBox(height: 24),
+              const SizedBox(height: 12),
               _buildAddButton(taskTitle),
               // Кнопка создания действия
             ],
@@ -253,16 +293,16 @@ class _AddActionPageState extends State<AddActionPage> {
         duration: const Duration(milliseconds: 300),
         curve: Curves.easeInOut,
         width: 50,
-        height: 50,
+        height: 40,
         decoration: BoxDecoration(
           color: isSelected ? Color(0xFF5F33E1) : Colors.transparent,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(18),
         ),
         child: Center(
           child: Image.asset(
             assetPath,
-            width: 28,
-            height: 28,
+            width: 24,
+            height: 24,
             color: isSelected ? Colors.white : Color(0xFF5F33E1),
           ),
         ),
@@ -346,7 +386,7 @@ class _AddActionPageState extends State<AddActionPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-           Text(
+          Text(
             tr('type_of_fulfilment'),
             style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
           ),
@@ -422,7 +462,7 @@ class _AddActionPageState extends State<AddActionPage> {
           Text(
             label,
             style: const TextStyle(
-              fontSize: 16,
+              fontSize: 14,
               fontWeight: FontWeight.bold, // Жирный текст
             ),
           ),
@@ -528,77 +568,94 @@ class _AddActionPageState extends State<AddActionPage> {
 
     showDialog(
       context: context,
+      barrierColor: Colors.black.withOpacity(0.1), // Полупрозрачный барьер
       builder: (BuildContext context) {
-        return Dialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
-          ),
-          child: Container(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // Календарь
-                TableCalendar(
-                  firstDay: DateTime.now(),  // Ограничиваем выбор на сегодня
-                  lastDay: DateTime.utc(2030, 3, 14),
-                  focusedDay: initialDate,
-                  selectedDayPredicate: (day) {
-                    return isSameDay(day, initialDate);
-                  },
-                  calendarStyle: CalendarStyle(
-                    selectedDecoration: BoxDecoration(
-                      color: const Color(0xFF5F33E1),
-                      shape: BoxShape.circle,
-                    ),
-                    todayDecoration: BoxDecoration(
-                      color: Colors.transparent,
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: const Color(0xFF5F33E1),
-                        width: 1,
-                      ),
-                    ),
-                    todayTextStyle: TextStyle(
-                      color: Colors.black,
-                    ),
-                    outsideDaysVisible: false,
-                  ),
-                  headerStyle: HeaderStyle(
-                    formatButtonVisible: false,
-                    titleCentered: true,
-                    leftChevronIcon: const Icon(Icons.chevron_left, color: Color(0xFF5F33E1)),
-                    rightChevronIcon: const Icon(Icons.chevron_right, color: Color(0xFF5F33E1)),
-                  ),
-                  daysOfWeekVisible: true,
-                  onDaySelected: (selectedDay, focusedDay) {
-                    print("Selected day: $selectedDay");
-
-                    if (isStartDate) {
-                      // Если это выбор начальной даты
-                      if (endDate != null && selectedDay.isAfter(endDate!)) {
-                        _showError(tr("error_start_date_later_than_end"));
-                      } else {
-                        onDateSelected(selectedDay);
-                        dateError = null;
-                        _resetInvalidDays(); // Сбрасываем чекбоксы после выбора начальной даты
-                      }
-                    } else {
-                      // Если это выбор конечной даты
-                      if (startDate != null && selectedDay.isBefore(startDate!)) {
-                        _showError(tr("error_end_date_earlier_than_start"));
-                      } else {
-                        onDateSelected(selectedDay);
-                        dateError = null;
-                        _resetInvalidDays(); // Сбрасываем чекбоксы после выбора конечной даты
-                      }
-                    }
-                    Navigator.pop(context); // Закрываем диалог
-                  },
-                ),
-              ],
+        return Stack(
+          children: [
+            // Эффект размытия
+            BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5), // Эффект размытия
+              child: Container(
+                color: Colors.black.withOpacity(0), // Прозрачный контейнер для сохранения размытия
+              ),
             ),
-          ),
+            Positioned(
+              bottom: 90, // Отступ выше BottomNavigationBar
+              left: 10, // Отступы для более узкого окна
+              right: 10,
+              child: Dialog(
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Container(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // Календарь
+                      TableCalendar(
+                        firstDay: DateTime.now(), // Ограничиваем выбор на сегодня
+                        lastDay: DateTime.utc(2030, 3, 14),
+                        focusedDay: initialDate,
+                        selectedDayPredicate: (day) {
+                          return isSameDay(day, initialDate);
+                        },
+                        calendarStyle: CalendarStyle(
+                          selectedDecoration: BoxDecoration(
+                            color: const Color(0xFF5F33E1),
+                            shape: BoxShape.circle,
+                          ),
+                          todayDecoration: BoxDecoration(
+                            color: Colors.transparent,
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: const Color(0xFF5F33E1),
+                              width: 1,
+                            ),
+                          ),
+                          todayTextStyle: TextStyle(
+                            color: Colors.black,
+                          ),
+                          outsideDaysVisible: false,
+                        ),
+                        headerStyle: HeaderStyle(
+                          formatButtonVisible: false,
+                          titleCentered: true,
+                          leftChevronIcon: const Icon(Icons.chevron_left, color: Color(0xFF5F33E1)),
+                          rightChevronIcon: const Icon(Icons.chevron_right, color: Color(0xFF5F33E1)),
+                        ),
+                        daysOfWeekVisible: true,
+                        onDaySelected: (selectedDay, focusedDay) {
+                          print("Selected day: $selectedDay");
+
+                          if (isStartDate) {
+                            // Если это выбор начальной даты
+                            if (endDate != null && selectedDay.isAfter(endDate!)) {
+                              _showError(tr("error_start_date_later_than_end"));
+                            } else {
+                              onDateSelected(selectedDay);
+                              dateError = null;
+                              _resetInvalidDays(); // Сбрасываем чекбоксы после выбора начальной даты
+                            }
+                          } else {
+                            // Если это выбор конечной даты
+                            if (startDate != null && selectedDay.isBefore(startDate!)) {
+                              _showError(tr("error_end_date_earlier_than_start"));
+                            } else {
+                              onDateSelected(selectedDay);
+                              dateError = null;
+                              _resetInvalidDays(); // Сбрасываем чекбоксы после выбора конечной даты
+                            }
+                          }
+                          Navigator.pop(context); // Закрываем диалог
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
         );
       },
     );
@@ -670,7 +727,7 @@ class _AddActionPageState extends State<AddActionPage> {
                   children: [
                      Text(
                       tr('start_date'), // Заголовок для поля начальной даты
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                     ),
                     const SizedBox(height: 8),
                     // Отступ между заголовком и полем
@@ -697,7 +754,7 @@ class _AddActionPageState extends State<AddActionPage> {
                   children: [
                      Text(
                       tr('end_date'), // Заголовок для поля конечной даты
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                     ),
                     const SizedBox(height: 8),
                     // Отступ между заголовком и полем
@@ -850,8 +907,8 @@ class _AddActionPageState extends State<AddActionPage> {
                 Text(
                   days[index],
                   style: const TextStyle(
-                    fontSize: 16,
-                    color: Color(0xFF212121),
+                    fontSize: 14,
+                    color: Color(0xFF616060),
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -940,8 +997,8 @@ class _AddActionPageState extends State<AddActionPage> {
                 Text(
                   days[dayIndex],
                   style: const TextStyle(
-                    fontSize: 16,
-                    color: Color(0xFF212121),
+                    fontSize: 14,
+                    color: Color(0xFF616060),
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -992,7 +1049,7 @@ class _AddActionPageState extends State<AddActionPage> {
     return Column(
       children: [
         Padding(
-          padding: const EdgeInsets.symmetric(vertical: 24.0),
+          padding: const EdgeInsets.symmetric(vertical: 6.0),
           child: Row(
             children: [
               Container(
@@ -1121,47 +1178,81 @@ class _AddActionPageState extends State<AddActionPage> {
                     fontWeight: FontWeight.bold,
                   ),
                 ),
-                Switch(
-                  value: notificationsEnabled,
-                  onChanged: (startDate != null && endDate != null) // Проверяем, выбраны ли даты
-                      ? (bool value) {
-                    setState(() {
-                      notificationsEnabled = value;
-                      // Обновляем дни для всех уведомлений при включении тумблера
-                      if (notificationsEnabled) {
-                        for (var notification in notificationWidgets) {
-                          notification['days'] = List<bool>.generate(7, (dayIndex) {
-                            return _isWithinDateRange(startDate!, endDate!, dayIndex);
-                          });
-                        }
-                      } else {
-                        for (var notification in notificationWidgets) {
-                          notification['days'] = List<bool>.filled(7, false); // Сбрасываем дни, если уведомления выключены
-                        }
+                Padding(
+                  padding: const EdgeInsets.all(4.0), // Прямые отступы вокруг переключателя
+                  child: Container(
+                    height: 30, // Высота контейнера
+                    width: 50, // Ширина контейнера
+                    decoration: BoxDecoration(
+                      color: Colors.transparent,
+                      border: Border.all(
+                        color: Colors.white, // Цвет ободка
+                        width: 2, // Ширина ободка
+                      ),
+                      borderRadius: BorderRadius.circular(15), // Скругление углов
+                    ),
+                    child: GestureDetector(
+                      onTap: (startDate != null && endDate != null)
+                          ? () {
+                        setState(() {
+                          notificationsEnabled = !notificationsEnabled;
+                          // Обновляем дни для всех уведомлений при включении тумблера
+                          if (notificationsEnabled) {
+                            for (var notification in notificationWidgets) {
+                              notification['days'] = List<bool>.generate(7, (dayIndex) {
+                                return _isWithinDateRange(startDate!, endDate!, dayIndex);
+                              });
+                            }
+                          } else {
+                            for (var notification in notificationWidgets) {
+                              notification['days'] = List<bool>.filled(7, false); // Сбрасываем дни, если уведомления выключены
+                            }
+                          }
+                        });
                       }
-                    });
-                  }
-                      : (bool value) {
-                    _showError(tr('error_select_start_end_dates')); // Показываем ошибку
-                  },
-                  activeColor: Color(0xFFFFFFFF),
-                  activeTrackColor: Color(0xFF5F33E1),
-                  inactiveTrackColor: Color(0xFFEEE9FF),
-                  inactiveThumbColor: Color(0xFF5F33E1),
+                          : () {
+                        _showError(tr('error_select_start_end_dates')); // Показываем ошибку
+                      },
+                      child: Stack(
+                        children: [
+                          Container(
+                            decoration: BoxDecoration(
+                              color: notificationsEnabled ? const Color(0xFF5F33E1) : const Color(0xFFEEE9FF),
+                              borderRadius: BorderRadius.circular(15),
+                            ),
+                          ),
+                          Positioned(
+                            left: notificationsEnabled ? null : 2, // Отступ слева
+                            right: notificationsEnabled ? 2 : null, // Отступ справа
+                            top: 2, // Отступ сверху
+                            child: Container(
+                              width: 22, // Ширина шарика
+                              height: 22,
+                              decoration: BoxDecoration(
+                                color: notificationsEnabled ? const Color(0xFFFFFFFF) : const Color(0xFF5F33E1),
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
                 ),
+
+
+
               ],
             ),
             if (notificationsEnabled)
-              Padding(
-                padding: const EdgeInsets.only(top: 16.0),
-                child: Column(
+               Column(
                   children: notificationWidgets
                       .asMap()
                       .entries
                       .map((entry) => _buildTimePicker(entry.key))
                       .toList(),
                 ),
-              ),
+
           ],
         ),
       ),

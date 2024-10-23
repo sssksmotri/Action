@@ -5,14 +5,14 @@ import 'Screens/add.dart';
 import 'Screens/settings_screen.dart';
 import 'Screens/notes.dart';
 import 'Screens/archive.dart';
-import 'Screens/addpage.dart';
+import 'dart:ui';
 import 'Screens/stat.dart';
 import 'package:action_notes/Service/database_helper.dart';
 import 'package:table_calendar/table_calendar.dart';
 import 'package:action_notes/Service/NotificationService.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'dart:convert';
 import 'package:action_notes/Service/HabitReminderService.dart';
+
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -60,7 +60,7 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-
+  bool _isTextVisible = true;
   List<Map<String, dynamic>> _habits = [];
   String? _selectedFilter;
   int _selectedIndex = 0;
@@ -75,6 +75,7 @@ class _HomePageState extends State<HomePage> {
     habitReminderService.initializeReminders();// Фильтруем привычки при инициализации
     DatabaseHelper db = DatabaseHelper.instance;
     db.archiveExpiredHabits();
+    _loadTextVisibility();
   }
 
   void _onItemTapped(int index) {
@@ -116,98 +117,107 @@ class _HomePageState extends State<HomePage> {
 
 
   // Метод для подтверждения удаления
-  void _showDeleteDialog(BuildContext context, String taskTitle,int habitId,
+  void _showDeleteDialog(BuildContext context, String taskTitle, int habitId,
       Function() onDelete) {
     showDialog(
       context: context,
+      barrierColor: Colors.black.withOpacity(0.1),
       builder: (BuildContext context) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
-          ),
-          contentPadding: const EdgeInsets.fromLTRB(24, 20, 24, 10),
-          // Паддинг для внутреннего контента
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              RichText(
-                textAlign: TextAlign.center,
-                text: TextSpan(
-                  text: "are_you_sure".tr(),
-                  style: const TextStyle(
-                    color: Colors.black,
-                    fontSize: 18,
-                  ),
-                  children: [
-                    TextSpan(
-                      text: taskTitle,
+        return Stack(
+          children: [
+            // Эффект размытия
+            BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5), // Эффект размытия
+              child: Container(
+                color: Colors.black.withOpacity(0), // Прозрачный контейнер для сохранения размытия
+              ),
+            ),
+            // Основное содержимое диалогового окна
+            AlertDialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+              ),
+              contentPadding: const EdgeInsets.fromLTRB(24, 20, 24, 10),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  RichText(
+                    textAlign: TextAlign.center,
+                    text: TextSpan(
+                      text: "are_you_sure".tr(),
                       style: const TextStyle(
-                        color: Color(0xFF5F33E1),
-                        // Фиолетовый цвет для названия задачи
-                        fontWeight: FontWeight.bold,
+                        color: Colors.black,
+                        fontSize: 18,
+                      ),
+                      children: [
+                        TextSpan(
+                          text: taskTitle,
+                          style: const TextStyle(
+                            color: Color(0xFF5F33E1), // Фиолетовый цвет для названия задачи
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const TextSpan(
+                          text: "?",
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              actionsPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              actions: <Widget>[
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    // Кнопка "No, leave it"
+                    Expanded(
+                      child: TextButton(
+                        onPressed: () {
+                          Navigator.of(context).pop(); // Закрыть диалог
+                        },
+                        style: TextButton.styleFrom(
+                          backgroundColor: const Color(0xFFEEE9FF), // Легкий фиолетовый фон
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(24),
+                          ),
+                          padding: const EdgeInsets.symmetric(vertical: 15),
+                        ),
+                        child: Text(
+                          "no_leave_it".tr(),
+                          style: TextStyle(
+                            color: Color(0xFF5F33E1), // Фиолетовый текст
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                       ),
                     ),
-                    const TextSpan(
-                      text: "?",
+                    const SizedBox(width: 10), // Отступ между кнопками
+                    // Кнопка "Yes, delete"
+                    Expanded(
+                      child: TextButton(
+                        onPressed: () {
+                          Navigator.of(context).pop(); // Закрыть диалог
+                          _deleteHabit(habitId); // Вызов метода удаления
+                        },
+                        style: TextButton.styleFrom(
+                          backgroundColor: Colors.red, // Красный фон
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(24),
+                          ),
+                          padding: const EdgeInsets.symmetric(vertical: 15),
+                        ),
+                        child: Text(
+                          "yes_delete".tr(),
+                          style: TextStyle(
+                            color: Colors.white, // Белый текст
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
                     ),
                   ],
-                ),
-              ),
-            ],
-          ),
-          actionsPadding: const EdgeInsets.symmetric(
-              horizontal: 16, vertical: 10),
-          actions: <Widget>[
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                // Кнопка "No, leave it"
-                Expanded(
-                  child: TextButton(
-                    onPressed: () {
-                      Navigator.of(context).pop(); // Закрыть диалог
-                    },
-                    style: TextButton.styleFrom(
-                      backgroundColor: const Color(0xFFEEE9FF),
-                      // Легкий фиолетовый фон
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(24),
-                      ),
-                      padding: const EdgeInsets.symmetric(vertical: 15),
-                    ),
-                    child:  Text(
-                      "no_leave_it".tr(),
-                      style: TextStyle(
-                        color: Color(0xFF5F33E1), // Фиолетовый текст
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 10), // Отступ между кнопками
-                // Кнопка "Yes, delete"
-                Expanded(
-                  child: TextButton(
-                    onPressed: () {
-                      Navigator.of(context).pop(); // Закрыть диалог
-                      _deleteHabit(habitId); // Вызов метода удаления
-                    },
-                    style: TextButton.styleFrom(
-                      backgroundColor: Colors.red, // Красный фон
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(24),
-                      ),
-                      padding: const EdgeInsets.symmetric(vertical: 15),
-                    ),
-                    child:  Text(
-                      "yes_delete".tr(),
-                      style: TextStyle(
-                        color: Colors.white, // Белый текст
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
                 ),
               ],
             ),
@@ -236,17 +246,17 @@ class _HomePageState extends State<HomePage> {
                 ),
                 const SizedBox(width: 8),
                 Container(
-                  padding: const EdgeInsets.all(4),
+                  padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
                     color: Color(0xFFEEE9FF),
-                    borderRadius: BorderRadius.circular(8),
+                    shape: BoxShape.circle,
                   ),
                   child: Text(
                     '${_habits.length}', // Динамическое отображение количества привычек
                     style: TextStyle(
                       color: Color(0xFF5F33E1),
                       fontWeight: FontWeight.bold,
-                      fontSize: 18,
+                      fontSize: 16,
                     ),
                   ),
                 ),
@@ -269,7 +279,6 @@ class _HomePageState extends State<HomePage> {
                         builder: (context) => ArchivePage(),
                       ),
                     ).then((result) {
-                      // Здесь вы можете обновить состояние, если нужно
                       if (result != null) {
                         setState(() {
                           _loadHabits();
@@ -288,204 +297,252 @@ class _HomePageState extends State<HomePage> {
         child: Column(
           children: [
             Expanded(
-              child: ReorderableListView.builder(
-                onReorder: _onReorder, // Используем метод _onReorder
-                itemCount: _habits.length, // Количество привычек
-                itemBuilder: (context, index) {
-                  final habit = _habits[index]; // Привычка
-                  int habitType = int.parse(habit['type'].toString());
+              child: ListView(
+                children: [
+                  // Карточки привычек
+                  ReorderableListView.builder(
+                    shrinkWrap: true,
+                    physics: NeverScrollableScrollPhysics(), // Отключаем собственный скролл
+                    onReorder: _onReorder, // Используем метод _onReorder
+                    itemCount: _habits.length, // Количество привычек
+                    itemBuilder: (context, index) {
+                      final habit = _habits[index]; // Привычка
+                      int habitType = int.parse(habit['type'].toString());
 
-                  // Для привычек с типом "одно действие" (habitType == 0)
-                  // Для привычек с типом "одно действие" (habitType == 0)
-                  if (habitType == 0) {
-                    bool isCompleted = habit['currentProgress'] == 1;
+                      if (habitType == 0) {
+                        bool isCompleted = habit['currentProgress'] == 1;
 
-                    return _buildHabitItem(
-                      habit['name'], // Название привычки
-                      isCompleted, // Завершена ли привычка
-                          () async {
-                        if (!isSameDay(_selectedDate, _today)) {
-                          return;
-                        }
+                        return _buildHabitItem(
+                          habit['name'], // Название привычки
+                          isCompleted, // Завершена ли привычка
+                              () async {
+                            if (!isSameDay(_selectedDate, _today)) {
+                              return;
+                            }
 
-                        // Переключаем состояние завершения привычки
-                        int newProgress = isCompleted ? 0 : 1; // 0 - не завершено, 1 - завершено
+                            // Переключаем состояние завершения привычки
+                            int newProgress = isCompleted ? 0 : 1; // 0 - не завершено, 1 - завершено
 
-                        await DatabaseHelper.instance.updateHabitProgress(
+                            await DatabaseHelper.instance.updateHabitProgress(
+                              habit['id'],
+                              newProgress.toDouble(), // Обновляем прогресс до нового значения
+                              DateTime.now().toIso8601String().split('T')[0],
+                            );
+
+                            if (newProgress == 1) {
+                              // Если привычка завершена, обновляем статус в БД
+                              await DatabaseHelper.instance.updateHabitStatus(
+                                habit['id'],
+                                'completed',
+                                DateTime.now().toIso8601String().split('T')[0],
+                              );
+                            }
+                            if (newProgress == 0) {
+                              // Если привычка завершена, обновляем статус в БД
+                              await DatabaseHelper.instance.updateHabitStatus(
+                                habit['id'],
+                                'not_completed',
+                                DateTime.now().toIso8601String().split('T')[0],
+                              );
+                            }
+
+                            setState(() {
+                              _habits = List.from(_habits);
+                              _habits[index] = Map<String, dynamic>.from(_habits[index])
+                                ..['currentProgress'] = newProgress; // Обновляем текущий прогресс
+                            });
+                          },
                           habit['id'],
-                          newProgress.toDouble(), // Обновляем прогресс до нового значения
-                          DateTime.now().toIso8601String().split('T')[0],
+                          key: ValueKey(habit['id']),
                         );
+                      }
 
-                        if (newProgress == 1) {
-                          // Если привычка завершена, обновляем статус в БД
-                          await DatabaseHelper.instance.updateHabitStatus(
-                            habit['id'],
-                            'completed',
-                          );
-                        }
-                        if (newProgress == 0) {
-                          // Если привычка завершена, обновляем статус в БД
-                          await DatabaseHelper.instance.updateHabitStatus(
-                            habit['id'],
-                            'not_completed',
-                          );
-                        }
+                      // Для привычек с количеством (habitType == 1)
+                      else if (habitType == 1) {
+                        int currentProgress = (habit['currentProgress'] ?? 0).toInt();
+                        int maxProgress = (habit['quantity'] ?? 10).toInt();
 
-                        setState(() {
-                          _habits = List.from(_habits);
-                          _habits[index] = Map<String, dynamic>.from(_habits[index])
-                            ..['currentProgress'] = newProgress; // Обновляем текущий прогресс
-                        });
-                      },
-                      habit['id'],
-                      key: ValueKey(habit['id']),
-                    );
-                  }
+                        return _buildCountItem(
+                          habit['name'],
+                          currentProgress, // Отображаем текущий прогресс
+                          maxProgress,
+                              () async {
+                            if (!isSameDay(_selectedDate, _today)) {
+                              return;
+                            }
+                            if (currentProgress < maxProgress) {
+                              int newProgress = currentProgress + 1; // Увеличиваем прогресс на 1
 
-                  // Для привычек с количеством (habitType == 1)
-                  else if (habitType == 1) {
-                    int currentProgress = (habit['currentProgress'] ?? 0).toInt();
-                    int maxProgress = (habit['quantity'] ?? 10).toInt();
+                              await DatabaseHelper.instance.updateHabitProgress(
+                                habit['id'],
+                                newProgress.toDouble(),
+                                DateTime.now().toIso8601String().split('T')[0],
+                              );
 
-                    return _buildCountItem(
-                      habit['name'],
-                      currentProgress, // Отображаем текущий прогресс
-                      maxProgress,
-                          () async {
-                        if (!isSameDay(_selectedDate, _today)) {
-                          return;
-                        }
-                        if (currentProgress < maxProgress) {
-                          int newProgress = currentProgress + 1; // Увеличиваем прогресс на 1
+                              if (newProgress == maxProgress) {
+                                // Если достигнут максимальный прогресс, обновляем статус
+                                await DatabaseHelper.instance.updateHabitStatus(
+                                  habit['id'],
+                                  'completed',
+                                  DateTime.now().toIso8601String().split('T')[0],
+                                );
+                              }
 
-                          await DatabaseHelper.instance.updateHabitProgress(
-                            habit['id'],
-                            newProgress.toDouble(),
-                            DateTime.now().toIso8601String().split('T')[0],
-                          );
+                              setState(() {
+                                _habits = List.from(_habits);
+                                _habits[index] = Map<String, dynamic>.from(_habits[index])
+                                  ..['currentProgress'] = newProgress; // Обновляем текущий прогресс
+                              });
+                            }
+                          },
+                              () async {
+                            if (!isSameDay(_selectedDate, _today)) {
+                              return;
+                            }
+                            if (currentProgress > 0) {
+                              int newProgress = currentProgress - 1; // Уменьшаем прогресс на 1
+                              await DatabaseHelper.instance.updateHabitStatus(
+                                habit['id'],
+                                'not_completed',
+                                DateTime.now().toIso8601String().split('T')[0],
+                              );
 
-                          if (newProgress == maxProgress) {
-                            // Если достигнут максимальный прогресс, обновляем статус
-                            await DatabaseHelper.instance.updateHabitStatus(
-                              habit['id'],
-                              'completed',
-                            );
-                          }
+                              await DatabaseHelper.instance.updateHabitProgress(
+                                habit['id'],
+                                newProgress.toDouble(),
+                                DateTime.now().toIso8601String().split('T')[0],
+                              );
 
-                          setState(() {
-                            _habits = List.from(_habits);
-                            _habits[index] = Map<String, dynamic>.from(_habits[index])
-                              ..['currentProgress'] = newProgress; // Обновляем текущий прогресс
-                          });
-                        }
-                      },
-                          () async {
-                        if (!isSameDay(_selectedDate, _today)) {
-                          return;
-                        }
-                        if (currentProgress > 0) {
-                          int newProgress = currentProgress - 1; // Уменьшаем прогресс на 1
-                          await DatabaseHelper.instance.updateHabitStatus(
-                            habit['id'],
-                            'not_completed',
-                          );
+                              setState(() {
+                                _habits = List.from(_habits);
+                                _habits[index] = Map<String, dynamic>.from(_habits[index])
+                                  ..['currentProgress'] = newProgress; // Обновляем текущий прогресс
+                              });
+                            }
+                          },
+                              () {
+                            _showDeleteDialog(context, habit['name'], habit['id'], () {});
+                          },
+                          habit['id'],
+                          key: ValueKey(habit['id']),
+                        );
+                      }
 
-                          await DatabaseHelper.instance.updateHabitProgress(
-                            habit['id'],
-                            newProgress.toDouble(),
-                            DateTime.now().toIso8601String().split('T')[0],
-                          );
+                      else if (habitType == 2) {
+                        double currentProgress = habit['currentProgress'] ?? 0.0;
+                        double maxProgress = habit['volume_specified'] ?? 1.0;
 
-                          setState(() {
-                            _habits = List.from(_habits);
-                            _habits[index] = Map<String, dynamic>.from(_habits[index])
-                              ..['currentProgress'] = newProgress; // Обновляем текущий прогресс
-                          });
-                        }
-                      },
-                          () {
-                        _showDeleteDialog(context, habit['name'], habit['id'], () {});
-                      },
-                      habit['id'],
-                      key: ValueKey(habit['id']),
-                    );
-                  }
+                        return _buildPressCountHabit(
+                          habit,
+                              () async {
+                            if (!isSameDay(_selectedDate, _today)) {
+                              return;
+                            }
+                            if (currentProgress < maxProgress) {
+                              double newProgress = currentProgress + (habit['volume_per_press'] ?? 0.1);
 
-                  else if (habitType == 2) {
-                    double currentProgress = habit['currentProgress'] ?? 0.0;
-                    double maxProgress = habit['volume_specified'] ?? 1.0;
+                              await DatabaseHelper.instance.updateHabitProgress(
+                                habit['id'],
+                                newProgress.toDouble(),
+                                DateTime.now().toIso8601String().split('T')[0],
+                              );
 
-                    return _buildPressCountHabit(
-                      habit,
-                          () async {
-                        if (!isSameDay(_selectedDate, _today)) {
-                          return;
-                        }
-                        if (currentProgress < maxProgress) {
-                          double newProgress = currentProgress + (habit['volume_per_press'] ?? 0.1);
+                              if (newProgress >= maxProgress) {
+                                // Обновляем статус, если достигнут максимальный прогресс
+                                await DatabaseHelper.instance.updateHabitStatus(
+                                  habit['id'],
+                                  'completed',
+                                  DateTime.now().toIso8601String().split('T')[0],
+                                );
+                              }
 
-                          await DatabaseHelper.instance.updateHabitProgress(
-                            habit['id'],
-                            newProgress.toDouble(),
-                            DateTime.now().toIso8601String().split('T')[0],
-                          );
+                              setState(() {
+                                _habits = List.from(_habits);
+                                _habits[index] = Map<String, dynamic>.from(_habits[index])
+                                  ..['currentProgress'] = newProgress;
+                              });
+                            }
+                          },
+                              () async {
+                            if (!isSameDay(_selectedDate, _today)) {
+                              return;
+                            }
+                            if (currentProgress > 0) {
+                              double newProgress = currentProgress - (habit['volume_per_press'] ?? 0.1);
+                              await DatabaseHelper.instance.updateHabitStatus(
+                                habit['id'],
+                                'not_completed',
+                                DateTime.now().toIso8601String().split('T')[0],
+                              );
+                              await DatabaseHelper.instance.updateHabitProgress(
+                                habit['id'],
+                                newProgress.toDouble(),
+                                DateTime.now().toIso8601String().split('T')[0],
+                              );
 
-                          if (newProgress >= maxProgress) {
-                            // Обновляем статус, если достигнут максимальный прогресс
-                            await DatabaseHelper.instance.updateHabitStatus(
-                              habit['id'],
-                              'completed',
-                            );
-                          }
+                              setState(() {
+                                _habits = List.from(_habits);
+                                _habits[index] = Map<String, dynamic>.from(_habits[index])
+                                  ..['currentProgress'] = newProgress;
+                              });
+                            }
+                          },
+                              () {
+                            // Логика редактирования привычки
+                          },
+                              () {
+                            _showDeleteDialog(context, habit['name'], habit['id'], () {});
+                          },
+                          habit['id'],
+                          key: ValueKey(habit['id']),
+                        );
+                      }
+                      else {
+                        return Container(); // Для других типов
+                      }
+                    },
+                  ),
+                  const SizedBox(height: 10),
 
-                          setState(() {
-                            _habits = List.from(_habits);
-                            _habits[index] = Map<String, dynamic>.from(_habits[index])
-                              ..['currentProgress'] = newProgress;
-                          });
-                        }
-                      },
-                          () async {
-                        if (!isSameDay(_selectedDate, _today)) {
-                          return;
-                        }
-                        if (currentProgress > 0) {
-                          double newProgress = currentProgress - (habit['volume_per_press'] ?? 0.1);
-                          await DatabaseHelper.instance.updateHabitStatus(
-                            habit['id'],
-                            'not_completed',
-                          );
-                          await DatabaseHelper.instance.updateHabitProgress(
-                            habit['id'],
-                            newProgress.toDouble(),
-                            DateTime.now().toIso8601String().split('T')[0],
-                          );
+                  // Текст под карточками
+                  if (_isTextVisible)
 
-                          setState(() {
-                            _habits = List.from(_habits);
-                            _habits[index] = Map<String, dynamic>.from(_habits[index])
-                              ..['currentProgress'] = newProgress;
-                          });
-                        }
-                      },
-                          () {
-                        // Логика редактирования привычки
-                      },
-                          () {
-                        _showDeleteDialog(context, habit['name'], habit['id'], () {});
-                      },
-                      habit['id'],
-                      key: ValueKey(habit['id']),
-                    );
-                  }
-                  else {
-                    return Container(); // Для других типов
-                  }
-                },
+                       Row(
+                        mainAxisSize: MainAxisSize.min,
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 2, horizontal: 6),
+                            child: Text(
+                              "Hold down the habit bar to move it around",
+                              style: TextStyle(
+                                color: const Color(0xFF5F33E1),
+                              ),
+                            ),
+                          ),
+                          GestureDetector(
+                            onTap: () {
+                              setState(() {
+                                _isTextVisible = false;
+                                 _saveTextVisibility();
+                              });
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.all(2),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF5F33E1),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: const Icon(Icons.close, size: 12, color: Colors.white),
+                            ),
+                          ),
+                        ],
+                      ),
+
+                ],
               ),
             ),
-
             _buildBottomDateSelector(),
           ],
         ),
@@ -515,9 +572,23 @@ class _HomePageState extends State<HomePage> {
           ],
         ),
       ),
+
     );
   }
 
+
+
+  Future<void> _loadTextVisibility() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _isTextVisible = prefs.getBool('isTextVisible') ?? true; // Значение по умолчанию - true
+    });
+  }
+
+  Future<void> _saveTextVisibility() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('isTextVisible', _isTextVisible);
+  }
 
 
 
@@ -554,7 +625,7 @@ class _HomePageState extends State<HomePage> {
     DatabaseHelper dbHelper = DatabaseHelper.instance;
 
     // Получаем все активные привычки
-    List<Map<String, dynamic>> habits = await dbHelper.queryAllHabits();
+    List<Map<String, dynamic>> habits = await dbHelper.queryActiveHabits();
 
     // Получаем список id всех привычек
     List<int> habitIds = habits.map((habit) => habit['id'] as int).toList();
@@ -632,10 +703,13 @@ class _HomePageState extends State<HomePage> {
     setState(() {
       _habits = updatedHabits;
       _selectedFilter='Custom';
+      _isTextVisible = false;
     });
 
     // Сохраняем обновленные позиции в базе данных
     await _updateHabitPositionsInDb();
+
+    await _saveTextVisibility();
   }
 
 
@@ -646,6 +720,8 @@ class _HomePageState extends State<HomePage> {
       Map<String, dynamic> habit = _habits[i];
       // Обновляем позицию в базе данных
       await dbHelper.updateHabitPosition(habit['id'], i);
+      _isTextVisible = false;
+      await _saveTextVisibility();
     }
   }
 
@@ -732,16 +808,16 @@ class _HomePageState extends State<HomePage> {
         duration: const Duration(milliseconds: 300),
         curve: Curves.easeInOut,
         width: 50,
-        height: 50,
+        height: 40,
         decoration: BoxDecoration(
           color: isSelected ? Color(0xFF5F33E1) : Colors.transparent,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(18),
         ),
         child: Center(
           child: Image.asset(
             assetPath,
-            width: 28,
-            height: 28,
+            width: 24,
+            height: 24,
             color: isSelected ? Colors.white : Color(0xFF5F33E1),
           ),
         ),
@@ -792,25 +868,25 @@ class _HomePageState extends State<HomePage> {
                     },
                     itemBuilder: (BuildContext context) {
                       return [
-                        const PopupMenuItem<String>(
+                         PopupMenuItem<String>(
                           value: 'Archive',
                           child: Padding(
                             padding: EdgeInsets.symmetric(vertical: 4),
-                            child: Text('Archive'),
+                            child: Text('archive'.tr()),
                           ),
                         ),
-                        const PopupMenuItem<String>(
+                         PopupMenuItem<String>(
                           value: 'Edit',
                           child: Padding(
                             padding: EdgeInsets.symmetric(vertical: 4),
-                            child: Text('Edit'),
+                            child: Text('edit'.tr()),
                           ),
                         ),
-                        const PopupMenuItem<String>(
+                         PopupMenuItem<String>(
                           value: 'Delete',
                           child: Padding(
                             padding: EdgeInsets.symmetric(vertical: 4),
-                            child: Text('Delete', style: TextStyle(color: Colors.red)),
+                            child: Text('delete'.tr(), style: const TextStyle(color: Colors.red)),
                           ),
                         ),
                       ];
@@ -1060,12 +1136,12 @@ class _HomePageState extends State<HomePage> {
 
         // Обновляем привычку в базе данных, устанавливая archived в 1
         await db.updateHabit({'id': habitId, 'archived': 1}); // Архивируем привычку
-
+        habitReminderService.cancelAllReminders(habitId);
         // Обновляем состояние
         setState(() {
           // Создаем новый список на основе существующего, чтобы избежать ошибок с изменяемыми объектами
           _habits = List.from(_habits)..removeWhere((habit) => habit['id'] == habitId);
-          _loadHabits();
+
         });
       }
 
@@ -1091,23 +1167,7 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  Widget _buildTodayButton() {
-    return Center(
-      child: ElevatedButton(
-        onPressed: () {
-          setState(() {
-            _selectedDate = _today;
-          });
-        },
-        style: ElevatedButton.styleFrom(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(30),
-          ),
-        ),
-        child: Text('go_to_today'.tr()),
-      ),
-    );
-  }
+
 
   Future<void> _deleteHabit(int habitId) async {
     DatabaseHelper db = DatabaseHelper.instance; // Получаем экземпляр вашего помощника по базе данных
@@ -1163,7 +1223,12 @@ class _HomePageState extends State<HomePage> {
 
             // Правая стрелка
             IconButton(
-              icon: const Icon(Icons.chevron_right, color: Color(0xFF5F33E1)),
+              icon: Icon(
+                Icons.chevron_right,
+                color: isSameDay(_selectedDate, _today)
+                    ? const Color(0x4D5F33E1)
+                    : const Color(0xFF5F33E1), // Обычный цвет
+              ),
               onPressed: isSameDay(_selectedDate, _today)
                   ? null  // Блокируем стрелку, если выбранная дата — сегодняшняя
                   : () {
@@ -1173,6 +1238,7 @@ class _HomePageState extends State<HomePage> {
                 });
               },
             ),
+
 
             // Кнопка возврата к сегодняшней дате, если выбранная дата не сегодняшняя
             if (!isSameDay(_selectedDate, _today))
@@ -1208,15 +1274,23 @@ class _HomePageState extends State<HomePage> {
   void _showCalendarDialog() {
     showDialog(
       context: context,
+      barrierColor: Colors.black.withOpacity(0.1),
       builder: (BuildContext context) {
         return Stack(
           children: [
+            // Эффект размытия
+            BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5), // Эффект размытия
+              child: Container(
+                color: Colors.black.withOpacity(0), // Прозрачный контейнер для сохранения размытия
+              ),
+            ),
             Positioned(
               bottom: 90, // Отступ выше BottomNavigationBar
               left: 10, // Отступы для более узкого окна
               right: 10,
               child: Opacity(
-                opacity: 1, // Делаем окно полупрозрачным
+                opacity: 1, // Делаем окно непрозрачным
                 child: Dialog(
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(10),
@@ -1271,8 +1345,7 @@ class _HomePageState extends State<HomePage> {
                             }
                           },
                           enabledDayPredicate: (day) {
-                            return day.isBefore(
-                                _today); // Блокируем завтрашние дни
+                            return day.isBefore(_today); // Блокируем завтрашние дни
                           },
                         ),
                       ],
@@ -1286,4 +1359,5 @@ class _HomePageState extends State<HomePage> {
       },
     );
   }
+
 }

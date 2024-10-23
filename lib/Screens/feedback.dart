@@ -69,7 +69,7 @@ class _FeedbackPageState extends State<FeedbackPage> {
               'contact_us_part1'.tr(),  // Локализованная часть "If you are dissatisfied with something, "
               'write_to_us'.tr(),  // Локализованная часть "write to us"
               'we_will_fix'.tr(),  // Локализованная часть "we will fix the error."
-              'Suggest improvements',  // Локализованная кнопка "Suggest improvements"
+              'suggest_improvements'.tr(),  // Локализованная кнопка "Suggest improvements"
                   () {
                 Navigator.push(context, MaterialPageRoute(builder: (context) => SuggestPage()));
               },
@@ -116,7 +116,7 @@ class _FeedbackPageState extends State<FeedbackPage> {
             textAlign: TextAlign.center, // Center align the text
             text: TextSpan(
               style: const TextStyle(
-                fontSize: 18,
+                fontSize: 14,
                 fontWeight: FontWeight.bold, // Bold text
                 color: Colors.black,
               ),
@@ -155,7 +155,7 @@ class _FeedbackPageState extends State<FeedbackPage> {
         style: const TextStyle(
           color: Colors.white,
           fontWeight: FontWeight.bold,
-          fontSize: 18,
+          fontSize: 14,
         ),
       ),
     );
@@ -168,17 +168,17 @@ class _FeedbackPageState extends State<FeedbackPage> {
         duration: const Duration(milliseconds: 300),
         curve: Curves.easeInOut,
         width: 50,
-        height: 50,
+        height: 40,
         decoration: BoxDecoration(
-          color: isSelected ? const Color(0xFF5F33E1) : Colors.transparent,
-          borderRadius: BorderRadius.circular(12),
+          color: isSelected ? Color(0xFF5F33E1) : Colors.transparent,
+          borderRadius: BorderRadius.circular(18),
         ),
         child: Center(
           child: Image.asset(
             assetPath,
-            width: 28,
-            height: 28,
-            color: isSelected ? Colors.white : const Color(0xFF5F33E1),
+            width: 24,
+            height: 24,
+            color: isSelected ? Colors.white : Color(0xFF5F33E1),
           ),
         ),
       ),

@@ -615,23 +615,21 @@ class _ChartScreenState extends State<ChartScreen> {
 
   Widget _buildNavItem(int index, String assetPath, {bool isSelected = false}) {
     return GestureDetector(
-      onTap: () {
-        _onItemTapped(index);
-      },
+      onTap: () => _onItemTapped(index),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 300),
         curve: Curves.easeInOut,
         width: 50,
-        height: 50,
+        height: 40,
         decoration: BoxDecoration(
           color: isSelected ? Color(0xFF5F33E1) : Colors.transparent,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(18),
         ),
         child: Center(
           child: Image.asset(
             assetPath,
-            width: 28,
-            height: 28,
+            width: 24,
+            height: 24,
             color: isSelected ? Colors.white : Color(0xFF5F33E1),
           ),
         ),
@@ -642,7 +640,6 @@ class _ChartScreenState extends State<ChartScreen> {
   Widget _buildBottomDateSelector() {
     String formattedStartDate = DateFormat('MMMM d', Localizations.localeOf(context).toString()).format(_selectedDateRangeStart);
     String formattedEndDate = DateFormat('MMMM d', Localizations.localeOf(context).toString()).format(_selectedDateRangeEnd);
-
     String formattedDateRange = '$formattedStartDate - $formattedEndDate';
 
     return GestureDetector(
@@ -658,6 +655,7 @@ class _ChartScreenState extends State<ChartScreen> {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
+            // Левая стрелка
             IconButton(
               icon: const Icon(Icons.chevron_left, color: Color(0xFF5F33E1)),
               onPressed: () {
@@ -687,6 +685,8 @@ class _ChartScreenState extends State<ChartScreen> {
                 });
               },
             ),
+
+            // Текущий диапазон дат
             Text(
               formattedDateRange,
               style: const TextStyle(
@@ -695,15 +695,23 @@ class _ChartScreenState extends State<ChartScreen> {
                 fontWeight: FontWeight.bold,
               ),
             ),
+
+            // Правая стрелка
             IconButton(
-              icon: const Icon(Icons.chevron_right, color: Color(0xFF5F33E1)),
-              onPressed: () {
+              icon: Icon(
+                Icons.chevron_right,
+                color: _isForwardNavigationAllowed()
+                    ? const Color(0xFF5F33E1) // Обычный цвет
+                    : const Color(0x4D5F33E1), // Полупрозрачный цвет для недоступного состояния
+              ),
+              onPressed: _isForwardNavigationAllowed()
+                  ? () {
                 setState(() {
                   // Логика для перехода на следующий период (неделя, 2 недели, месяц)
-                  if (_selectedTab == 0 && _selectedDateRangeEnd.add(Duration(days: 7)).isBefore(_today.add(Duration(days: 1)))) {
+                  if (_selectedTab == 0) {
                     _selectedDateRangeStart = _selectedDateRangeStart.add(Duration(days: 7));
                     _selectedDateRangeEnd = _selectedDateRangeEnd.add(Duration(days: 7));
-                  } else if (_selectedTab == 1 && _selectedDateRangeEnd.add(Duration(days: 14)).isBefore(_today.add(Duration(days: 1)))) {
+                  } else if (_selectedTab == 1) {
                     _selectedDateRangeStart = _selectedDateRangeStart.add(Duration(days: 14));
                     _selectedDateRangeEnd = _selectedDateRangeEnd.add(Duration(days: 14));
                   } else if (_selectedTab == 2) {
@@ -717,16 +725,17 @@ class _ChartScreenState extends State<ChartScreen> {
 
                     if (_selectedDateRangeEnd.isAfter(_today)) {
                       _selectedDateRangeStart = DateTime(_today.year, _today.month, 1);
-
                     }
                   }
 
                   loadChartData(); // Обновляем данные графика
                 });
-              },
+              }
+                  : null, // Делаем кнопку недоступной, если условие не выполняется
             ),
-            // Кнопка возврата к сегодняшней дате, если диапазон не включает текущий день
-            if (!isSameDay(_selectedDateRangeEnd, _today))
+
+            // Кнопка возврата к сегодняшнему дню, если текущий день не включен
+            if (!_isTodayInCurrentRange())
               Container(
                 width: 35,
                 height: 35,
@@ -743,8 +752,18 @@ class _ChartScreenState extends State<ChartScreen> {
                   onPressed: () {
                     setState(() {
                       _selectedDate = _today;
-                      _selectedDateRangeStart = _today.subtract(Duration(days: _today.weekday - 1));
-                      _selectedDateRangeEnd = _selectedDateRangeStart.add(Duration(days: 6));
+
+                      // Обновление диапазона дат в зависимости от выбранного периода
+                      if (_selectedTab == 0) {
+                        _selectedDateRangeStart = _today.subtract(Duration(days: _today.weekday - 1));
+                        _selectedDateRangeEnd = _selectedDateRangeStart.add(Duration(days: 6));
+                      } else if (_selectedTab == 1) {
+                        _selectedDateRangeStart = _today.subtract(Duration(days: _today.weekday - 1));
+                        _selectedDateRangeEnd = _selectedDateRangeStart.add(Duration(days: 13));
+                      } else if (_selectedTab == 2) {
+                        _selectedDateRangeStart = DateTime(_today.year, _today.month, 1);
+                        _selectedDateRangeEnd = DateTime(_today.year, _today.month + 1, 0);
+                      }
 
                       loadChartData(); // Обновляем данные графика
                     });
@@ -756,6 +775,28 @@ class _ChartScreenState extends State<ChartScreen> {
       ),
     );
   }
+
+// Проверка, доступна ли навигация вперед
+  bool _isForwardNavigationAllowed() {
+    if (_selectedTab == 0) {
+      // Для недельного периода
+      return _selectedDateRangeEnd.add(Duration(days: 7)).isBefore(_today.add(Duration(days: 1)));
+    } else if (_selectedTab == 1) {
+      // Для двухнедельного периода
+      return _selectedDateRangeEnd.add(Duration(days: 14)).isBefore(_today.add(Duration(days: 1)));
+    } else if (_selectedTab == 2) {
+      // Для месячного периода
+      DateTime nextMonthStart = DateTime(_selectedDateRangeStart.year, _selectedDateRangeStart.month + 1, 1);
+      return nextMonthStart.isBefore(_today.add(Duration(days: 1)));
+    }
+    return false;
+  }
+
+// Проверка, включен ли текущий день в диапазон
+  bool _isTodayInCurrentRange() {
+    return _today.isAfter(_selectedDateRangeStart) && _today.isBefore(_selectedDateRangeEnd.add(Duration(days: 1)));
+  }
+
 
 
   void _showCalendarDialog() {

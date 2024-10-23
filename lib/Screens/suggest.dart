@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:action_notes/main.dart';
 import 'settings_screen.dart';
+import 'dart:ui';
 import 'package:easy_localization/easy_localization.dart';
 
 class SuggestPage extends StatefulWidget {
@@ -38,50 +39,66 @@ class _SuggestPageState extends State<SuggestPage> {
     }
   }
 
+
+
   void _showSubmissionDialog() {
     showDialog(
       context: context,
+      barrierColor: Colors.black.withOpacity(0.1),
       builder: (BuildContext context) {
-        return AlertDialog(
-          content: Column(
-            mainAxisSize: MainAxisSize.min, // Adjust the size of the dialog
-            children: [
-              Text(
-                'yourOfferSubmitted'.tr(),
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-                textAlign: TextAlign.center,
+        return Stack(
+          children: [
+            // Эффект размытия
+            BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5), // Эффект размытия
+              child: Container(
+                color: Colors.black.withOpacity(0), // Прозрачный контейнер для сохранения размытия
               ),
-              const SizedBox(height: 20), // Space between text and button
-              SizedBox(
-                width: double.infinity, // Full width for the button
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF5F33E1), // Button color
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(30), // Rounded corners
-                    ),
-                    padding: const EdgeInsets.symmetric(vertical: 15), // Vertical padding
+            ),
+            // Основное содержимое диалогового окна
+            AlertDialog(
+              content: Column(
+                mainAxisSize: MainAxisSize.min, // Настройка размера диалога
+                children: [
+                  Text(
+                    'yourOfferSubmitted'.tr(),
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                    textAlign: TextAlign.center,
                   ),
-                  onPressed: () {
-                    Navigator.of(context).pop(); // Close the dialog
-                    Navigator.of(context).pop(); // Return to previous screen
-                  },
-                  child: Text(
-                    'home'.tr(),
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold, // Bold text
-                      color: Colors.white, // White text
-                      fontSize: 18,
+                  const SizedBox(height: 20), // Отступ между текстом и кнопкой
+                  SizedBox(
+                    width: double.infinity, // Полная ширина для кнопки
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF5F33E1), // Цвет кнопки
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(30), // Закругленные углы
+                        ),
+                        padding: const EdgeInsets.symmetric(vertical: 15), // Вертикальный отступ
+                      ),
+                      onPressed: () {
+                        Navigator.of(context).pop();
+                        Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => HomePage()));
+                      },
+                      child: Text(
+                        'home'.tr(),
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold, // Жирный текст
+                          color: Colors.white, // Белый текст
+                          fontSize: 18,
+                        ),
+                      ),
                     ),
                   ),
-                ),
+                ],
               ),
-            ],
-          ),
+            ),
+          ],
         );
       },
     );
   }
+
 
   @override
   Widget build(BuildContext context) {
@@ -140,7 +157,7 @@ class _SuggestPageState extends State<SuggestPage> {
                     _buildTextField(
                       controller: _emailController,
                       hintText: 'email'.tr(),
-                      suffixText: 'not necessary', // Suffix for not necessary
+                      suffixText: 'not_necessary'.tr(), // Suffix for not necessary
                     ),
                     const SizedBox(height: 10), // Space between fields
 
@@ -261,17 +278,17 @@ class _SuggestPageState extends State<SuggestPage> {
         duration: const Duration(milliseconds: 300),
         curve: Curves.easeInOut,
         width: 50,
-        height: 50,
+        height: 40,
         decoration: BoxDecoration(
-          color: isSelected ? const Color(0xFF5F33E1) : Colors.transparent,
-          borderRadius: BorderRadius.circular(12),
+          color: isSelected ? Color(0xFF5F33E1) : Colors.transparent,
+          borderRadius: BorderRadius.circular(18),
         ),
         child: Center(
           child: Image.asset(
             assetPath,
-            width: 28,
-            height: 28,
-            color: isSelected ? Colors.white : const Color(0xFF5F33E1),
+            width: 24,
+            height: 24,
+            color: isSelected ? Colors.white : Color(0xFF5F33E1),
           ),
         ),
       ),
