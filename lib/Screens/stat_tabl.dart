@@ -10,6 +10,7 @@ import 'package:action_notes/Screens/settings_screen.dart';
 import 'package:action_notes/Screens/add.dart';
 import 'package:action_notes/Screens/stat.dart';
 import 'package:easy_localization/easy_localization.dart';
+import 'dart:ui';
 class ChartScreen extends StatefulWidget {
   @override
   _ChartScreenState createState() => _ChartScreenState();
@@ -802,9 +803,17 @@ class _ChartScreenState extends State<ChartScreen> {
   void _showCalendarDialog() {
     showDialog(
       context: context,
+      barrierColor: Colors.black.withOpacity(0.1), // Полупрозрачная заливка
       builder: (BuildContext context) {
         return Stack(
           children: [
+            // Эффект размытия фона
+            BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5), // Размытие фона
+              child: Container(
+                color: Colors.black.withOpacity(0), // Прозрачный контейнер для сохранения эффекта размытия
+              ),
+            ),
             Positioned(
               bottom: 90,
               left: 10,
@@ -879,6 +888,7 @@ class _ChartScreenState extends State<ChartScreen> {
       },
     );
   }
+
 
 }
 

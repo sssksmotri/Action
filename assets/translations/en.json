@@ -1,6 +1,6 @@
 {
-  "completed_first": "Сначала выполненные",
-  "not_completed_first": "Сначала невыполненные",
+  "completed_first": "Completed first",
+  "not_completed_first": "Not completed at first",
   "custom": "Custom",
   "actions": "Actions",
   "are_you_sure": "Are you sure you want to delete?",

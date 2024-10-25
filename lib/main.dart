@@ -12,6 +12,10 @@ import 'package:table_calendar/table_calendar.dart';
 import 'package:action_notes/Service/NotificationService.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:action_notes/Service/HabitReminderService.dart';
+import 'package:device_info_plus/device_info_plus.dart';
+import 'package:permission_handler/permission_handler.dart';
+
+
 
 
 void main() async {
@@ -60,7 +64,7 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-  bool _isTextVisible = true;
+  bool _isTextVisible = false;
   List<Map<String, dynamic>> _habits = [];
   String? _selectedFilter;
   int _selectedIndex = 0;
@@ -68,6 +72,12 @@ class _HomePageState extends State<HomePage> {
   DateTime _today = DateTime.now();
   final HabitReminderService habitReminderService = HabitReminderService();
   bool _showDragHint = true;
+  DateTime? _loginTime;
+  Map<String, int> _sectionTimes = {}; // Для записи времени в разделах
+  int _habitCount = 0;
+  String deviceInfo = "Unknown";
+  bool _isDialogShownBefore = false;
+
   @override
   void initState() {
     super.initState();
@@ -76,7 +86,139 @@ class _HomePageState extends State<HomePage> {
     DatabaseHelper db = DatabaseHelper.instance;
     db.archiveExpiredHabits();
     _loadTextVisibility();
+    _loginTime = DateTime.now(); // Записываем время входа
+    _loadHabitCount();
+    _checkIfDialogShownBefore();
   }
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _getDeviceInfo(); // Перемещаем вызов в didChangeDependencies
+  }
+
+  Future<void> _getDeviceInfo() async {
+    DeviceInfoPlugin deviceInfoPlugin = DeviceInfoPlugin();
+    String deviceData;
+
+    try {
+      if (Theme.of(context).platform == TargetPlatform.android) {
+        AndroidDeviceInfo androidInfo = await deviceInfoPlugin.androidInfo;
+        deviceData = 'Android: ${androidInfo.model}, ${androidInfo.brand}, Android version: ${androidInfo.version.release}';
+        print('Device Info: Android device detected: $deviceData');
+      } else if (Theme.of(context).platform == TargetPlatform.iOS) {
+        IosDeviceInfo iosInfo = await deviceInfoPlugin.iosInfo;
+        deviceData = 'iOS: ${iosInfo.name}, ${iosInfo.systemVersion}, Model: ${iosInfo.utsname.machine}';
+        print('Device Info: iOS device detected: $deviceData');
+      } else {
+        deviceData = 'Other platform';
+        print('Device Info: Other platform detected.');
+      }
+    } catch (e) {
+      deviceData = 'Failed to get device info: $e';
+      print('Error: Failed to retrieve device info: $e');
+    }
+
+    setState(() {
+      deviceInfo = deviceData;
+    });
+
+    // Логируем сохранение информации о девайсе
+    print('Saving device info to the database: $deviceInfo');
+
+    // Сохраняем информацию о девайсе в таблицу
+    DatabaseHelper dbHelper = DatabaseHelper.instance;
+    await dbHelper.addDeviceInfo(deviceInfo);
+
+    // Логируем успешное завершение операции
+    print('Device info successfully saved to the database.');
+  }
+
+  // Проверка, показывался ли диалог ранее
+  Future<void> _checkIfDialogShownBefore() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    _isDialogShownBefore = prefs.getBool('isDialogShown') ?? false;
+
+    if (!_isDialogShownBefore) {
+      _checkNotificationPermission();
+    }
+  }
+
+  // Проверка разрешений
+  Future<void> _checkNotificationPermission() async {
+    var status = await Permission.notification.status;
+    if (status.isDenied || status.isPermanentlyDenied) {
+      _showPermissionDialog();
+    }
+  }
+
+  // Показ диалога с запросом разрешения
+  void _showPermissionDialog() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          title: Row(
+            children: [
+              Icon(Icons.notifications_active, color: Colors.blueAccent),
+              SizedBox(width: 10),
+              Text(
+                'Разрешить уведомления',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize:18),
+              ),
+            ],
+          ),
+          content: Text(
+            'Для получения важных уведомлений, пожалуйста, разрешите отправку уведомлений.',
+            style: TextStyle(fontSize: 16),
+          ),
+          actionsPadding: EdgeInsets.symmetric(horizontal: 15, vertical: 10),
+          actions: [
+            TextButton(
+              child: Text(
+                'Отмена',
+                style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold),
+              ),
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.blueAccent,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+              child: Text(
+                'Разрешить',
+                style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+              ),
+              onPressed: () async {
+                Navigator.of(context).pop();
+                await _requestNotificationPermission();  // Запрос разрешения
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+
+  // Запрос разрешения на уведомления
+  Future<void> _requestNotificationPermission() async {
+    var status = await Permission.notification.request();
+
+    if (status.isGranted) {
+      // Сохранить состояние, чтобы не показывать диалог повторно
+      SharedPreferences prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('isDialogShown', true);
+    }
+  }
+
 
   void _onItemTapped(int index) {
     setState(() {
@@ -112,6 +254,49 @@ class _HomePageState extends State<HomePage> {
         context,
         MaterialPageRoute(builder: (context) => const StatsPage()),
       );
+    }
+  }
+
+  void _loadHabitCount() async {
+    List<Map<String, dynamic>> habits = await DatabaseHelper.instance.queryAllHabits();
+    setState(() {
+      _habitCount = habits.length; // Записываем количество привычек
+    });
+  }
+
+
+
+  void _logAppUsage() async {
+    // Вычисляем длительность сессии
+    final int duration = DateTime.now().difference(_loginTime!).inSeconds;
+
+    // Получаем язык приложения
+    final String language = context.locale.languageCode;
+
+    // Получаем текущую дату
+    final String currentDate = DateTime.now().toIso8601String().split('T')[0];
+
+    // Логирование времени, проведенного в разделах
+    final Map<String, dynamic> appUsageLog = {
+      'language': language,                        // Язык
+      'login_time': _loginTime!.toIso8601String(), // Время входа
+      'duration': duration,                        // Длительность активности
+      'date': currentDate,                         // Дата
+      'habit_count': _habitCount,                  // Количество привычек
+      'section_times': _sectionTimes.toString(),   // Время в разделах
+    };
+
+
+    // Вставляем запись в таблицу AppUsageLog
+    await DatabaseHelper.instance.insertAppUsageLog(appUsageLog);
+  }
+
+  // Метод для обновления времени на странице
+  void _updateSectionTime(String section) {
+    if (_sectionTimes.containsKey(section)) {
+      _sectionTimes[section] = _sectionTimes[section]! + 1; // Обновляем счетчик времени
+    } else {
+      _sectionTimes[section] = 1;
     }
   }
 
@@ -229,6 +414,7 @@ class _HomePageState extends State<HomePage> {
 
   @override
   Widget build(BuildContext context) {
+    _updateSectionTime('HomePage');
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9F9),
       appBar: AppBar(
@@ -663,6 +849,7 @@ class _HomePageState extends State<HomePage> {
       _habits = filteredHabits.map((habit) {
         int habitId = habit['id'] as int;
         double currentProgress = habitProgress[habitId] ?? 0.0;
+        _isTextVisible=true;
         return {
           ...habit,
           'currentProgress': currentProgress,  // Прогресс за выбранный день
@@ -730,7 +917,7 @@ class _HomePageState extends State<HomePage> {
   void _showPopupMenu(BuildContext context) {
     showMenu(
       context: context,
-      position: RelativeRect.fromLTRB(100, 100, 50, 0),
+      position: RelativeRect.fromLTRB(100, 50, 50, 0),
       items: [
         PopupMenuItem<String>(
           value: 'Completed first',
@@ -1325,6 +1512,10 @@ class _HomePageState extends State<HomePage> {
                           headerStyle: HeaderStyle(
                             formatButtonVisible: false,
                             titleCentered: true,
+                            titleTextFormatter: (date, locale) {
+                              return DateFormat.MMMM(locale).format(date); // Показываем только месяц
+                            },
+
                             leftChevronIcon: const Icon(
                                 Icons.chevron_left, color: Color(0xFF5F33E1)),
                             rightChevronIcon: const Icon(

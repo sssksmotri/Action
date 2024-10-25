@@ -11,6 +11,8 @@ class DatabaseHelper {
   static final tableReminders = 'Reminders';
   static final tableHabitLog = 'HabitLog';
   static final tableHabitNotes = 'HabitNotes';
+  static final tableAppUsageLog = "AppUsageLog";
+
 
 
   // Создание базы данных
@@ -79,6 +81,21 @@ class DatabaseHelper {
       FOREIGN KEY (habit_id) REFERENCES $tableHabits (id) ON DELETE CASCADE
     )
 ''');
+
+
+      await db.execute('''
+    CREATE TABLE $tableAppUsageLog (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      language TEXT,
+      login_time TEXT,
+      duration INTEGER,
+      habit_count INTEGER,
+      date TEXT ,
+      deviceInfo TEXT,
+      section_times TEXT
+    );
+  ''');
+
 
     await db.execute('''
       CREATE TABLE $tableHabitNotes (
@@ -424,6 +441,28 @@ class DatabaseHelper {
         'created_at': note['created_at'] ?? '',
       };
     }).toList();
+  }
+
+  Future<List<Map<String, dynamic>>> queryAllAppUsageLogs() async {
+    final db = await instance.database;
+    return await db.query('app_usage_log');
+  }
+
+  Future<int> insertAppUsageLog(Map<String, dynamic> row) async {
+    Database db = await instance.database;
+    return await db.insert('AppUsageLog', row);
+  }
+
+  Future<void> addDeviceInfo(String deviceInfo) async {
+    final db = await database;
+
+    await db.insert(
+      'AppUsageLog', // Замени на актуальное имя таблицы
+      {
+        'deviceInfo': deviceInfo, // Поле для информации о девайсе
+      },
+      conflictAlgorithm: ConflictAlgorithm.replace, // Обновляем запись в случае конфликта
+    );
   }
 
 
