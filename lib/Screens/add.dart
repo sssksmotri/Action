@@ -9,9 +9,11 @@ import 'dart:ui';
 import 'stat.dart';
 import 'package:action_notes/Service/HabitReminderService.dart';
 import 'package:easy_localization/easy_localization.dart';
+import 'package:action_notes/Widgets/loggable_screen.dart';
 
 class AddActionPage extends StatefulWidget {
-  const AddActionPage({Key? key}) : super(key: key);
+  final int sessionId;
+  const AddActionPage({Key? key, required this.sessionId}) : super(key: key);
 
   @override
   _AddActionPageState createState() => _AddActionPageState();
@@ -47,43 +49,71 @@ class _AddActionPageState extends State<AddActionPage> {
   // Списки для выбора часов и минут
   final List<int> hours = List.generate(24, (index) => index);
   final List<int> minutes = List.generate(60, (index) => index);
+  FocusNode hourFocusNode = FocusNode();
+  FocusNode minuteFocusNode = FocusNode();
+  FocusNode quantityNode = FocusNode();
+  int? _currentSessionId;
+
+  @override
+  void dispose() {
+    hourFocusNode.dispose();
+    minuteFocusNode.dispose();
+    quantityNode.dispose();
+    super.dispose();
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _currentSessionId = widget.sessionId; // Инициализируем _currentSessionId здесь
+  }
 
   void _onItemTapped(int index) {
     setState(() {
       _selectedIndex = index;
     });
-    if (index == 0) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const HomePage()),
-      );
-    }
-    if (index == 1) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const NotesPage()),
-      );
+
+    // Определим имя экрана вручную
+    String screenName;
+    Widget page;
+
+    switch (index) {
+      case 0:
+        screenName = 'HomePage';
+        page = HomePage(sessionId: widget.sessionId);
+        break;
+      case 1:
+        screenName = 'NotesPage';
+        page = NotesPage(sessionId: widget.sessionId);
+        break;
+      case 2:
+        screenName = 'AddActionPage';
+        page = AddActionPage(sessionId: widget.sessionId);
+        break;
+      case 3:
+        screenName = 'StatsPage';
+        page = StatsPage(sessionId: widget.sessionId);
+        break;
+      case 4:
+        screenName = 'SettingsPage';
+        page = SettingsPage(sessionId: widget.sessionId);
+        break;
+      default:
+        return;
     }
 
-    if (index == 4) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const SettingsPage()),
-      );
-    }
-    if (index == 2) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const AddActionPage()),
-      );
-    }
-    if (index == 3) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const StatsPage()),
-      );
-    }
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(
+        builder: (context) => LoggableScreen(
+          screenName: screenName, // Передаем четко определенное имя экрана
+          child: page,
+          currentSessionId: widget.sessionId,
+        ),
+      ),
+    );
   }
+
 
   void _showDeleteDialog(BuildContext context, String taskTitle, Function() onDelete) {
     showDialog(
@@ -103,7 +133,8 @@ class _AddActionPageState extends State<AddActionPage> {
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(20),
                 ),
-                contentPadding: const EdgeInsets.fromLTRB(24, 20, 24, 10),
+                contentPadding: const EdgeInsets.fromLTRB(18, 20, 18, 10),
+                insetPadding: const EdgeInsets.all(15), // Отступ от краев
                 content: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.center,
@@ -115,60 +146,88 @@ class _AddActionPageState extends State<AddActionPage> {
                         style: const TextStyle(
                           color: Colors.black,
                           fontWeight: FontWeight.bold,
-                          fontSize: 24,
+                          fontSize: 20, // Размер шрифта уменьшен для лучшей адаптации
                         ),
                       ),
                     ),
                   ],
                 ),
-                actionsPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                actionsPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
                 actions: <Widget>[
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       // Кнопка "Home"
-                      Expanded(
+                      SizedBox(
+                        width: 165, // Увеличиваем ширину кнопки
+                        height: 45, // Увеличил высоту для улучшения размещения текста
                         child: TextButton(
                           onPressed: () {
                             Navigator.of(context).pop();
-                            Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => HomePage()));
+                            Navigator.pushReplacement(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => LoggableScreen(
+                                  screenName: 'HomePage',
+                                  child: HomePage(
+                                    sessionId: _currentSessionId!, // Передаем sessionId в HomePage
+                                  ),
+                                  currentSessionId: _currentSessionId!, // Передаем currentSessionId в LoggableScreen
+                                ),
+                              ),
+                            );
                           },
                           style: TextButton.styleFrom(
                             backgroundColor: const Color(0xFFEEE9FF),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(24),
                             ),
-                            padding: const EdgeInsets.symmetric(vertical: 15),
+                            padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 10), // Скорректированные паддинги
                           ),
                           child: Text(
                             "home".tr(), // Локализованный текст
                             style: const TextStyle(
                               color: Color(0xFF5F33E1),
                               fontWeight: FontWeight.bold,
+                              fontSize: 14, // Размер текста для кнопки
                             ),
                           ),
                         ),
                       ),
-                      const SizedBox(width: 10), // Отступ между кнопками
+                      const SizedBox(width: 8), // Отступ между кнопками
                       // Кнопка "Create a new action"
-                      Expanded(
+                      SizedBox(
+                        width: 165, // Увеличиваем ширину кнопки
+                        height: 45, // Увеличил высоту
                         child: TextButton(
                           onPressed: () {
                             Navigator.of(context).pop();
-                            Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => AddActionPage()));
+                            Navigator.pushReplacement(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => LoggableScreen(
+                                  screenName: 'AddActionPage',
+                                  child: AddActionPage(
+                                    sessionId: _currentSessionId!, // Передаем sessionId в AddActionPage
+                                  ),
+                                  currentSessionId: _currentSessionId!, // Передаем currentSessionId в LoggableScreen
+                                ),
+                              ),
+                            );
                           },
                           style: TextButton.styleFrom(
                             backgroundColor: const Color(0xFF5F33E1),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(24),
                             ),
-                            padding: const EdgeInsets.symmetric(vertical: 15, horizontal: 20),
+                            padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 10), // Скорректированные паддинги
                           ),
                           child: Text(
-                            "create_new_action".tr(), // Локализованный текст
+                            "create_action".tr(), // Локализованный текст
                             style: const TextStyle(
                               color: Colors.white,
                               fontWeight: FontWeight.bold,
+                              fontSize: 12, // Увеличен размер текста для улучшения читабельности
                             ),
                             textAlign: TextAlign.center,
                             maxLines: 2,
@@ -192,10 +251,11 @@ class _AddActionPageState extends State<AddActionPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white, // Установлен белый фон
+      backgroundColor: const Color(0xFFF8F9F9),
       appBar: AppBar(
+        backgroundColor: const Color(0xFFF8F9F9),
+
         automaticallyImplyLeading: false,
-        backgroundColor: Colors.white,
         elevation: 0,
         title: Text(
           tr('add_action'),
@@ -213,19 +273,29 @@ class _AddActionPageState extends State<AddActionPage> {
               onTap: () {
                 // Возврат на главную страницу и удаление всех предыдущих страниц
                 Navigator.of(context).pushAndRemoveUntil(
-                  MaterialPageRoute(builder: (context) => HomePage()), // Замените MainPage на ваш главный экран
+                  MaterialPageRoute(
+                    builder: (context) => LoggableScreen(
+                      screenName: 'HomePage',
+                      child: HomePage(
+                        sessionId: _currentSessionId!, // Передаем sessionId в HomePage
+                      ),
+                      currentSessionId: _currentSessionId!, // Передаем currentSessionId в LoggableScreen
+                    ),
+                  ),
                       (Route<dynamic> route) => false, // Удаляем все предыдущие страницы
                 );
               },
               child: Container(
-                padding: const EdgeInsets.all(1.0), // Отступы вокруг крестика
+                padding: const EdgeInsets.all(6.0), // Отступы вокруг крестика
                 decoration: BoxDecoration(
                   color: const Color(0xFFEEE9FF), // Фоновый цвет вокруг крестика
                   borderRadius: BorderRadius.circular(8), // Скругление углов
                 ),
-                child: Icon(
-                  Icons.close, // Иконка крестика
-                  color: const Color(0xFF5F33E1), // Цвет крестика
+                child: Image.asset(
+                  'assets/images/krest.png', // Путь к вашему изображению
+                  width: 14,  // Размер изображения (как у иконки)
+                  height: 14,
+                  color: const Color(0xFF5F33E1),  // Цвет картинки (если нужно перекрасить)
                 ),
               ),
             ),
@@ -253,6 +323,8 @@ class _AddActionPageState extends State<AddActionPage> {
               const SizedBox(height: 12),
               _buildAddButton(taskTitle),
               // Кнопка создания действия
+              const SizedBox(height: 6),
+
             ],
           ),
         ),
@@ -262,13 +334,7 @@ class _AddActionPageState extends State<AddActionPage> {
         decoration: BoxDecoration(
           color: const Color(0xFFEEE9FF),
           borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.1),
-              blurRadius: 8,
-              offset: Offset(0, -2),
-            ),
-          ],
+
         ),
         height: 60,
         child: Row(
@@ -325,14 +391,6 @@ class _AddActionPageState extends State<AddActionPage> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.2),
-            spreadRadius: 2,
-            blurRadius: 5,
-            offset: const Offset(0, 3),
-          ),
-        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -353,7 +411,13 @@ class _AddActionPageState extends State<AddActionPage> {
                 actionName = value;
               });
             },
-          ),
+          textInputAction: TextInputAction.done, // Добавлено для завершения
+          onSubmitted: (value) {
+            FocusScope.of(context).unfocus();
+          },
+
+    ),
+
           if (nameError != null) // Отображение ошибки под полем ввода
             Padding(
               padding: const EdgeInsets.only(top: 8.0),
@@ -374,14 +438,6 @@ class _AddActionPageState extends State<AddActionPage> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.2),
-            spreadRadius: 2,
-            blurRadius: 5,
-            offset: const Offset(0, 3),
-          ),
-        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -488,7 +544,14 @@ class _AddActionPageState extends State<AddActionPage> {
             ),
           ),
           keyboardType: TextInputType.number,
-        ),
+          textInputAction: TextInputAction.done, // Добавлено для завершения
+          onSubmitted: (value) {
+        // Действия при нажатии кнопки "Готово"
+        // Например, можно скрыть клавиатуру:
+        FocusScope.of(context).unfocus();
+      },
+    ),
+
         if (errorMessage != null && errorMessage.isNotEmpty)
           Padding(
             padding: const EdgeInsets.only(top: 8.0),
@@ -518,7 +581,13 @@ class _AddActionPageState extends State<AddActionPage> {
             ),
           ),
           keyboardType: TextInputType.number,
-        ),
+      textInputAction: TextInputAction.done, // Добавлено для завершения
+      onSubmitted: (value) {
+        // Действия при нажатии кнопки "Готово"
+        // Например, можно скрыть клавиатуру:
+        FocusScope.of(context).unfocus();
+      },
+    ),
         if (errorMessage != null && errorMessage.isNotEmpty)
           Padding(
             padding: const EdgeInsets.only(top: 8.0),
@@ -548,6 +617,12 @@ class _AddActionPageState extends State<AddActionPage> {
             ),
           ),
           keyboardType: TextInputType.number,
+      textInputAction: TextInputAction.done, // Добавлено для завершения
+      onSubmitted: (value) {
+        // Действия при нажатии кнопки "Готово"
+        // Например, можно скрыть клавиатуру:
+        FocusScope.of(context).unfocus();
+      },
         ),
         if (errorMessage != null && errorMessage.isNotEmpty)
           Padding(
@@ -569,97 +644,133 @@ class _AddActionPageState extends State<AddActionPage> {
     showDialog(
       context: context,
       barrierColor: Colors.black.withOpacity(0.1), // Полупрозрачный барьер
+      barrierDismissible: true, // Позволяем закрывать диалог при нажатии вне области
       builder: (BuildContext context) {
-        return Stack(
-          children: [
-            // Эффект размытия
-            BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5), // Эффект размытия
-              child: Container(
-                color: Colors.black.withOpacity(0), // Прозрачный контейнер для сохранения размытия
+        return Dialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5), // Эффект размытия фона
+            child: Container(
+              padding: const EdgeInsets.all(16.0),
+              decoration: BoxDecoration(
+                color: Colors.white, // цвет фона календаря
+                borderRadius: BorderRadius.circular(10),
               ),
-            ),
-            Positioned(
-              bottom: 90, // Отступ выше BottomNavigationBar
-              left: 10, // Отступы для более узкого окна
-              right: 10,
-              child: Dialog(
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Container(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      // Календарь
-                      TableCalendar(
-                        firstDay: DateTime.now(), // Ограничиваем выбор на сегодня
-                        lastDay: DateTime.utc(2030, 3, 14),
-                        focusedDay: initialDate,
-                        selectedDayPredicate: (day) {
-                          return isSameDay(day, initialDate);
-                        },
-                        calendarStyle: CalendarStyle(
-                          selectedDecoration: BoxDecoration(
-                            color: const Color(0xFF5F33E1),
-                            shape: BoxShape.circle,
-                          ),
-                          todayDecoration: BoxDecoration(
-                            color: Colors.transparent,
-                            shape: BoxShape.circle,
-                            border: Border.all(
-                              color: const Color(0xFF5F33E1),
-                              width: 1,
-                            ),
-                          ),
-                          todayTextStyle: TextStyle(
-                            color: Colors.black,
-                          ),
-                          outsideDaysVisible: false,
-                        ),
-                        headerStyle: HeaderStyle(
-                          formatButtonVisible: false,
-                          titleCentered: true,
-                          leftChevronIcon: const Icon(Icons.chevron_left, color: Color(0xFF5F33E1)),
-                          rightChevronIcon: const Icon(Icons.chevron_right, color: Color(0xFF5F33E1)),
-                        ),
-                        daysOfWeekVisible: true,
-                        onDaySelected: (selectedDay, focusedDay) {
-                          print("Selected day: $selectedDay");
-
-                          if (isStartDate) {
-                            // Если это выбор начальной даты
-                            if (endDate != null && selectedDay.isAfter(endDate!)) {
-                              _showError(tr("error_start_date_later_than_end"));
-                            } else {
-                              onDateSelected(selectedDay);
-                              dateError = null;
-                              _resetInvalidDays(); // Сбрасываем чекбоксы после выбора начальной даты
-                            }
-                          } else {
-                            // Если это выбор конечной даты
-                            if (startDate != null && selectedDay.isBefore(startDate!)) {
-                              _showError(tr("error_end_date_earlier_than_start"));
-                            } else {
-                              onDateSelected(selectedDay);
-                              dateError = null;
-                              _resetInvalidDays(); // Сбрасываем чекбоксы после выбора конечной даты
-                            }
-                          }
-                          Navigator.pop(context); // Закрываем диалог
-                        },
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TableCalendar(
+                    firstDay: DateTime.utc(2010, 10, 16),
+                    lastDay: DateTime.utc(2030, 3, 14),
+                    focusedDay: initialDate,
+                    locale: Localizations.localeOf(context).toString(),
+                    selectedDayPredicate: (day) => isSameDay(day, initialDate),
+                    calendarStyle: CalendarStyle(
+                      selectedDecoration: BoxDecoration(
+                        color: const Color(0xFF5F33E1),
+                        shape: BoxShape.circle,
                       ),
-                    ],
+                      todayDecoration: BoxDecoration(
+                        color: Colors.transparent,
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: const Color(0xFF5F33E1),
+                          width: 1,
+                        ),
+                      ),
+                      todayTextStyle: const TextStyle(
+                        color: Colors.black,
+                      ),
+                      outsideDaysVisible: false,
+                      disabledTextStyle: const TextStyle(color: Colors.grey), // Отключенные дни серым
+                    ),
+                    headerStyle: HeaderStyle(
+                      formatButtonVisible: false,
+                      titleCentered: true,
+                      titleTextStyle: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black,
+                      ),
+                      titleTextFormatter: (date, locale) {
+                        String formattedMonth = DateFormat.MMMM(locale).format(date);
+                        if (locale == 'ru') {
+                          formattedMonth = formattedMonth[0].toUpperCase() + formattedMonth.substring(1);
+                        }
+                        return formattedMonth;
+                      },
+                      leftChevronIcon: Padding(
+                        padding: const EdgeInsets.only(left: 42.0),
+                        child: Image.asset(
+                          'assets/images/arr_left.png',
+                          width: 20,
+                          height: 20,
+                          color: const Color(0xFF5F33E1),
+                        ),
+                      ),
+                      rightChevronIcon: Padding(
+                        padding: const EdgeInsets.only(right: 42.0),
+                        child: Image.asset(
+                          'assets/images/arr_right.png',
+                          width: 20,
+                          height: 20,
+                          color: const Color(0xFF5F33E1),
+                        ),
+                      ),
+                    ),
+                    daysOfWeekVisible: true,
+                    daysOfWeekStyle: DaysOfWeekStyle(
+                      weekdayStyle: const TextStyle(
+                        fontSize: 13,
+                        color: Colors.grey,
+                      ),
+                      weekendStyle: const TextStyle(
+                        fontSize: 13,
+                        color: Colors.grey,
+                      ),
+                      dowTextFormatter: (date, locale) =>
+                          DateFormat.E(locale).format(date).toUpperCase(),
+                    ),
+                    enabledDayPredicate: (day) {
+                      return day.isAfter(DateTime.now().subtract(const Duration(days: 1)));
+                    },
+                    onDaySelected: (selectedDay, focusedDay) {
+                      print("Selected day: $selectedDay");
+
+                      if (isStartDate) {
+                        if (endDate != null && selectedDay.isAfter(endDate!)) {
+                          _showError(tr("error_start_date_later_than_end"));
+                        } else {
+                          onDateSelected(selectedDay);
+                          dateError = null;
+                          _resetInvalidDays();
+                        }
+                      } else {
+                        if (startDate != null && selectedDay.isBefore(startDate!)) {
+                          _showError(tr("error_end_date_earlier_than_start"));
+                        } else {
+                          onDateSelected(selectedDay);
+                          dateError = null;
+                          _resetInvalidDays();
+                        }
+                      }
+                      Navigator.pop(context);
+                    },
                   ),
-                ),
+                ],
               ),
             ),
-          ],
+          ),
         );
       },
     );
   }
+
+
+
+
 
 // Метод для создания виджета выбора даты
   Widget _buildDatePicker(String label, String value, bool isStartDate, ValueChanged<DateTime?> onDatePicked) {
@@ -673,8 +784,8 @@ class _AddActionPageState extends State<AddActionPage> {
         });
       },
       child: Container(
-        width: 130,
-        height: 60,
+        width: 150,
+        height: 50,
         padding: const EdgeInsets.symmetric(horizontal: 8),
         decoration: BoxDecoration(
           color: const Color(0xFFF8F9F9),
@@ -684,8 +795,11 @@ class _AddActionPageState extends State<AddActionPage> {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Text(
-              value.isEmpty ? DateFormat('dd/MM/yyyy').format(DateTime.now()) : value,  // Отображаем сегодняшнюю дату если value пустое
-              style: const TextStyle(fontSize: 16, color: Colors.black),
+              value.isEmpty ? (isStartDate ? tr('from') : tr('to')) : value,  // Отображаем "From" или "To" если значение пустое
+              style: TextStyle(
+                fontSize: 16,
+                color: value.isEmpty ? Colors.grey : Colors.black, // Цвет текста: серый если пусто, черный если выбрано
+              ),
             ),
             Image.asset(
               'assets/images/Calendar.png',
@@ -706,72 +820,68 @@ class _AddActionPageState extends State<AddActionPage> {
       decoration: BoxDecoration(
         color: Colors.white, // Цвет карточки
         borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.2),
-            spreadRadius: 2,
-            blurRadius: 5,
-            offset: const Offset(0, 3),
-          ),
-        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
+              // Первый Column для начальной даты
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                     Text(
-                      tr('start_date'), // Заголовок для поля начальной даты
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                    ),
-                    const SizedBox(height: 8),
-                    // Отступ между заголовком и полем
-                    _buildDatePicker(
-                      tr('start_date'),
-                      startDate != null
-                          ? DateFormat('dd.MM.yy').format(startDate!)
-                          : tr('from'), // Отображаем "From" если дата не выбрана
-                      true, // Это начальная дата
-                          (pickedDate) {
-                        setState(() {
-                          startDate = pickedDate;
-                          _resetInvalidDays();
-                        });
-                      },
-                    ),
-                  ],
+                child: Padding(
+                  padding: const EdgeInsets.only(right: 10), // Отступ справа
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        tr('start_date'), // Заголовок для поля начальной даты
+                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 8), // Отступ между заголовком и полем
+                      _buildDatePicker(
+                        tr('start_date'),
+                        startDate != null
+                            ? DateFormat('dd.MM.yy').format(startDate!)
+                            : '', // Значение пустое, если дата не выбрана
+                        true, // Это начальная дата
+                            (pickedDate) {
+                          setState(() {
+                            startDate = pickedDate;
+                            _resetInvalidDays();
+                          });
+                        },
+                      ),
+                    ],
+                  ),
                 ),
               ),
-              const SizedBox(width: 16),
+              // Второй Column для конечной даты
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                     Text(
-                      tr('end_date'), // Заголовок для поля конечной даты
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                    ),
-                    const SizedBox(height: 8),
-                    // Отступ между заголовком и полем
-                    _buildDatePicker(
-                      tr('end_date'),
-                      endDate != null
-                          ? DateFormat('dd.MM.yy').format(endDate!)
-                          : tr('to'), // Отображаем "To" если дата не выбрана
-                      false, // Это конечная дата
-                          (pickedDate) {
-                        setState(() {
-                          endDate = pickedDate;
-                          _resetInvalidDays();
-                        });
-                      },
-                    ),
-                  ],
+                child: Padding(
+                  padding: const EdgeInsets.only(left: 10), // Отступ слева
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        tr('end_date'), // Заголовок для поля конечной даты
+                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 8), // Отступ между заголовком и полем
+                      _buildDatePicker(
+                        tr('end_date'),
+                        endDate != null
+                            ? DateFormat('dd.MM.yy').format(endDate!)
+                            : '', // Значение пустое, если дата не выбрана
+                        false, // Это конечная дата
+                            (pickedDate) {
+                          setState(() {
+                            endDate = pickedDate;
+                            _resetInvalidDays();
+                          });
+                        },
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ],
@@ -800,14 +910,7 @@ class _AddActionPageState extends State<AddActionPage> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.2),
-            spreadRadius: 2,
-            blurRadius: 5,
-            offset: const Offset(0, 3),
-          ),
-        ],
+
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1049,7 +1152,7 @@ class _AddActionPageState extends State<AddActionPage> {
     return Column(
       children: [
         Padding(
-          padding: const EdgeInsets.symmetric(vertical: 6.0),
+          padding: const EdgeInsets.symmetric(vertical: 4.0),
           child: Row(
             children: [
               Container(
@@ -1072,6 +1175,7 @@ class _AddActionPageState extends State<AddActionPage> {
                       if (hour != null && _isValidTime(hour, selectedMinute)) {
                         notificationWidgets[index]['hour'] = hour;
                         _resetInvalidDays();
+                        hourFocusNode.unfocus();
                       }
                     });
                   },
@@ -1097,6 +1201,7 @@ class _AddActionPageState extends State<AddActionPage> {
                       int? minute = int.tryParse(value);
                       if (minute != null && _isValidTime(selectedHour, minute)) {
                         notificationWidgets[index]['minute'] = minute;
+                        minuteFocusNode.unfocus();
                       }
                     });
                   },
@@ -1160,7 +1265,7 @@ class _AddActionPageState extends State<AddActionPage> {
   Widget _buildNotificationToggle() {
     return Card(
       color: Color(0xFFFFFFFF),
-      elevation: 1,
+      elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
       ),
@@ -1252,6 +1357,7 @@ class _AddActionPageState extends State<AddActionPage> {
                       .map((entry) => _buildTimePicker(entry.key))
                       .toList(),
                 ),
+            const SizedBox(height: 10),
 
           ],
         ),
@@ -1269,9 +1375,9 @@ class _AddActionPageState extends State<AddActionPage> {
       },
       style: ElevatedButton.styleFrom(
         backgroundColor: const Color(0xFF5F33E1),
-        padding: const EdgeInsets.symmetric(vertical: 16),
+        padding: const EdgeInsets.symmetric(vertical: 12),
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(18),
         ),
       ),
       child:  Center(
@@ -1434,7 +1540,7 @@ class _AddActionPageState extends State<AddActionPage> {
       try {
         // Здесь добавляем привычку в БД
         int habitId = await habitService.insertHabit(newHabit);; // Предполагается, что у вас есть метод добавления привычки
-
+        await DatabaseHelper.instance.incrementHabitCount(_currentSessionId!);
         // Проверяем, включены ли уведомления и выбраны ли дни
         if (notificationsEnabled) {
           for (var timeEntry in notificationWidgets) {

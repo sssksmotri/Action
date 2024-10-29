@@ -6,9 +6,11 @@ import 'stat.dart';
 import 'addpage.dart';
 import 'package:action_notes/Service/database_helper.dart'; // Импортируйте ваш класс DatabaseHelper
 import 'package:easy_localization/easy_localization.dart';
-class NotesPage extends StatefulWidget {
-  const NotesPage({Key? key}) : super(key: key);
+import 'package:action_notes/Widgets/loggable_screen.dart';
 
+class NotesPage extends StatefulWidget {
+  final int sessionId;
+  const NotesPage({Key? key, required this.sessionId}) : super(key: key);
   @override
   _NotesPageState createState() => _NotesPageState();
 }
@@ -16,43 +18,60 @@ class NotesPage extends StatefulWidget {
 class _NotesPageState extends State<NotesPage> {
   int _selectedIndex = 4;
   bool _showArchived = false; // Переменная для отслеживания состояния отображения архивных привычек
+  int? _currentSessionId;
+
+  @override
+  void initState() {
+    super.initState();
+    _currentSessionId = widget.sessionId; // Инициализируем _currentSessionId здесь
+  }
 
   void _onItemTapped(int index) {
     setState(() {
       _selectedIndex = index;
     });
-    if (index == 0) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const HomePage()),
-      );
-    }
-    if (index == 1) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const NotesPage()),
-      );
+
+    // Определим имя экрана вручную
+    String screenName;
+    Widget page;
+
+    switch (index) {
+      case 0:
+        screenName = 'HomePage';
+        page = HomePage(sessionId: widget.sessionId);
+        break;
+      case 1:
+        screenName = 'NotesPage';
+        page = NotesPage(sessionId: widget.sessionId);
+        break;
+      case 2:
+        screenName = 'AddActionPage';
+        page = AddActionPage(sessionId: widget.sessionId);
+        break;
+      case 3:
+        screenName = 'StatsPage';
+        page = StatsPage(sessionId: widget.sessionId);
+        break;
+      case 4:
+        screenName = 'SettingsPage';
+        page = SettingsPage(sessionId: widget.sessionId);
+        break;
+      default:
+        return;
     }
 
-    if (index == 4) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const SettingsPage()),
-      );
-    }
-    if (index == 2) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const AddActionPage()),
-      );
-    }
-    if (index == 3) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const StatsPage()),
-      );
-    }
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(
+        builder: (context) => LoggableScreen(
+          screenName: screenName, // Передаем четко определенное имя экрана
+          child: page,
+          currentSessionId: widget.sessionId,
+        ),
+      ),
+    );
   }
+
 
   // Получение привычек из базы данных
   Future<List<Map<String, dynamic>>> fetchHabits() async {
@@ -72,7 +91,7 @@ class _NotesPageState extends State<NotesPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: const Color(0xFFF8F9F9),
         automaticallyImplyLeading: false,
         title: Align(
           alignment: Alignment.centerLeft,
@@ -118,7 +137,14 @@ class _NotesPageState extends State<NotesPage> {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (context) => NoteAddPage(habitId: habit['id']), // Передаем ID привычки
+                          builder: (context) => LoggableScreen(
+                            screenName: 'NoteAddPage',
+                            child: NoteAddPage(
+                              habitId: habit['id'], // Передаем ID привычки
+                              sessionId: _currentSessionId!, // Передаем sessionId в NoteAddPage
+                            ),
+                            currentSessionId: _currentSessionId!, // Передаем currentSessionId в LoggableScreen
+                          ),
                         ),
                       );
                     },
@@ -130,19 +156,12 @@ class _NotesPageState extends State<NotesPage> {
           },
         ),
       ),
-      backgroundColor: Colors.white,
+      backgroundColor: const Color(0xFFF8F9F9),
       bottomNavigationBar: Container(
         margin: const EdgeInsets.only(bottom: 30, right: 16, left: 16),
         decoration: BoxDecoration(
           color: const Color(0xFFEEE9FF),
           borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.1),
-              blurRadius: 8,
-              offset: Offset(0, -2),
-            ),
-          ],
         ),
         height: 60,
         child: Row(
@@ -166,14 +185,6 @@ class _NotesPageState extends State<NotesPage> {
       margin: const EdgeInsets.only(bottom: 10),
       decoration: BoxDecoration(
         color: Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.2),
-            spreadRadius: 3,
-            blurRadius: 5,
-            offset: const Offset(0, 1),
-          ),
-        ],
         borderRadius: BorderRadius.circular(16),
       ),
       child: Row(
@@ -187,10 +198,10 @@ class _NotesPageState extends State<NotesPage> {
               color: Colors.black,
             ),
           ),
-          const Icon(
-            Icons.arrow_forward_ios_rounded,
-            size: 22,
-            color: Color(0xFF5F33E1),
+          Image.asset(
+            'assets/images/arr_right.png',
+            width: 18,
+            height: 18,
           ),
         ],
       ),

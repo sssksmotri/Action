@@ -1,5 +1,7 @@
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
+import 'dart:convert';
+import 'package:uuid/uuid.dart';
 
 class DatabaseHelper {
   // Путь к базе данных
@@ -12,7 +14,7 @@ class DatabaseHelper {
   static final tableHabitLog = 'HabitLog';
   static final tableHabitNotes = 'HabitNotes';
   static final tableAppUsageLog = "AppUsageLog";
-
+  final Uuid uuid = Uuid();
 
 
   // Создание базы данных
@@ -84,17 +86,19 @@ class DatabaseHelper {
 
 
       await db.execute('''
-    CREATE TABLE $tableAppUsageLog (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      language TEXT,
-      login_time TEXT,
-      duration INTEGER,
-      habit_count INTEGER,
-      date TEXT ,
-      deviceInfo TEXT,
-      section_times TEXT
-    );
-  ''');
+  CREATE TABLE $tableAppUsageLog (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id TEXT UNIQUE,
+    language TEXT,
+    login_time TEXT,
+    end_time TEXT,
+    total_duration INTEGER,
+    habit_count INTEGER DEFAULT 0,
+    date TEXT,
+    deviceInfo TEXT,
+    section_times TEXT
+  );
+''');
 
 
     await db.execute('''
@@ -179,9 +183,39 @@ class DatabaseHelper {
   // Обновление привычки
   Future<int> updateHabit(Map<String, dynamic> row) async {
     Database db = await instance.database;
-    int id = row['id'];
-    return await db.update(tableHabits, row, where: 'id = ?', whereArgs: [id]);
+
+    // Логируем данные перед обновлением
+    print('Обновляем привычку с данными: $row');
+
+    // Проверяем, существует ли ID
+    int? id = row['id'];
+
+    if (id == null) {
+      print('Ошибка: ID не найден в переданных данных.');
+      return 0; // Или выбросьте исключение
+    }
+
+    // Проверяем наличие обязательных полей
+    if (row['type'] == null) {
+      print('Ошибка: type не может быть null');
+      return 0; // Или выбросьте исключение
+    }
+
+    // Обновление записи в БД
+    int result;
+    try {
+      result = await db.update(tableHabits, row, where: 'id = ?', whereArgs: [id]);
+      print('Успешно обновлено. Изменения: $result'); // Логируем количество обновленных строк
+    } catch (e) {
+      print('Ошибка при обновлении привычки: $e'); // Логируем ошибку, если она произошла
+      return 0; // Или выбросьте исключение
+    }
+
+    return result; // Возвращаем результат обновления
   }
+
+
+
 
   Future<int> updateHabitQuantity(int habitId, int newQuantity) async {
     final db = await database;
@@ -408,8 +442,10 @@ class DatabaseHelper {
 
   Future<int> deleteHabitNote(int id) async {
     Database db = await instance.database;
+    print("Deleting note with id: $id"); // Выводим ID удаляемой заметки
     return await db.delete(tableHabitNotes, where: 'id = ?', whereArgs: [id]);
   }
+
 
   Future<List<Map<String, dynamic>>> getHabitLogsForDateRange(String startDate,
       String endDate) async {
@@ -445,7 +481,7 @@ class DatabaseHelper {
 
   Future<List<Map<String, dynamic>>> queryAllAppUsageLogs() async {
     final db = await instance.database;
-    return await db.query('app_usage_log');
+    return await db.query('AppUsageLog');
   }
 
   Future<int> insertAppUsageLog(Map<String, dynamic> row) async {
@@ -465,6 +501,98 @@ class DatabaseHelper {
     );
   }
 
+  Future<int> logSessionStart(String language, String deviceInfo) async {
+    final db = await database;
+    String sessionId = uuid.v4(); // Генерация уникального session_id
 
+    int id = await db.insert(
+      'AppUsageLog',
+      {
+        'session_id': sessionId,
+        'language': language,
+        'login_time': DateTime.now().toIso8601String(),
+        'deviceInfo': deviceInfo,
+      },
+    );
+    return id;
+  }
+
+  Future<void> logSessionEnd(int sessionId) async {
+    final db = await database;
+
+    final loginTimeResult = await db.query(
+      'AppUsageLog',
+      columns: ['login_time'],
+      where: 'id = ?',
+      whereArgs: [sessionId],
+    );
+
+    if (loginTimeResult.isNotEmpty) {
+      final loginTime = loginTimeResult.first['login_time'] as String?;
+      if (loginTime != null) {
+        final duration = DateTime.now().difference(DateTime.parse(loginTime)).inSeconds;
+        await db.update(
+          'AppUsageLog',
+          {
+            'total_duration': duration,
+            'end_time': DateTime.now().toIso8601String(),
+          },
+          where: 'id = ?',
+          whereArgs: [sessionId],
+        );
+      }
+    }
+  }
+
+  Future<void> logSectionTime(int sessionId, String sectionName, int timeSpent) async {
+    final db = await database;
+
+    final result = await db.query(
+      'AppUsageLog',
+      columns: ['section_times'],
+      where: 'id = ?',
+      whereArgs: [sessionId],
+    );
+
+    Map<String, int> sectionTimes = result.isNotEmpty && result.first['section_times'] != null
+        ? Map<String, int>.from(json.decode(result.first['section_times'] as String))
+        : {};
+
+    sectionTimes[sectionName] = (sectionTimes[sectionName] ?? 0) + timeSpent;
+
+    await db.update(
+      'AppUsageLog',
+      {'section_times': json.encode(sectionTimes)},
+      where: 'id = ?',
+      whereArgs: [sessionId],
+    );
+  }
+
+  Future<void> incrementHabitCount(int sessionId) async {
+    final db = await database;
+
+    final result = await db.query(
+      'AppUsageLog',
+      columns: ['habit_count'],
+      where: 'id = ?',
+      whereArgs: [sessionId],
+    );
+
+    int habitCount = (result.isNotEmpty && result.first['habit_count'] != null)
+        ? result.first['habit_count'] as int
+        : 0;
+
+    habitCount += 1;
+
+    await db.update(
+      'AppUsageLog',
+      {'habit_count': habitCount},
+      where: 'id = ?',
+      whereArgs: [sessionId],
+    );
+  }
 }
+
+
+
 

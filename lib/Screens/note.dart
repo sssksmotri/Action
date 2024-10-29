@@ -1,9 +1,15 @@
 import 'package:flutter/material.dart';
 import '../main.dart';
 import 'settings_screen.dart';
+import 'add.dart';
+import 'notes.dart';
+import 'stat.dart';
+import 'package:action_notes/Widgets/loggable_screen.dart';
 
 class NotePage extends StatefulWidget {
-  const NotePage({Key? key}) : super(key: key);
+  final int sessionId;
+  const NotePage({Key? key, required this.sessionId}) : super(key: key);
+
 
   @override
   _NotePageState createState() => _NotePageState();
@@ -12,30 +18,64 @@ class NotePage extends StatefulWidget {
 class _NotePageState extends State<NotePage> {
   int _selectedIndex = 4;
   bool isEnglish = true;
-
   // Controllers for the text fields
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _suggestionController = TextEditingController();
+  int? _currentSessionId;
+
+  @override
+  void initState() {
+    super.initState();
+    _currentSessionId = widget.sessionId; // Инициализируем _currentSessionId здесь
+  }
 
   void _onItemTapped(int index) {
     setState(() {
       _selectedIndex = index;
     });
 
-    if (index == 0) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const HomePage()),
-      );
+    // Определим имя экрана вручную
+    String screenName;
+    Widget page;
+
+    switch (index) {
+      case 0:
+        screenName = 'HomePage';
+        page = HomePage(sessionId: widget.sessionId);
+        break;
+      case 1:
+        screenName = 'NotesPage';
+        page = NotesPage(sessionId: widget.sessionId);
+        break;
+      case 2:
+        screenName = 'AddActionPage';
+        page = AddActionPage(sessionId: widget.sessionId);
+        break;
+      case 3:
+        screenName = 'StatsPage';
+        page = StatsPage(sessionId: widget.sessionId);
+        break;
+      case 4:
+        screenName = 'SettingsPage';
+        page = SettingsPage(sessionId: widget.sessionId);
+        break;
+      default:
+        return;
     }
-    if (index == 5) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const SettingsPage()),
-      );
-    }
+
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(
+        builder: (context) => LoggableScreen(
+          screenName: screenName, // Передаем четко определенное имя экрана
+          child: page,
+          currentSessionId: widget.sessionId,
+        ),
+      ),
+    );
   }
+
 
   void _showSubmissionDialog() {
     showDialog(
@@ -87,7 +127,7 @@ class _NotePageState extends State<NotePage> {
     return Scaffold(
       resizeToAvoidBottomInset: false,
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: const Color(0xFFF8F9F9),
         leading: IconButton(
           icon: Image.asset(
             'assets/images/ar_back.png',
@@ -118,13 +158,7 @@ class _NotePageState extends State<NotePage> {
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(15),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.1),
-                    blurRadius: 8,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
+
               ),
               child: Column(
                 children: [
@@ -195,7 +229,7 @@ class _NotePageState extends State<NotePage> {
           ],
         ),
       ),
-      backgroundColor: Colors.white,
+      backgroundColor: const Color(0xFFF8F9F9),
 
       bottomNavigationBar: Container(
         margin: const EdgeInsets.only(bottom: 30, right: 16, left: 16),

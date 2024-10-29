@@ -1,9 +1,14 @@
 import 'package:flutter/material.dart';
 import '../main.dart';
 import 'package:easy_localization/easy_localization.dart';
-
+import 'package:action_notes/Widgets/loggable_screen.dart';
+import 'add.dart';
+import 'notes.dart';
+import 'stat.dart';
+import 'settings_screen.dart';
 class legalPage extends StatefulWidget {
-  const legalPage({Key? key}) : super(key: key);
+  final int sessionId;
+  const legalPage({Key? key, required this.sessionId}) : super(key: key);
 
   @override
   _legalPageState createState() => _legalPageState();
@@ -12,61 +17,94 @@ class legalPage extends StatefulWidget {
 class _legalPageState extends State<legalPage> {
   int _selectedIndex = 4;
   bool isEnglish = true;
+  int? _currentSessionId;
+  @override
+  void initState() {
+    super.initState();
+    _currentSessionId = widget.sessionId;
+  }
 
   void _onItemTapped(int index) {
     setState(() {
       _selectedIndex = index;
     });
 
-    if (index == 0) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const HomePage()),
-      );
+    // Определим имя экрана вручную
+    String screenName;
+    Widget page;
+
+    switch (index) {
+      case 0:
+        screenName = 'HomePage';
+        page = HomePage(sessionId: widget.sessionId);
+        break;
+      case 1:
+        screenName = 'NotesPage';
+        page = NotesPage(sessionId: widget.sessionId);
+        break;
+      case 2:
+        screenName = 'AddActionPage';
+        page = AddActionPage(sessionId: widget.sessionId);
+        break;
+      case 3:
+        screenName = 'StatsPage';
+        page = StatsPage(sessionId: widget.sessionId);
+        break;
+      case 4:
+        screenName = 'SettingsPage';
+        page = SettingsPage(sessionId: widget.sessionId);
+        break;
+      default:
+        return;
     }
+
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(
+        builder: (context) => LoggableScreen(
+          screenName: screenName, // Передаем четко определенное имя экрана
+          child: page,
+          currentSessionId: widget.sessionId,
+        ),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        leading: IconButton(
-          icon: Image.asset(
-            'assets/images/ar_back.png',
-            width: 30,
-            height: 30,
-          ),
-          onPressed: () {
-            Navigator.of(context).pop();
-          },
-        ),
-        elevation: 0,
-        title: Row(
-          children: [
-            Text(
-              'legal_information'.tr(),
-              style: TextStyle(
-                fontWeight: FontWeight.bold, // Bold text
-              ),
+        appBar: AppBar(
+          backgroundColor: const Color(0xFFF8F9F9),
+          leading: IconButton(
+            icon: Image.asset(
+              'assets/images/ar_back.png',
+              width: 30,
+              height: 30,
             ),
-          ],
+            onPressed: () {
+              Navigator.of(context).pop();
+            },
+          ),
+          title: Row(
+            children: [
+              Transform.translate(
+                offset: Offset(-16, 0), // Сдвиг текста ближе к стрелке
+                child: Text(
+                  'legal_information'.tr(),
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold, // Bold text
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
-      ),
-      body: Container(
+        body: Container(
         margin: const EdgeInsets.all(16.0),
         padding: const EdgeInsets.all(20.0),
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.grey.withOpacity(0.2),
-              spreadRadius: 3,
-              blurRadius: 5,
-              offset: const Offset(0, 2),
-            ),
-          ],
         ),
         child: SingleChildScrollView( // Wrap the Text widget with SingleChildScrollView
           child: const Text(
@@ -78,19 +116,12 @@ class _legalPageState extends State<legalPage> {
           ),
         ),
       ),
-      backgroundColor: Colors.white,
+      backgroundColor: const Color(0xFFF8F9F9),
       bottomNavigationBar: Container(
         margin: const EdgeInsets.only(bottom: 30, right: 16, left: 16),
         decoration: BoxDecoration(
           color: const Color(0xFFEEE9FF),
           borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.1),
-              blurRadius: 8,
-              offset: const Offset(0, -2),
-            ),
-          ],
         ),
         height: 60,
         child: Row(

@@ -8,55 +8,77 @@ import '../main.dart';
 import 'add.dart';
 import 'notes.dart';
 import 'stat.dart';
+import 'package:action_notes/Widgets/loggable_screen.dart';
 
 class SettingsPage extends StatefulWidget {
-  const SettingsPage({Key? key}) : super(key: key);
-
+  final int sessionId;
+  const SettingsPage({Key? key, required this.sessionId}) : super(key: key);
   @override
   _SettingsPageState createState() => _SettingsPageState();
 }
 
 class _SettingsPageState extends State<SettingsPage> {
   int _selectedIndex = 4;
+  int? _currentSessionId;
+
+  @override
+  void initState() {
+    super.initState();
+    _currentSessionId = widget.sessionId; // Инициализируем _currentSessionId здесь
+  }
 
   void _onItemTapped(int index) {
     setState(() {
       _selectedIndex = index;
     });
 
-    if (index == 0) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const HomePage()),
-      );
-    } else if (index == 1) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const NotesPage()),
-      );
-    } else if (index == 2) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const AddActionPage()),
-      );
-    } else if (index == 3) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const StatsPage()),
-      );
-    } else if (index == 4) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const SettingsPage()),
-      );
+    // Определим имя экрана вручную
+    String screenName;
+    Widget page;
+
+    switch (index) {
+      case 0:
+        screenName = 'HomePage';
+        page = HomePage(sessionId: widget.sessionId);
+        break;
+      case 1:
+        screenName = 'NotesPage';
+        page = NotesPage(sessionId: widget.sessionId);
+        break;
+      case 2:
+        screenName = 'AddActionPage';
+        page = AddActionPage(sessionId: widget.sessionId);
+        break;
+      case 3:
+        screenName = 'StatsPage';
+        page = StatsPage(sessionId: widget.sessionId);
+        break;
+      case 4:
+        screenName = 'SettingsPage';
+        page = SettingsPage(sessionId: widget.sessionId);
+        break;
+      default:
+        return;
     }
+
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(
+        builder: (context) => LoggableScreen(
+          screenName: screenName, // Передаем четко определенное имя экрана
+          child: page,
+          currentSessionId: widget.sessionId,
+        ),
+      ),
+    );
   }
+
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: const Color(0xFFF8F9F9),
         automaticallyImplyLeading: false,
         title: Align(
           alignment: Alignment.centerLeft,
@@ -81,13 +103,13 @@ class _SettingsPageState extends State<SettingsPage> {
                 Padding(
                   padding: const EdgeInsets.all(4.0), // Прямые отступы вокруг переключателя
                   child: Container(
-                    height: 30, // Высота контейнера
+                    height: 25, // Высота контейнера
                     width: 50, // Ширина контейнера
                     decoration: BoxDecoration(
                       color: Colors.transparent,
                       border: Border.all(
-                        color: Colors.white, // Цвет ободка
-                        width: 2, // Ширина ободка
+                        color: Color(0xFF5F33E1), // Цвет ободка
+                        width: 1, // Ширина ободка
                       ),
                       borderRadius: BorderRadius.circular(15), // Скругление углов
                     ),
@@ -103,7 +125,7 @@ class _SettingsPageState extends State<SettingsPage> {
                         children: [
                           Container(
                             decoration: BoxDecoration(
-                              color: context.locale.languageCode == 'en' ? const Color(0xFF5F33E1) : const Color(0xFFEEE9FF),
+                              color: context.locale.languageCode == 'en' ? const Color(0xFFEEE9FF) : const Color(0xFFEEE9FF),
                               borderRadius: BorderRadius.circular(15),
                             ),
                           ),
@@ -112,10 +134,10 @@ class _SettingsPageState extends State<SettingsPage> {
                             right: context.locale.languageCode == 'en' ? 2 : null, // Отступ справа
                             top: 2, // Отступ сверху
                             child: Container(
-                              width: 22, // Ширина шарика
-                              height: 22,
+                              width: 18, // Ширина шарика
+                              height: 18,
                               decoration: BoxDecoration(
-                                color: context.locale.languageCode == 'en' ? const Color(0xFFFFFFFF) : const Color(0xFF5F33E1),
+                                color: context.locale.languageCode == 'en' ? const Color(0xFF5F33E1) : const Color(0xFF5F33E1),
                                 shape: BoxShape.circle,
                               ),
                             ),
@@ -144,7 +166,13 @@ class _SettingsPageState extends State<SettingsPage> {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (context) => const NotificationsPage(),
+                    builder: (context) => LoggableScreen(
+                      screenName: 'NotificationsPage',
+                      child: NotificationsPage(
+                        sessionId: _currentSessionId!, // Передаем sessionId в NotificationsPage
+                      ),
+                      currentSessionId: _currentSessionId!, // Передаем currentSessionId в LoggableScreen
+                    ),
                   ),
                 );
               },
@@ -152,10 +180,17 @@ class _SettingsPageState extends State<SettingsPage> {
             ),
             GestureDetector(
               onTap: () {
+                // Переход на LegalPage
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (context) => const legalPage(),
+                    builder: (context) => LoggableScreen(
+                      screenName: 'LegalPage',
+                      child: legalPage(
+                        sessionId: _currentSessionId!, // Передаем sessionId в LegalPage
+                      ),
+                      currentSessionId: _currentSessionId!, // Передаем currentSessionId в LoggableScreen
+                    ),
                   ),
                 );
               },
@@ -166,7 +201,13 @@ class _SettingsPageState extends State<SettingsPage> {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (context) => const FeedbackPage(),
+                    builder: (context) => LoggableScreen(
+                      screenName: 'FeedbackPage',
+                      child: FeedbackPage(
+                        sessionId: _currentSessionId!, // Передаем sessionId в FeedbackPage
+                      ),
+                      currentSessionId: _currentSessionId!, // Передаем currentSessionId в LoggableScreen
+                    ),
                   ),
                 );
               },
@@ -177,7 +218,13 @@ class _SettingsPageState extends State<SettingsPage> {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (context) => const SuggestPage(),
+                    builder: (context) => LoggableScreen(
+                      screenName: 'SuggestPage',
+                      child: SuggestPage(
+                        sessionId: _currentSessionId!, // Передаем sessionId в SuggestPage
+                      ),
+                      currentSessionId: _currentSessionId!, // Передаем currentSessionId в LoggableScreen
+                    ),
                   ),
                 );
               },
@@ -186,19 +233,12 @@ class _SettingsPageState extends State<SettingsPage> {
           ],
         ),
       ),
-      backgroundColor: Colors.white,
+      backgroundColor: const Color(0xFFF8F9F9),
       bottomNavigationBar: Container(
         margin: const EdgeInsets.only(bottom: 30, right: 16, left: 16),
         decoration: BoxDecoration(
           color: const Color(0xFFEEE9FF),
           borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.1),
-              blurRadius: 8,
-              offset: Offset(0, -2),
-            ),
-          ],
         ),
         height: 60,
         child: Row(
@@ -221,14 +261,6 @@ class _SettingsPageState extends State<SettingsPage> {
       margin: const EdgeInsets.only(bottom: 10),
       decoration: BoxDecoration(
         color: Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.2),
-            spreadRadius: 3,
-            blurRadius: 5,
-            offset: const Offset(0, 1),
-          ),
-        ],
         borderRadius: BorderRadius.circular(16),
       ),
       child: Row(
@@ -242,11 +274,12 @@ class _SettingsPageState extends State<SettingsPage> {
               color: Colors.black,
             ),
           ),
-          const Icon(
-            Icons.arrow_forward_ios_rounded,
-            size: 22,
-            color: Color(0xFF5F33E1),
+          Image.asset(
+            'assets/images/arr_right.png',
+            width: 18,
+            height: 18,
           ),
+
         ],
       ),
     );

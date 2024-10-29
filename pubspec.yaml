@@ -29,7 +29,7 @@ dependencies:
   reorderables: ^0.6.0
   device_info_plus: ^11.1.0
   permission_handler: ^11.3.1
-
+  uuid: ^4.5.1
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -59,4 +59,10 @@ flutter:
     - assets/images/Chart3.png
     - assets/images/Folder2.png
     - assets/images/Upload.png
+    - assets/images/arr_left.png
+    - assets/images/arr_right.png
+    - assets/images/arr_vn.png
+    - assets/images/krest.png
+    - assets/images/menu.png
+    - assets/images/Check.png
 

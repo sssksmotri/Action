@@ -8,9 +8,11 @@ import 'dart:ui';
 import 'stat.dart';
 import 'stat_tabl.dart';
 import 'package:action_notes/Service/database_helper.dart'; // Импортируйте свой класс для работы с БД
-
+import 'package:action_notes/Widgets/loggable_screen.dart';
 class ArchivePage extends StatefulWidget {
-  const ArchivePage({Key? key}) : super(key: key);
+  final int sessionId;
+
+  const ArchivePage({Key? key, required this.sessionId}) : super(key: key);
 
   @override
   _ArchivePageState createState() => _ArchivePageState();
@@ -20,57 +22,74 @@ class _ArchivePageState extends State<ArchivePage> {
   int _selectedIndex = 4;
   bool _isFolderPressed = true; // Состояние для кнопки папки (сразу нажатая)
   List<Map<String, dynamic>> _archivedHabits = []; // Список архивированных привычек
-
+  int? _currentSessionId;
   @override
   void initState() {
     super.initState();
     _loadArchivedHabits(); // Загружаем архивированные привычки
+    _currentSessionId = widget.sessionId;
   }
 
   // Метод для загрузки архивированных привычек из БД
   void _loadArchivedHabits() async {
     DatabaseHelper db = DatabaseHelper.instance; // Создаем экземпляр класса БД
     List<Map<String, dynamic>> habits = await db.getArchivedHabits(); // Получаем архивированные привычки
+
+    // Выводим данные для отладки
+    print("Archived habits loaded: $habits");
+
     setState(() {
       _archivedHabits = habits; // Обновляем состояние
     });
   }
 
+
   void _onItemTapped(int index) {
     setState(() {
       _selectedIndex = index;
     });
-    if (index == 0) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const HomePage()),
-      );
+
+    // Определим имя экрана вручную
+    String screenName;
+    Widget page;
+
+    switch (index) {
+      case 0:
+        screenName = 'HomePage';
+        page = HomePage(sessionId: widget.sessionId);
+        break;
+      case 1:
+        screenName = 'NotesPage';
+        page = NotesPage(sessionId: widget.sessionId);
+        break;
+      case 2:
+        screenName = 'AddActionPage';
+        page = AddActionPage(sessionId: widget.sessionId);
+        break;
+      case 3:
+        screenName = 'StatsPage';
+        page = StatsPage(sessionId: widget.sessionId);
+        break;
+      case 4:
+        screenName = 'SettingsPage';
+        page = SettingsPage(sessionId: widget.sessionId);
+        break;
+      default:
+        return;
     }
-    if (index == 1) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const NotesPage()),
-      );
-    }
-    if (index == 4) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const SettingsPage()),
-      );
-    }
-    if (index == 2) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const AddActionPage()),
-      );
-    }
-    if (index == 3) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const StatsPage()),
-      );
-    }
+
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(
+        builder: (context) => LoggableScreen(
+          screenName: screenName, // Передаем четко определенное имя экрана
+          child: page,
+          currentSessionId: widget.sessionId,
+        ),
+      ),
+    );
   }
+
 
   void _showDeleteDialog(BuildContext context, String taskTitle, int habitId,
       Function() onDelete) {
@@ -93,6 +112,7 @@ class _ArchivePageState extends State<ArchivePage> {
                 borderRadius: BorderRadius.circular(20),
               ),
               contentPadding: const EdgeInsets.fromLTRB(24, 20, 24, 10),
+              insetPadding: const EdgeInsets.all(10),
               content: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.center,
@@ -103,7 +123,9 @@ class _ArchivePageState extends State<ArchivePage> {
                       text: "are_you_sure".tr(),
                       style: const TextStyle(
                         color: Colors.black,
-                        fontSize: 18,
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+
                       ),
                       children: [
                         TextSpan(
@@ -135,9 +157,10 @@ class _ArchivePageState extends State<ArchivePage> {
                         style: TextButton.styleFrom(
                           backgroundColor: const Color(0xFFEEE9FF), // Легкий фиолетовый фон
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(24),
+                            borderRadius: BorderRadius.circular(16),
                           ),
-                          padding: const EdgeInsets.symmetric(vertical: 15),
+                          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 20), // Уменьшение горизонтальных отступов
+
                         ),
                         child: Text(
                           "no_leave_it".tr(),
@@ -159,9 +182,9 @@ class _ArchivePageState extends State<ArchivePage> {
                         style: TextButton.styleFrom(
                           backgroundColor: Colors.red, // Красный фон
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(24),
+                            borderRadius: BorderRadius.circular(16),
                           ),
-                          padding: const EdgeInsets.symmetric(vertical: 15),
+                          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 20), // Уменьшение горизонтальных отступов
                         ),
                         child: Text(
                           "yes_delete".tr(),
@@ -172,6 +195,7 @@ class _ArchivePageState extends State<ArchivePage> {
                         ),
                       ),
                     ),
+
                   ],
                 ),
               ],
@@ -201,13 +225,16 @@ class _ArchivePageState extends State<ArchivePage> {
           children: [
             Row(
               children: [
-                Text(
+              Transform.translate(
+            offset: Offset(-16, 0), // Смещение текста влево
+              child: Text(
                   'archive'.tr(),
                   style: TextStyle(
                     fontSize: 24,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
+              )
               ],
             ),
             Row(
@@ -221,7 +248,18 @@ class _ArchivePageState extends State<ArchivePage> {
                     height: 32,
                   ),
                   onPressed: () {
-                    Navigator.push(context, MaterialPageRoute(builder: (context) => ChartScreen()));
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => LoggableScreen(
+                          screenName: 'ChartScreen',
+                          child: ChartScreen(
+                            sessionId: _currentSessionId!, // Передаем sessionId в ChartScreen
+                          ),
+                          currentSessionId: _currentSessionId!, // Передаем currentSessionId в LoggableScreen
+                        ),
+                      ),
+                    );
                   },
                 ),
                 Container(
@@ -252,7 +290,7 @@ class _ArchivePageState extends State<ArchivePage> {
             ),
           ],
         ),
-        backgroundColor: Colors.white,
+        backgroundColor: const Color(0xFFF8F9F9),
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -269,19 +307,12 @@ class _ArchivePageState extends State<ArchivePage> {
           },
         ),
       ),
-      backgroundColor: Colors.white,
+      backgroundColor: const Color(0xFFF8F9F9),
       bottomNavigationBar: Container(
         margin: const EdgeInsets.only(bottom: 30, right: 16, left: 16),
         decoration: BoxDecoration(
           color: const Color(0xFFEEE9FF),
           borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.1),
-              blurRadius: 8,
-              offset: Offset(0, -2),
-            ),
-          ],
         ),
         height: 60,
         child: Row(
@@ -305,14 +336,6 @@ class _ArchivePageState extends State<ArchivePage> {
       margin: const EdgeInsets.only(bottom: 10),
       decoration: BoxDecoration(
         color: Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.2),
-            spreadRadius: 3,
-            blurRadius: 5,
-            offset: const Offset(0, 1),
-          ),
-        ],
         borderRadius: BorderRadius.circular(16),
       ),
       child: Row(
@@ -330,7 +353,7 @@ class _ArchivePageState extends State<ArchivePage> {
             children: [
               GestureDetector(
                 onTap: () {
-                  _activeHabit(habitId); // Выводим сообщение в консоль при нажатии
+                  _activeHabit(habitId); // Обработка нажатия на иконку загрузки
                 },
                 child: Image.asset(
                   'assets/images/Upload.png',
@@ -338,39 +361,42 @@ class _ArchivePageState extends State<ArchivePage> {
                   height: 24,
                 ),
               ),
-              Transform.rotate(
-                angle: -90 * (3.141592653589793238 / 180),
-                child: PopupMenuButton<String>(
-                  onSelected: (value) {
-                    if (value == 'Delete') {
-                      _showDeleteDialog(context, title, habitId, () {});
-                    } else {
-                      print('Selected: $value');
-                    }
-                  },
-                  itemBuilder: (BuildContext context) {
-                    return [
-                       PopupMenuItem<String>(
-                        value: 'Edit',
-                        child: Padding(
-                          padding: EdgeInsets.symmetric(vertical: 4),
-                          child: Text(tr('edit')),
-                        ),
-                      ),
-                       PopupMenuItem<String>(
-                        value: 'Delete',
-                        child: Padding(
-                          padding: EdgeInsets.symmetric(vertical: 4),
-                          child: Text(tr('delete'), style: TextStyle(color: Colors.red)),
-                        ),
-                      ),
-                    ];
-                  },
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  color: Colors.white,
+              const SizedBox(width: 8), // Отступ между иконками
+              PopupMenuButton<String>(
+                icon: Transform.scale(
+                  scale: 2.5, // Масштабирование иконки
+                  child: Image.asset('assets/images/menu.png', width: 24, height: 24),
                 ),
+                onSelected: (value) {
+                  if (value == 'Delete') {
+                    _showDeleteDialog(context, title, habitId, () {});
+                  } else {
+                    print('Selected: $value');
+                  }
+                },
+                itemBuilder: (BuildContext context) {
+                  return [
+                    PopupMenuItem<String>(
+                      value: 'Delete',
+                      height: 25,
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        child: Text(
+                          tr('delete'),
+                          style: TextStyle(color: Colors.red, fontSize: 14),
+                        ),
+                      ),
+                    ),
+                  ];
+                },
+                constraints: BoxConstraints.tightFor(
+                  width: context.locale.languageCode == 'en' ? 70 : 80, // Используем locale от Easy Localization
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                color: Colors.white,
+                offset: const Offset(0, 30),
               ),
             ],
           ),
@@ -418,16 +444,34 @@ class _ArchivePageState extends State<ArchivePage> {
   }
 
   void _activeHabit(int habitId) async {
-    DatabaseHelper db = DatabaseHelper.instance; // Получаем экземпляр вашего помощника по базе данных
+    DatabaseHelper db = DatabaseHelper.instance; // Get instance of the DatabaseHelper
 
-    // Обновляем привычку в базе данных, устанавливая archived в 1
-    await db.updateHabit({'id': habitId, 'archived': 0}); // Архивируем привычку
+    // Fetch the current habit from the database to preserve other fields
+    var currentHabit = await db.queryHabitById(habitId);
+    if (currentHabit == null) {
+      print('Ошибка: привычка с ID $habitId не найдена.');
+      return;
+    }
 
-    // Обновляем состояние
-    setState(() {
-      // Создаем новый список на основе существующего, чтобы избежать ошибок с изменяемыми объектами
-     _loadArchivedHabits();
-    });
+    // Merge the current habit with the updated values
+    Map<String, dynamic> updatedHabit = {
+      ...currentHabit,
+      'archived': 0,  // Unarchive the habit
+    };
+
+    // Attempt to update the habit in the database
+    int result = await db.updateHabit(updatedHabit);
+    if (result > 0) {
+      print('Привычка с ID $habitId успешно активирована.');
+
+      // Update the state by reloading the list of archived habits
+      setState(() {
+        _loadArchivedHabits();  // Reload archived habits to refresh the UI
+      });
+    } else {
+      print('Ошибка при активации привычки.');
+    }
   }
+
 
 }

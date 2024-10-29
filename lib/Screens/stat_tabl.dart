@@ -11,7 +11,11 @@ import 'package:action_notes/Screens/add.dart';
 import 'package:action_notes/Screens/stat.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'dart:ui';
+import 'package:action_notes/Widgets/loggable_screen.dart';
+
 class ChartScreen extends StatefulWidget {
+  final int sessionId;
+  const ChartScreen({Key? key, required this.sessionId}) : super(key: key);
   @override
   _ChartScreenState createState() => _ChartScreenState();
 }
@@ -32,11 +36,12 @@ class _ChartScreenState extends State<ChartScreen> {
   List<_ChartData> twoWeeksData = [];
 
   List<_ChartData> monthData = [];
-
+  int? _currentSessionId;
 
   @override
   void initState() {
     super.initState();
+    _currentSessionId = widget.sessionId;
     data = weekData; // По умолчанию показываем данные за неделю
     loadChartData();
     _trackballBehavior = TrackballBehavior(
@@ -62,38 +67,48 @@ class _ChartScreenState extends State<ChartScreen> {
     setState(() {
       _selectedIndex = index;
     });
-    if (index == 0) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const HomePage()),
-      );
-    }
-    if (index == 1) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const NotesPage()),
-      );
+
+    // Определим имя экрана вручную
+    String screenName;
+    Widget page;
+
+    switch (index) {
+      case 0:
+        screenName = 'HomePage';
+        page = HomePage(sessionId: widget.sessionId);
+        break;
+      case 1:
+        screenName = 'NotesPage';
+        page = NotesPage(sessionId: widget.sessionId);
+        break;
+      case 2:
+        screenName = 'AddActionPage';
+        page = AddActionPage(sessionId: widget.sessionId);
+        break;
+      case 3:
+        screenName = 'StatsPage';
+        page = StatsPage(sessionId: widget.sessionId);
+        break;
+      case 4:
+        screenName = 'SettingsPage';
+        page = SettingsPage(sessionId: widget.sessionId);
+        break;
+      default:
+        return;
     }
 
-    if (index == 4) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const SettingsPage()),
-      );
-    }
-    if (index == 2) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const AddActionPage()),
-      );
-    }
-    if (index == 3) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const StatsPage()),
-      );
-    }
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(
+        builder: (context) => LoggableScreen(
+          screenName: screenName, // Передаем четко определенное имя экрана
+          child: page,
+          currentSessionId: widget.sessionId,
+        ),
+      ),
+    );
   }
+
 
 
 
@@ -150,10 +165,10 @@ class _ChartScreenState extends State<ChartScreen> {
       int completed = completedHabits[date] ?? 0;
       int completionPercentage = (total > 0) ? ((completed / total) * 100).round() : 0;
 
-      String formattedDate = DateFormat('d.MM').format(DateTime.parse(date));
+      DateTime parsedDate = DateTime.parse(date);
 
       chartData.add(_ChartData(
-          formattedDate,
+          parsedDate,
           total, // Общее количество привычек
           completionPercentage, // Процент выполнения
           completed // Количество выполненных привычек
@@ -210,11 +225,14 @@ class _ChartScreenState extends State<ChartScreen> {
           children: [
             Row(
               children: [
-                Text(
-                  tr('chart'),
-                  style: TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
+                Transform.translate(
+                  offset: Offset(-16, 0), // Сдвиг текста влево
+                  child: Text(
+                    tr('chart'),
+                    style: TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ),
               ],
@@ -227,13 +245,6 @@ class _ChartScreenState extends State<ChartScreen> {
                   decoration: BoxDecoration(
                     color: Color(0xFF5F33E1), // Цвет фона
                     shape: BoxShape.circle, // Круглая форма
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.2),
-                        blurRadius: 3,
-                        offset: Offset(0, 3),
-                      ),
-                    ],
                   ),
                   child: ClipOval(
                     child: Padding(
@@ -255,75 +266,256 @@ class _ChartScreenState extends State<ChartScreen> {
                     height: 32, // Высота иконки
                   ),
                   onPressed: () {
-                    Navigator.push(context, MaterialPageRoute(builder: (context) => ArchivePage()));
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => LoggableScreen(
+                          screenName: 'ArchivePage',
+                          child: ArchivePage(
+                            sessionId: _currentSessionId!, // Передаем sessionId в ArchivePage
+                          ),
+                          currentSessionId: _currentSessionId!, // Передаем currentSessionId в LoggableScreen
+                        ),
+                      ),
+                    );
+
                   },
                 ),
               ],
             ),
           ],
         ),
-        backgroundColor: Colors.white,
+        backgroundColor: const Color(0xFFF8F9F9),
       ),
       body: Column(
         children: <Widget>[
           _buildCustomToggle(),
           _buildChartCard(),
-          _buildStatsRow(),
           // График с Trackball для отображения подсказок при касании
           Expanded(
             child: Container(
-              padding: const EdgeInsets.all(16.0),
-              height: MediaQuery.of(context).size.height * 0.35,
+              padding: const EdgeInsets.all(8.0),
+              height: MediaQuery.of(context).size.height * 0.15,
               child: _selectedChart == 0
-                  ? SfCartesianChart(
-                primaryXAxis: CategoryAxis(),
-                series: <CartesianSeries>[
-                  ColumnSeries<_ChartData, String>(
-                    dataSource: data,
-                    xValueMapper: (_ChartData sales, _) => sales.day,
-                    yValueMapper: (_ChartData sales, _) =>
-                    _showPercent ? sales.percent : sales.completed,
-                    color: Color(0xFF5F33E1),
-                    borderRadius: BorderRadius.circular(5),
-                    width: 0.8,
-                    spacing: 0.1,
-                    dataLabelSettings: DataLabelSettings(isVisible: false),
-                  )
+                  ? Stack(
+                children: [
+                  // Светло-фиолетовый столбец на заднем фоне
+                  Padding(
+                    padding: const EdgeInsets.all(8.0),
+                    child: SfCartesianChart(
+                      primaryXAxis: DateTimeAxis(
+                        majorGridLines: MajorGridLines(width: 0),
+                        dateFormat: DateFormat('dd.MM'),
+                        interval: _selectedTab == 0 ? 1 : (_selectedTab == 1 ? 2 : 5),
+                        intervalType: DateTimeIntervalType.days,
+                      ),
+                      primaryYAxis: NumericAxis(
+                        minimum: 0,
+                        maximum: _showPercent ? 100 : 10,
+                        interval: _showPercent ? 10 : 1,
+                        majorGridLines: MajorGridLines(width: 0),
+                      ),
+                      plotAreaBorderWidth: 0,
+                      series: <CartesianSeries>[
+                        ColumnSeries<_ChartData, DateTime>(
+                          dataSource: data,
+                          xValueMapper: (_ChartData sales, _) => sales.day,
+                          yValueMapper: (_ChartData sales, _) => _showPercent ? 100 : 10,
+                          color: Color(0xFFECEAFF),
+                          borderRadius: BorderRadius.circular(10),
+                          width: 0.9,
+                          spacing: 0.0,
+                          opacity: 0.6,
+                        ),
+                      ],
+                    ),
+                  ),
+                  // Темно-фиолетовый столбец с данными
+                  Padding(
+                    padding: const EdgeInsets.all(8.0),
+                    child: SfCartesianChart(
+                      primaryXAxis: DateTimeAxis(
+                        majorGridLines: MajorGridLines(width: 0),
+                        dateFormat: DateFormat('dd.MM'),
+                        interval: _selectedTab == 0 ? 1 : (_selectedTab == 1 ? 2 : 5),
+                        intervalType: DateTimeIntervalType.days,
+                      ),
+                      primaryYAxis: NumericAxis(
+                        minimum: 0,
+                        maximum: _showPercent ? 100 : 10,
+                        interval: _showPercent ? 10 : 1,
+                        majorGridLines: MajorGridLines(width: 0),
+                      ),
+                      plotAreaBorderWidth: 0,
+                      series: <CartesianSeries>[
+                        ColumnSeries<_ChartData, DateTime>(
+                          dataSource: data,
+                          xValueMapper: (_ChartData sales, _) => sales.day,
+                          yValueMapper: (_ChartData sales, _) =>
+                          _showPercent ? sales.percent : sales.completed,
+                          color: Color(0xFF5F33E1),
+                          borderRadius: BorderRadius.circular(10),
+                          width: 0.9,
+                          spacing: 0.0,
+                          dataLabelSettings: DataLabelSettings(isVisible: false),
+                        ),
+                      ],
+                      trackballBehavior: TrackballBehavior(
+                        enable: true,
+                        activationMode: ActivationMode.singleTap,
+                        tooltipSettings: InteractiveTooltip(
+                          enable: true,
+                          color: Colors.white, // основной фон тултипа белый
+                          textStyle: TextStyle(color: Color(0xFF5F33E1), fontSize: 12),
+                        ),
+                        builder: (BuildContext context, TrackballDetails details) {
+                          final date = DateFormat('dd.MM').format(details.point!.x);
+                          final value = _showPercent
+                              ? '${details.point!.y}%' // Процентное значение
+                              : details.point!.y.toString(); // Количество
+
+                          return Container(
+                            padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 10),
+                            decoration: BoxDecoration(
+                              color: Color(0xFFEEE9FF), // задний фон тултипа #EEE9FF
+                              borderRadius: BorderRadius.circular(12),
+                                boxShadow: [
+                            BoxShadow(
+                            color: Colors.black.withOpacity(0.1), // subtle shadow
+                            offset: Offset(0, 2),
+                            blurRadius: 4,
+                          ),
+                          ]
+                            ),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  date,
+                                  style: TextStyle(color: Colors.black, fontSize: 10), // Дата черным цветом, размер 8 пикселей
+                                ),
+                                Text(
+                                  value,
+                                  style: TextStyle(
+                                    color: Color(0xFF5F33E1), // Цвет темно-фиолетовый для значения
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ),
                 ],
-                trackballBehavior: _trackballBehavior, // Подключаем Trackball для подсказок
               )
-                  : SfCartesianChart(
-                primaryXAxis: CategoryAxis(),
+              :SfCartesianChart(
+                primaryXAxis: DateTimeAxis(
+                  majorGridLines: MajorGridLines(width: 0),
+                  dateFormat: DateFormat('dd.MM'),
+                  interval: _selectedTab == 0 ? 1 : (_selectedTab == 1 ? 2 : 5),
+                  intervalType: DateTimeIntervalType.days,
+                  edgeLabelPlacement: EdgeLabelPlacement.shift,
+                ),
+                primaryYAxis: NumericAxis(
+                  minimum: 0.0, // Указываем 0.0, чтобы он распознал значение как double
+                  maximum: _showPercent
+                      ? (data.isNotEmpty ? data.map((e) => e.percent).reduce((a, b) => a > b ? a : b).toDouble() + 10.0 : 100.0)
+                      : (data.isNotEmpty ? data.map((e) => e.completed).reduce((a, b) => a > b ? a : b).toDouble() + 2.0 : 10.0),
+                  interval: _showPercent ? 10.0 : 1.0, // Интервалы тоже указываем как double
+                  majorGridLines: MajorGridLines(width: 1),
+                ),
+
+                plotAreaBackgroundColor: Color(0xFFFFF0EC),
+                plotAreaBorderWidth: 0,
                 series: <CartesianSeries>[
-                  LineSeries<_ChartData, String>(
+                  LineSeries<_ChartData, DateTime>(
                     dataSource: data,
                     xValueMapper: (_ChartData sales, _) => sales.day,
-                    yValueMapper: (_ChartData sales, _) =>
-                    _showPercent ? sales.percent : sales.completed,
-                    color: Color(0xFF5F33E1),
-                    width: 0.8,
-                  )
+                    yValueMapper: (_ChartData sales, _) {
+                      // Вывод каждого значения точки в зависимости от состояния _showPercent
+                      final yValue = _showPercent ? sales.percent : sales.completed;
+                      print('Point for ${sales.day}: Y-Value = $yValue');
+                      return yValue;
+                    },
+                    color: Color(0xFFFB6A37),
+                    width: 2,
+                    markerSettings: MarkerSettings(
+                      isVisible: true,
+                      color: Color(0xFFFB6A37),
+                      shape: DataMarkerType.circle,
+                      borderWidth: 1,
+                      borderColor: Color(0xFFFB6A37),
+                    ),
+                  ),
                 ],
-                trackballBehavior: _trackballBehavior, // Подключаем Trackball для подсказок
+                trackballBehavior: TrackballBehavior(
+                  enable: true,
+                  activationMode: ActivationMode.singleTap,
+                  tooltipSettings: InteractiveTooltip(
+                    enable: true,
+                    color: Colors.white,
+                    textStyle: TextStyle(color: Color(0xFF5F33E1), fontSize: 12),
+                  ),
+                  lineDashArray: [8, 3],
+                  lineColor: Color(0xFFFB6A37),
+                  lineWidth: 1.5,
+                  builder: (BuildContext context, TrackballDetails details) {
+                    final date = DateFormat('dd.MM').format(details.point!.x);
+                    final value = _showPercent
+                        ? '${details.point!.y}%'
+                        : details.point!.y.toString();
+
+                    return Container(
+                      padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 10),
+                      decoration: BoxDecoration(
+                        color: Color(0xFFFFF5F0),
+                        borderRadius: BorderRadius.circular(8),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.1),
+                            offset: Offset(0, 2),
+                            blurRadius: 4,
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            date,
+                            style: TextStyle(color: Colors.black, fontSize: 10),
+                          ),
+                          Text(
+                            value,
+                            style: TextStyle(
+                              color: Color(0xFFFF6B3C),
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
               ),
+
             ),
           ),
+
+
           _buildBottomDateSelector(), // Выбор даты
         ],
       ),
-      backgroundColor: Colors.white,
+      backgroundColor: const Color(0xFFF8F9F9),
       bottomNavigationBar: Container(
         margin: const EdgeInsets.only(bottom: 30, right: 16, left: 16),
         decoration: BoxDecoration(
           color: const Color(0xFFEEE9FF),
           borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.1),
-              blurRadius: 8,
-              offset: Offset(0, -2),
-            ),
-          ],
         ),
         height: 60,
         child: Row(
@@ -342,9 +534,9 @@ class _ChartScreenState extends State<ChartScreen> {
 
   Widget _buildCustomToggle() {
     return Padding(
-      padding: EdgeInsets.symmetric(horizontal: 16), // Отступы только справа и слева для карточки
+      padding: EdgeInsets.symmetric(horizontal: 8), // Уменьшены отступы для карточки
       child: Card(
-        elevation: 1, // Тень для карточки
+        elevation: 0, // Тень для карточки
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(20), // Закругленные углы карточки
         ),
@@ -386,30 +578,26 @@ class _ChartScreenState extends State<ChartScreen> {
     return Expanded(
       child: Padding(
         padding: EdgeInsets.symmetric(horizontal: 4), // Отступ между кнопками
-        child: GestureDetector(
-          onTap: () {
+        child: TextButton(
+          onPressed: () {
             setState(() {
               _selectedIndex = index; // Обновляем выбранную кнопку
               _updateData(index); // Вызываем соответствующую функцию по индексу
             });
           },
-          child: AnimatedContainer(
-            duration: Duration(milliseconds: 200), // Плавная анимация
-            curve: Curves.easeInOut, // Эффект плавного переключения
-            padding: EdgeInsets.symmetric(vertical: 12), // Отступы для кнопок
-            decoration: BoxDecoration(
-              color: isSelected ? Color(0xFF5F33E1) : Color(0xFFF3EDFF), // Цвет фона кнопки
+          style: TextButton.styleFrom(
+            backgroundColor: isSelected ? Color(0xFF5F33E1) : Color(0xFFF3EDFF), // Цвет фона кнопки
+            shape: RoundedRectangleBorder(
               borderRadius: borderRadius,
             ),
-            child: Center(
-              child: Text(
-                label,
-                style: TextStyle(
-                  color: isSelected ? Colors.white : Color(0xFF5F33E1), // Цвет текста
-                  fontWeight: FontWeight.bold,
-                  fontSize: 16,
-                ),
-              ),
+            padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 20), // Уменьшение горизонтальных отступов
+          ),
+          child: Text(
+            label,
+            style: TextStyle(
+              color: isSelected ? Colors.white : Color(0xFF5F33E1), // Цвет текста
+              fontWeight: FontWeight.bold,
+              fontSize: 16,
             ),
           ),
         ),
@@ -417,58 +605,6 @@ class _ChartScreenState extends State<ChartScreen> {
     );
   }
 
-
-  // Метод для создания ряда с овальными виджетами
-  Widget _buildStatsRow() {
-    if (_selectedIndex == 1 || _selectedIndex == 2) {
-      return SizedBox.shrink();  // Возвращаем пустой контейнер, если выбран 1 или 2
-    }
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 16.0),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
-        children: data.map((item) {
-          return GestureDetector(
-            onTap: () {
-              setState(() {
-                _showPercent = !_showPercent; // Переключение между количеством и процентами
-              });
-            },
-            child: Container(
-              padding: EdgeInsets.symmetric(vertical: 4, horizontal: 8),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(30),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.grey.withOpacity(0.2),
-                    spreadRadius: 2,
-                    blurRadius: 7,
-                    offset: Offset(0, 3),
-                  ),
-                ],
-              ),
-              child: Column(
-                children: [
-                  SizedBox(height: 4),
-                  Text(
-                    _showPercent
-                        ? '${item.percent.toInt()}%' // Процент выполнения
-                        : '${item.completed.toInt()}', // Количество выполненных из общего количества
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF5F33E1),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          );
-        }).toList(),
-      ),
-    );
-  }
 
 
 
@@ -479,14 +615,6 @@ class _ChartScreenState extends State<ChartScreen> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(15.0),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.2),
-            spreadRadius: 2,
-            blurRadius: 7,
-            offset: Offset(0, 3),
-          ),
-        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -515,9 +643,10 @@ class _ChartScreenState extends State<ChartScreen> {
                           });
                         },
                         child: Container(
+                          width: 55,
                           decoration: BoxDecoration(
                             color: _selectedChart == 0 ? Color(0xFF5F33E1) : Colors.transparent, // Цвет фона
-                            borderRadius: BorderRadius.circular(8), // Закругление углов
+                            borderRadius: BorderRadius.circular(24), // Закругление углов
                             border: Border.all(
                               color: _selectedChart == 0 ? Color(0xFF5F33E1) : Color(0xFF5F33E1), // Цвет рамки
                             ),
@@ -539,11 +668,13 @@ class _ChartScreenState extends State<ChartScreen> {
                           });
                         },
                         child: Container(
+                          width: 60,
                           decoration: BoxDecoration(
                             color: _selectedChart == 1 ? Color(0xFF5F33E1) : Colors.transparent, // Цвет фона
-                            borderRadius: BorderRadius.circular(8), // Закругление углов
+                            borderRadius: BorderRadius.circular(24), // Закругление углов
                             border: Border.all(
-                              color: _selectedChart == 1 ? Color(0xFF5F33E1) : Colors.grey, // Цвет рамки
+                              color: _selectedChart == 1 ? Color(0xFF5F33E1) : Color(0xFF5F33E1), // Цвет рамки
+                              width: 2,
                             ),
                           ),
                           padding: EdgeInsets.all(8), // Отступ внутри контейнера
@@ -569,16 +700,21 @@ class _ChartScreenState extends State<ChartScreen> {
                 child: ElevatedButton(
                   style: ElevatedButton.styleFrom(backgroundColor: !_showPercent ? Color(0xFF5F33E1) : Colors.white, // Закрашенная при выборе, иначе белая
                     shadowColor: Colors.transparent, // Убираем тень
+                    side: BorderSide(
+                      color: Color(0xFF5F33E1), // Цвет рамки
+                      width: 1, // Ширина рамки
+                    ),
                   ),
                   onPressed: () {
                     setState(() {
                       _showPercent = false; // Показать количество
+                      loadChartData();
                     });
                   },
                   child: Text(
                     tr('quantity'), // Кнопка для количества
                     style: TextStyle(
-                      fontSize: 18, // Увеличенный размер шрифта
+                      fontSize: 16, // Увеличенный размер шрифта
                       fontWeight: FontWeight.bold, // Жирный шрифт
                       color: !_showPercent ? Colors.white : Color(0xFF5F33E1), // Цвет текста в зависимости от выбора
                     ),
@@ -591,16 +727,21 @@ class _ChartScreenState extends State<ChartScreen> {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: _showPercent ? Color(0xFF5F33E1) : Colors.white,
                     shadowColor: Colors.transparent, // Убираем тень
+                    side: BorderSide(
+                      color: Color(0xFF5F33E1), // Цвет рамки
+                      width: 1, // Ширина рамки
+                    ),
                   ),
                   onPressed: () {
                     setState(() {
                       _showPercent = true; // Показать процент
+                      loadChartData();
                     });
                   },
                   child: Text(
                     tr('percent'), // Кнопка для процентов
                     style: TextStyle(
-                      fontSize: 18, // Увеличенный размер шрифта
+                      fontSize: 16, // Увеличенный размер шрифта
                       fontWeight: FontWeight.bold, // Жирный шрифт
                       color: _showPercent ? Colors.white : Color(0xFF5F33E1), // Цвет текста в зависимости от выбора
                     ),
@@ -657,9 +798,8 @@ class _ChartScreenState extends State<ChartScreen> {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             // Левая стрелка
-            IconButton(
-              icon: const Icon(Icons.chevron_left, color: Color(0xFF5F33E1)),
-              onPressed: () {
+            GestureDetector(
+              onTap: () {
                 setState(() {
                   // Логика для перехода на предыдущий период (неделя, 2 недели, месяц)
                   if (_selectedTab == 0) {
@@ -685,27 +825,31 @@ class _ChartScreenState extends State<ChartScreen> {
                   loadChartData(); // Обновляем данные графика
                 });
               },
+              child: Padding(
+                padding: const EdgeInsets.all(8.0), // Отступ вокруг изображения
+                child: Image.asset(
+                  'assets/images/arr_left.png', // Путь к вашему изображению
+                  width: 22, // Ширина изображения
+                  height: 22, // Высота изображения
+                  color: Color(0xFF5F33E1), // Цвет изображения, если требуется
+                ),
+              ),
             ),
+
 
             // Текущий диапазон дат
             Text(
               formattedDateRange,
               style: const TextStyle(
                 color: Colors.black,
-                fontSize: 18,
+                fontSize: 16,
                 fontWeight: FontWeight.bold,
               ),
             ),
 
             // Правая стрелка
-            IconButton(
-              icon: Icon(
-                Icons.chevron_right,
-                color: _isForwardNavigationAllowed()
-                    ? const Color(0xFF5F33E1) // Обычный цвет
-                    : const Color(0x4D5F33E1), // Полупрозрачный цвет для недоступного состояния
-              ),
-              onPressed: _isForwardNavigationAllowed()
+            GestureDetector(
+              onTap: _isForwardNavigationAllowed()
                   ? () {
                 setState(() {
                   // Логика для перехода на следующий период (неделя, 2 недели, месяц)
@@ -732,7 +876,16 @@ class _ChartScreenState extends State<ChartScreen> {
                   loadChartData(); // Обновляем данные графика
                 });
               }
-                  : null, // Делаем кнопку недоступной, если условие не выполняется
+                  : null, // Если кнопка недоступна, обработчик нажатия будет равен null
+              child: Padding(
+                padding: const EdgeInsets.all(8.0), // Отступ вокруг изображения
+                child: Image.asset(
+                  'assets/images/arr_right.png', // Путь к вашему изображению
+                  width: 22, // Ширина изображения
+                  height: 22, // Высота изображения
+                  color: _isForwardNavigationAllowed() ? Color(0xFF5F33E1) : Color(0x4D5F33E1), // Цвет изображения
+                ),
+              ),
             ),
 
             // Кнопка возврата к сегодняшнему дню, если текущий день не включен
@@ -795,7 +948,8 @@ class _ChartScreenState extends State<ChartScreen> {
 
 // Проверка, включен ли текущий день в диапазон
   bool _isTodayInCurrentRange() {
-    return _today.isAfter(_selectedDateRangeStart) && _today.isBefore(_selectedDateRangeEnd.add(Duration(days: 1)));
+    // Изменение условий для проверки включения текущей даты в диапазон
+    return _today.isAfter(_selectedDateRangeStart) && _today.isBefore(_selectedDateRangeEnd.add(Duration(days: 1))) || _today.isAtSameMomentAs(_selectedDateRangeStart) || _today.isAtSameMomentAs(_selectedDateRangeEnd);
   }
 
 
@@ -804,86 +958,121 @@ class _ChartScreenState extends State<ChartScreen> {
     showDialog(
       context: context,
       barrierColor: Colors.black.withOpacity(0.1), // Полупрозрачная заливка
+      barrierDismissible: true, // Позволяем закрывать диалог при нажатии вне области
       builder: (BuildContext context) {
-        return Stack(
-          children: [
-            // Эффект размытия фона
-            BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5), // Размытие фона
-              child: Container(
-                color: Colors.black.withOpacity(0), // Прозрачный контейнер для сохранения эффекта размытия
+        return Dialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5), // Размытие фона
+            child: Container(
+              padding: const EdgeInsets.all(16.0),
+              decoration: BoxDecoration(
+                color: Colors.white, // Цвет фона календаря
+                borderRadius: BorderRadius.circular(10),
               ),
-            ),
-            Positioned(
-              bottom: 90,
-              left: 10,
-              right: 10,
-              child: Opacity(
-                opacity: 1,
-                child: Dialog(
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Container(
-                    padding: const EdgeInsets.all(16.0),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        TableCalendar(
-                          firstDay: DateTime.utc(2010, 10, 16),
-                          lastDay: DateTime.utc(2030, 3, 14),
-                          focusedDay: _selectedDate,
-                          calendarStyle: CalendarStyle(
-                            selectedDecoration: BoxDecoration(
-                              color: const Color(0xFF5F33E1),
-                              shape: BoxShape.circle,
-                            ),
-                            todayDecoration: BoxDecoration(
-                              color: Colors.transparent,
-                              shape: BoxShape.circle,
-                              border: Border.all(
-                                color: const Color(0xFF5F33E1),
-                                width: 1,
-                              ),
-                            ),
-                            todayTextStyle: TextStyle(
-                              color: Colors.black,
-                            ),
-                            outsideDaysVisible: false,
-                          ),
-                          headerStyle: HeaderStyle(
-                            formatButtonVisible: false,
-                            titleCentered: true,
-                            leftChevronIcon: const Icon(Icons.chevron_left, color: Color(0xFF5F33E1)),
-                            rightChevronIcon: const Icon(Icons.chevron_right, color: Color(0xFF5F33E1)),
-                          ),
-                          daysOfWeekVisible: true,
-                          selectedDayPredicate: (day) {
-                            return isSameDay(_selectedDate, day);
-                          },
-                          onDaySelected: (selectedDay, focusedDay) {
-                            if (selectedDay.isBefore(_today)) {
-                              setState(() {
-                                _selectedDate = selectedDay;
-                                _selectedDateRangeStart = selectedDay.subtract(Duration(days: selectedDay.weekday - 1));
-                                _selectedDateRangeEnd = _selectedDateRangeStart.add(Duration(days: 6));
-
-                                loadChartData(); // Обновляем данные графика
-                              });
-                              Navigator.pop(context);
-                            }
-                          },
-                          enabledDayPredicate: (day) {
-                            return day.isBefore(_today);
-                          },
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TableCalendar(
+                    firstDay: DateTime.utc(2010, 10, 16),
+                    lastDay: DateTime.utc(2030, 3, 14),
+                    focusedDay: _selectedDate,
+                    locale: Localizations.localeOf(context).toString(),
+                    calendarStyle: CalendarStyle(
+                      selectedDecoration: BoxDecoration(
+                        color: const Color(0xFF5F33E1),
+                        shape: BoxShape.circle,
+                      ),
+                      todayDecoration: BoxDecoration(
+                        color: Colors.transparent,
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: const Color(0xFF5F33E1),
+                          width: 1,
                         ),
-                      ],
+                      ),
+                      todayTextStyle: TextStyle(
+                        color: Colors.black,
+                      ),
+                      outsideDaysVisible: false,
                     ),
+                    headerStyle: HeaderStyle(
+                      formatButtonVisible: false,
+                      titleCentered: true,
+                      titleTextStyle: const TextStyle(
+                        fontSize: 18, // Размер шрифта для месяца
+                        fontWeight: FontWeight.bold, // Жирный шрифт
+                        color: Colors.black, // Цвет текста для названия месяца
+                      ),
+                      titleTextFormatter: (date, locale) {
+                        String formattedMonth = DateFormat.MMMM(locale).format(date);
+
+                        // Преобразуем первую букву в верхний регистр только для русского языка
+                        if (locale == 'ru') {
+                          formattedMonth = formattedMonth[0].toUpperCase() + formattedMonth.substring(1);
+                        }
+
+                        return formattedMonth;
+                      },
+                      leftChevronIcon: Padding(
+                        padding: const EdgeInsets.only(left: 42.0),
+                        child: Image.asset(
+                          'assets/images/arr_left.png', // Путь к изображению стрелки влево
+                          width: 20,
+                          height: 20,
+                          color: const Color(0xFF5F33E1), // Цвет изображения
+                        ),
+                      ),
+                      rightChevronIcon: Padding(
+                        padding: const EdgeInsets.only(right: 42.0),
+                        child: Image.asset(
+                          'assets/images/arr_right.png', // Путь к изображению стрелки вправо
+                          width: 20,
+                          height: 20,
+                          color: const Color(0xFF5F33E1), // Цвет изображения
+                        ),
+                      ),
+                    ),
+                    daysOfWeekVisible: true,
+                    daysOfWeekStyle: DaysOfWeekStyle(
+                      weekdayStyle: const TextStyle(
+                        fontSize: 13, // Размер шрифта для дней недели
+                        fontWeight: FontWeight.normal, // Не жирный шрифт
+                        color: Colors.grey, // Цвет текста для будних дней
+                      ),
+                      weekendStyle: const TextStyle(
+                        fontSize: 13, // Размер шрифта для выходных
+                        fontWeight: FontWeight.normal, // Не жирный шрифт
+                        color: Colors.grey,
+                      ),
+                      dowTextFormatter: (date, locale) =>
+                          DateFormat.E(locale).format(date).toUpperCase(),
+                    ),
+                    selectedDayPredicate: (day) {
+                      return isSameDay(_selectedDate, day);
+                    },
+                    onDaySelected: (selectedDay, focusedDay) {
+                      if (selectedDay.isBefore(_today)) {
+                        setState(() {
+                          _selectedDate = selectedDay;
+                          _selectedDateRangeStart = selectedDay.subtract(Duration(days: selectedDay.weekday - 1));
+                          _selectedDateRangeEnd = _selectedDateRangeStart.add(Duration(days: 6));
+
+                          loadChartData(); // Обновляем данные графика
+                        });
+                        Navigator.pop(context);
+                      }
+                    },
+                    enabledDayPredicate: (day) {
+                      return day.isBefore(_today);
+                    },
                   ),
-                ),
+                ],
               ),
             ),
-          ],
+          ),
         );
       },
     );
@@ -896,7 +1085,7 @@ class _ChartScreenState extends State<ChartScreen> {
 class _ChartData {
   _ChartData(this.day, this.quantity, this.percent, this.completed);
 
-  final String day; // Дата
+  final DateTime  day; // Дата
   final int quantity; // Общее количество привычек
   final int percent; // Процент выполнения
   final int completed; // Количество выполненных привычек

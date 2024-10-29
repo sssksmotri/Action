@@ -11,9 +11,12 @@ import 'package:action_notes/Service/database_helper.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:table_calendar/table_calendar.dart';
 import 'package:easy_localization/easy_localization.dart';
+import 'dart:ui';
+import 'package:action_notes/Widgets/loggable_screen.dart';
 
 class StatsPage extends StatefulWidget {
-  const StatsPage({Key? key}) : super(key: key);
+  final int sessionId;
+  const StatsPage({Key? key, required this.sessionId}) : super(key: key);
 
   @override
   _StatsPageState createState() => _StatsPageState();
@@ -31,12 +34,13 @@ class _StatsPageState extends State<StatsPage> {
 
   // Список задач (привычек)
   final List<Map<String, dynamic>> tasks = [];
-
+  int? _currentSessionId;
   @override
   void initState() {
     super.initState();
     _updateDates();
     _loadTasks();
+    _currentSessionId = widget.sessionId;
   }
 
   void _updateDates() {
@@ -64,22 +68,48 @@ class _StatsPageState extends State<StatsPage> {
     setState(() {
       _selectedIndex = index;
     });
-    if (index == 0) {
-      Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const HomePage()));
+
+    // Определим имя экрана вручную
+    String screenName;
+    Widget page;
+
+    switch (index) {
+      case 0:
+        screenName = 'HomePage';
+        page = HomePage(sessionId: widget.sessionId);
+        break;
+      case 1:
+        screenName = 'NotesPage';
+        page = NotesPage(sessionId: widget.sessionId);
+        break;
+      case 2:
+        screenName = 'AddActionPage';
+        page = AddActionPage(sessionId: widget.sessionId);
+        break;
+      case 3:
+        screenName = 'StatsPage';
+        page = StatsPage(sessionId: widget.sessionId);
+        break;
+      case 4:
+        screenName = 'SettingsPage';
+        page = SettingsPage(sessionId: widget.sessionId);
+        break;
+      default:
+        return;
     }
-    if (index == 1) {
-      Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const NotesPage()));
-    }
-    if (index == 4) {
-      Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const SettingsPage()));
-    }
-    if (index == 2) {
-      Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const AddActionPage()));
-    }
-    if (index == 3) {
-      Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const StatsPage()));
-    }
+
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(
+        builder: (context) => LoggableScreen(
+          screenName: screenName, // Передаем четко определенное имя экрана
+          child: page,
+          currentSessionId: widget.sessionId,
+        ),
+      ),
+    );
   }
+
 
   // Загрузка данных о привычках
   Future<void> _loadTasks() async {
@@ -192,7 +222,7 @@ class _StatsPageState extends State<StatsPage> {
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(10),
       ),
-      elevation: 5,
+      elevation: 0,
       margin: const EdgeInsets.symmetric(vertical: 8),
       color: Colors.white,
       child: Padding(
@@ -239,57 +269,103 @@ class _StatsPageState extends State<StatsPage> {
 
 
   Widget _buildProgressBar(int completed, int total, List<bool> isCompleted) {
-    // Рассчитываем максимальное количество элементов в строке и количество строк
-    int maxItemsPerRow;
-    int numberOfRows;
+    // Логика для разных состояний
+    if (total <= 14) {
+      // Для 14 и меньше элементов — прямоугольные, расположенные в 1 или 2 строки
+      int maxItemsPerRow = total <= 7 ? total : (total / 1).ceil();
+      int numberOfRows = total <= 7 ? 1 : 2;
 
-    if (total <= 7) {
-      maxItemsPerRow = total;  // Все элементы в одну строку, если элементов 7 или меньше
-      numberOfRows = 1;
-    } else if (total <= 14) {
-      maxItemsPerRow = (total / 2).ceil();  // Для 14 дней делим на 2 строки по 7 элементов
-      numberOfRows = 2;  // Две строки для 14 дней
-    } else if (total <= 30) {
-      maxItemsPerRow = (total / 2).ceil();  // Для 15-30 дней делим на 2 строки
-      numberOfRows = 2;  // Две строки для 15-30 дней
-    } else {
-      maxItemsPerRow = (total / 3).ceil();  // Элементы распределяются на 3 строки для 30+ дней
-      numberOfRows = 3;  // Три строки для 30+ дней
-    }
+      return Column(
+        children: List.generate(numberOfRows, (rowIndex) {
+          return Row(
+            mainAxisAlignment: MainAxisAlignment.start,
+            children: List.generate(maxItemsPerRow, (index) {
+              int currentIndex = rowIndex * maxItemsPerRow + index;
+              if (currentIndex >= total) return Container();
 
-    return Column(
-      children: List.generate(numberOfRows, (rowIndex) {
-        return Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: List.generate(maxItemsPerRow, (index) {
-            int currentIndex = rowIndex * maxItemsPerRow + index;  // Рассчитываем текущий индекс элемента
-            if (currentIndex >= total) return Container();  // Если индекс превышает общее число элементов, возвращаем пустое место
-
-            // Увеличиваем ширину элемента, если элементов мало (например, 2, 3, 4)
-            double elementWidth = (total <= 4) ? (MediaQuery.of(context).size.width - 32) / total - 8 : (total > 14 ? 18 : 40);
-
-            return Expanded(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 4.0, vertical: 4.0),  // Отступы между элементами
-                child: Container(
-                  width: elementWidth,  // Изменяем ширину в зависимости от общего количества элементов
-                  height: total > 14 ? 18 : 15,  // Одинаковая высота для всех элементов
-                  decoration: BoxDecoration(
-                    color: isCompleted[currentIndex]
-                        ? Color(0xFF5F33E1)  // Оранжевый цвет для завершённых дней
-                        : Colors.grey[300],  // Серый цвет для пропущенных
-                    shape: total > 14 ? BoxShape.circle : BoxShape.rectangle,  // Круглые элементы для 15+ дней, прямоугольные для 14 и меньше
-                    borderRadius: total > 14 ? null : BorderRadius.circular(10),  // Закругленные углы для прямоугольных элементов
+              return Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 1.0, vertical: 1.0),
+                  child: Container(
+                    height: 15,
+                    decoration: BoxDecoration(
+                      color: isCompleted[currentIndex]
+                          ? const Color(0xFF5F33E1)
+                          : Colors.grey[300],
+                      shape: BoxShape.rectangle,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
                   ),
                 ),
-              ),
-            );
-          }),
-        );
-      }),
-    );
-  }
+              );
+            }),
+          );
+        }),
+      );
+    } else if (total <= 30) {
+      // Для 15-30 элементов — круги, расположенные в 2 строки
+      int maxItemsPerRow = (total / 2).ceil();
+      int numberOfRows = 2;
 
+      return Column(
+        children: List.generate(numberOfRows, (rowIndex) {
+          return Row(
+            mainAxisAlignment: MainAxisAlignment.start,
+            children: List.generate(maxItemsPerRow, (index) {
+              int currentIndex = rowIndex * maxItemsPerRow + index;
+              if (currentIndex >= total) return Container();
+
+              return Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 1.0, vertical: 1.0),
+                  child: Container(
+                    height: 18,
+                    decoration: BoxDecoration(
+                      color: isCompleted[currentIndex]
+                          ? const Color(0xFF5F33E1)
+                          : Colors.grey[300],
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                ),
+              );
+            }),
+          );
+        }),
+      );
+    } else {
+      // Для больше 30 элементов — круги в одной строке с возможностью прокрутки
+      int maxItemsPerRow = (total / 2).ceil();
+      int numberOfRows = 2;
+
+      return Column(
+        children: List.generate(numberOfRows, (rowIndex) {
+          return Row(
+            mainAxisAlignment: MainAxisAlignment.start,
+            children: List.generate(maxItemsPerRow, (index) {
+              int currentIndex = rowIndex * maxItemsPerRow + index;
+              if (currentIndex >= total) return Container();
+
+              return Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 1.0, vertical: 1.0),
+                  child: Container(
+                    height: 18,
+                    decoration: BoxDecoration(
+                      color: isCompleted[currentIndex]
+                          ? const Color(0xFF5F33E1)
+                          : Colors.grey[300],
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                ),
+              );
+            }),
+          );
+        }),
+      );
+    }
+  }
 
 
 
@@ -297,7 +373,7 @@ class _StatsPageState extends State<StatsPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: const Color(0xFFF8F9F9),
         automaticallyImplyLeading: false,
         title: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -312,14 +388,37 @@ class _StatsPageState extends State<StatsPage> {
                   iconSize: 32,
                   icon: Image.asset('assets/images/Chart.png'),
                   onPressed: () {
-                    Navigator.push(context, MaterialPageRoute(builder: (context) => ChartScreen()));
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => LoggableScreen(
+                          screenName: 'ChartScreen',
+                          child: ChartScreen(
+                            sessionId: _currentSessionId!, // Передаем sessionId в ChartScreen
+                          ),
+                          currentSessionId: _currentSessionId!, // Передаем currentSessionId в LoggableScreen
+                        ),
+                      ),
+                    );
+
                   },
                 ),
                 IconButton(
                   iconSize: 32,
                   icon: Image.asset('assets/images/Folder.png'),
                   onPressed: () {
-                    Navigator.push(context, MaterialPageRoute(builder: (context) => ArchivePage()));
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => LoggableScreen(
+                          screenName: 'ArchivePage',
+                          child: ArchivePage(
+                            sessionId: _currentSessionId!, // Передаем sessionId в ArchivePage
+                          ),
+                          currentSessionId: _currentSessionId!, // Передаем currentSessionId в LoggableScreen
+                        ),
+                      ),
+                    );
                   },
                 ),
               ],
@@ -346,7 +445,7 @@ class _StatsPageState extends State<StatsPage> {
           ],
         ),
       ),
-      backgroundColor: Colors.white,
+      backgroundColor: const Color(0xFFF8F9F9),
       bottomNavigationBar: _buildBottomNavigationBar(),
     );
   }
@@ -358,19 +457,20 @@ class _StatsPageState extends State<StatsPage> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(10),
-        boxShadow: const [
-          BoxShadow(color: Colors.grey, blurRadius: 1, spreadRadius: 0),
-        ],
       ),
       child: Column(
         children: [
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              // Левая стрелка
-              Container(
-                child: IconButton(
-                  icon: const Icon(Icons.chevron_left,  color: Color(0xFF5F33E1)),
+              // Кнопка стрелка влево
+              if (_selectedPeriod != tr('another_period')) // Проверяем выбранный период
+                IconButton(
+                  icon: Image.asset(
+                    'assets/images/arr_left.png',
+                    width: 20,
+                    height: 20,
+                  ),
                   onPressed: () {
                     setState(() {
                       if (_startDate != null && _startDate!.subtract(Duration(days: 7)).isBefore(_today)) {
@@ -381,27 +481,28 @@ class _StatsPageState extends State<StatsPage> {
                     });
                   },
                 ),
-              ),
-
-              // Текущий диапазон дат
               Expanded(
                 child: Center(
-                  child: Text(
+                  // Проверяем, выбран ли другой период
+                  child: _selectedPeriod == tr('another_period')
+                      ? Container() // Пустое пространство для "другого периода"
+                      : Text(
                     _formatDateRange(),
-                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w400),
                     textAlign: TextAlign.center,
                   ),
                 ),
               ),
-
-              // Правая стрелка
-              Container(
-                child: IconButton(
-                  icon: Icon(
-                    Icons.chevron_right,
+              // Кнопка стрелка вправо
+              if (_selectedPeriod != tr('another_period')) // Проверяем выбранный период
+                IconButton(
+                  icon: Image.asset(
+                    'assets/images/arr_right.png',
+                    width: 20,
+                    height: 20,
                     color: (_endDate != null && _endDate!.add(Duration(days: 7)).isBefore(DateTime.now().add(Duration(days: 1))))
-                        ? const Color(0xFF5F33E1) // Обычный цвет для активного состояния
-                        : const Color(0x4D5F33E1), // Полупрозрачный цвет для неактивного состояния
+                        ? const Color(0xFF5F33E1)
+                        : const Color(0x4D5F33E1),
                   ),
                   onPressed: (_endDate != null && _endDate!.add(Duration(days: 7)).isBefore(DateTime.now().add(Duration(days: 1))))
                       ? () {
@@ -411,52 +512,101 @@ class _StatsPageState extends State<StatsPage> {
                       _loadTasks();
                     });
                   }
-                      : null, // Делаем кнопку недоступной, если условие не выполняется
+                      : null,
                 ),
-              ),
-
               // Кнопка фильтра
-              Container(
-                width: 40,
-                child: IconButton(
-                  icon: Image.asset('assets/images/Filter.png', width: 24, height: 24),
-                  onPressed: () => _showPopupMenu(context), // Вызов метода при нажатии
-                ),
-              ),
 
-              // Выпадающий список для выбора периода
-              DropdownButtonHideUnderline(
-                child: DropdownButton<String>(
-                  value: _selectedPeriod,
-                  items: <String>[tr('week'), tr('two_weeks'), tr('month'), tr('another_period')]
-                      .map<DropdownMenuItem<String>>((String value) {
-                    return DropdownMenuItem<String>(
-                      value: value,
-                      child: Text(
-                        value,
-                        style: const TextStyle(
-                          color: Color(0xFF5F33E1),
-                          fontWeight: FontWeight.bold,
+                IconButton(
+                  icon: Image.asset('assets/images/Filter.png', width: 24, height: 24),
+                  onPressed: () => _showPopupMenu(context),
+                ),
+              // Выпадающий список
+              Container(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(12),
+                  color: Colors.white,
+                ),
+                child: DropdownButtonHideUnderline(
+                  child: DropdownButton<String>(
+                    value: _selectedPeriod,
+                    isDense: true,
+                    items: <String>[tr('week'), tr('two_weeks'), tr('month'), tr('another_period')]
+                        .map<DropdownMenuItem<String>>((String value) {
+                      return DropdownMenuItem<String>(
+                        value: value,
+                        child: Align(
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            value,
+                            style: const TextStyle(
+                              color: Color(0xFF5F33E1),
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
                         ),
+                      );
+                    }).toList(),
+                    onChanged: (String? newValue) {
+                      setState(() {
+                        _selectedPeriod = newValue!;
+                        _updateDates();
+                      });
+                    },
+                    icon: Padding(
+                      padding: const EdgeInsets.only(left: 8.0),
+                      child: Image.asset(
+                        'assets/images/arr_vn.png',
+                        width: 20,
+                        height: 20,
                       ),
-                    );
-                  }).toList(),
-                  onChanged: (String? newValue) {
-                    setState(() {
-                      _selectedPeriod = newValue!;
-                      _updateDates(); // Обновляем даты при изменении периода
-                    });
-                  },
-                  icon: const Icon(
-                    Icons.arrow_drop_down,
-                    color: Color(0xFF5F33E1),
+                    ),
+                    dropdownColor: Colors.white,
                   ),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 10),
-          // Добавьте здесь логику для "Another Period"
+          const SizedBox(height: 3),
+          // Логика для "Неделя"
+          if (_selectedPeriod == tr('week'))
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: _generateDaysForPeriod(_startDate!).map((day) {
+                int completedHabits = _getCompletedHabitsForDate(day);
+
+                return Container(
+                  width: 45,
+                  padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 1),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFEEE9FF),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Column(
+                    children: [
+                      Text(
+                        DateFormat('dd.MM').format(day),
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        '$completedHabits',
+                        style: const TextStyle(
+                          color: Color(0xFF5F33E1),
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }).toList(),
+            ),
+          const SizedBox(height: 3),
+          // Логика для "Другого периода"
           if (_selectedPeriod == tr('another_period')) ...[
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -464,7 +614,6 @@ class _StatsPageState extends State<StatsPage> {
                 Expanded(
                   child: GestureDetector(
                     onTap: () {
-                      // Показываем календарь для начальной даты
                       _showCalendarDialog(isStartDate: true);
                     },
                     child: Container(
@@ -488,11 +637,10 @@ class _StatsPageState extends State<StatsPage> {
                     ),
                   ),
                 ),
-                const SizedBox(width: 10),
+                const SizedBox(width: 5),
                 Expanded(
                   child: GestureDetector(
                     onTap: () {
-                      // Показываем календарь для конечной даты
                       _showCalendarDialog(isStartDate: false);
                     },
                     child: Container(
@@ -518,6 +666,7 @@ class _StatsPageState extends State<StatsPage> {
                 ),
               ],
             ),
+            const SizedBox(height: 5),
           ],
         ],
       ),
@@ -525,132 +674,197 @@ class _StatsPageState extends State<StatsPage> {
   }
 
 
+
+
+
+  int _getCompletedHabitsForDate(DateTime day) {
+    String dayString = DateFormat('yyyy-MM-dd').format(day);
+    int completedCount = 0;
+
+    for (var task in tasks) {
+      int dayIndex = day.difference(_startDate).inDays;
+      if (dayIndex >= 0 && dayIndex < task['isCompleted'].length && task['isCompleted'][dayIndex]) {
+        completedCount++;
+      }
+    }
+
+    return completedCount;
+  }
+  List<DateTime> _generateDaysForPeriod(DateTime startDate) {
+    return List.generate(7, (index) => startDate.add(Duration(days: index)));
+  }
+
   void _showCalendarDialog({required bool isStartDate}) {
     showDialog(
       context: context,
+      barrierColor: Colors.black.withOpacity(0.1),
+      barrierDismissible: true,
       builder: (BuildContext context) {
-        return Stack(
-          children: [
-            Positioned(
-              bottom: 90,
-              left: 10,
-              right: 10,
-              child: Opacity(
-                opacity: 1,
-                child: Dialog(
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Container(
-                    padding: const EdgeInsets.all(16.0),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        TableCalendar(
-                          firstDay: DateTime.utc(2010, 10, 16),
-                          lastDay: DateTime.utc(2030, 3, 14),
-                          focusedDay: _selectedDate,
-                          calendarStyle: CalendarStyle(
-                            selectedDecoration: BoxDecoration(
-                              color: const Color(0xFF5F33E1),
-                              shape: BoxShape.circle,
-                            ),
-                            todayDecoration: BoxDecoration(
-                              color: Colors.transparent,
-                              shape: BoxShape.circle,
-                              border: Border.all(
-                                color: const Color(0xFF5F33E1),
-                                width: 1,
-                              ),
-                            ),
-                            todayTextStyle: TextStyle(
-                              color: Colors.black,
-                            ),
-                            outsideDaysVisible: false,
-                          ),
-                          headerStyle: HeaderStyle(
-                            formatButtonVisible: false,
-                            titleCentered: true,
-                            leftChevronIcon: const Icon(Icons.chevron_left, color: Color(0xFF5F33E1)),
-                            rightChevronIcon: const Icon(Icons.chevron_right, color: Color(0xFF5F33E1)),
-                          ),
-                          daysOfWeekVisible: true,
-                          selectedDayPredicate: (day) {
-                            return isSameDay(_selectedDate, day);
-                          },
-                          onDaySelected: (selectedDay, focusedDay) {
-                            if (selectedDay.isBefore(_today)) {
-                              setState(() {
-                                _selectedDate = selectedDay;
-
-                                if (isStartDate) {
-                                  _startDate = selectedDay; // Устанавливаем начальную дату
-                                } else {
-                                  _endDate = selectedDay; // Устанавливаем конечную дату
-                                }
-
-                                // Здесь вы можете обновить диапазон дат или выполнить другие действия
-                                _loadTasks(); // Обновляем данные графика
-                              });
-                              Navigator.pop(context);
-                            }
-                          },
-                          enabledDayPredicate: (day) {
-                            return day.isBefore(_today);
-                          },
+        return Dialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
+            child: Container(
+              padding: const EdgeInsets.all(16.0),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TableCalendar(
+                    firstDay: DateTime.utc(2010, 10, 16),
+                    lastDay: DateTime.utc(2030, 3, 14),
+                    focusedDay: _selectedDate,
+                    locale: Localizations.localeOf(context).toString(),
+                    calendarStyle: CalendarStyle(
+                      selectedDecoration: BoxDecoration(
+                        color: const Color(0xFF5F33E1),
+                        shape: BoxShape.circle,
+                      ),
+                      todayDecoration: BoxDecoration(
+                        color: Colors.transparent,
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: const Color(0xFF5F33E1),
+                          width: 1,
                         ),
-                      ],
+                      ),
+                      todayTextStyle: const TextStyle(
+                        color: Colors.black,
+                      ),
+                      outsideDaysVisible: false,
                     ),
+                    headerStyle: HeaderStyle(
+                      formatButtonVisible: false,
+                      titleCentered: true,
+                      titleTextStyle: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black,
+                      ),
+                      titleTextFormatter: (date, locale) {
+                        String formattedMonth = DateFormat.MMMM(locale).format(date);
+                        if (locale == 'ru') {
+                          formattedMonth = formattedMonth[0].toUpperCase() + formattedMonth.substring(1);
+                        }
+                        return formattedMonth;
+                      },
+                      leftChevronIcon: Padding(
+                        padding: const EdgeInsets.only(left: 42.0),
+                        child: Image.asset(
+                          'assets/images/arr_left.png',
+                          width: 20,
+                          height: 20,
+                          color: const Color(0xFF5F33E1),
+                        ),
+                      ),
+                      rightChevronIcon: Padding(
+                        padding: const EdgeInsets.only(right: 42.0),
+                        child: Image.asset(
+                          'assets/images/arr_right.png',
+                          width: 20,
+                          height: 20,
+                          color: const Color(0xFF5F33E1),
+                        ),
+                      ),
+                    ),
+                    daysOfWeekVisible: true,
+                    daysOfWeekStyle: DaysOfWeekStyle(
+                      weekdayStyle: const TextStyle(
+                        fontSize: 13,
+                        color: Colors.grey,
+                      ),
+                      weekendStyle: const TextStyle(
+                        fontSize: 13,
+                        color: Colors.grey,
+                      ),
+                      dowTextFormatter: (date, locale) =>
+                          DateFormat.E(locale).format(date).toUpperCase(),
+                    ),
+                    selectedDayPredicate: (day) {
+                      return isSameDay(_selectedDate, day);
+                    },
+                    onDaySelected: (selectedDay, focusedDay) {
+                      if (selectedDay.isBefore(_today)) {
+                        setState(() {
+                          _selectedDate = selectedDay;
+                          if (isStartDate) {
+                            _startDate = selectedDay;
+                          } else {
+                            _endDate = selectedDay;
+                          }
+                          _loadTasks();
+                        });
+                        Navigator.pop(context);
+                      }
+                    },
+                    enabledDayPredicate: (day) {
+                      return day.isBefore(_today);
+                    },
                   ),
-                ),
+                ],
               ),
             ),
-          ],
+          ),
         );
       },
     );
   }
 
+
   void _showPopupMenu(BuildContext context) {
     showMenu(
+      constraints: BoxConstraints.tightFor(
+        width: context.locale.languageCode == 'en' ? 105 : 150, // Используем locale от Easy Localization
+      ),
       context: context,
-      position: RelativeRect.fromLTRB(100, 100, 50, 0), // Позиция попапа
+      position: RelativeRect.fromLTRB(100, 170, 50, 0), // Позиция попапа
       items: [
         PopupMenuItem<String>(
           value: 'Ascending',
+          height: 25, // Фиксированная высота
           child: Container(
-            padding: const EdgeInsets.all(8), // Отступы для удобства
+            padding: const EdgeInsets.symmetric(vertical: 2, horizontal: 8), // Уменьшенные отступы
             child: Text(
               tr('ascending'),
               style: TextStyle(
                 color: _selectedFilter == 'Ascending' ? Color(0xFF5F33E1) : Colors.black,
-                fontWeight: _selectedFilter == 'Ascending' ? FontWeight.bold : FontWeight.normal,
+                fontWeight:  FontWeight.bold,
+                fontSize: 12, // Уменьшенный размер шрифта
               ),
             ),
           ),
         ),
         PopupMenuItem<String>(
           value: 'Descending',
+          height: 25, // Фиксированная высота
           child: Container(
-            padding: const EdgeInsets.all(8), // Отступы для удобства
+            padding: const EdgeInsets.symmetric(vertical: 2, horizontal: 8), // Уменьшенные отступы
             child: Text(
               tr('descending'),
               style: TextStyle(
                 color: _selectedFilter == 'Descending' ? Color(0xFF5F33E1) : Colors.black,
-                fontWeight: _selectedFilter == 'Descending' ? FontWeight.bold : FontWeight.normal,
+                fontWeight: FontWeight.bold ,
+                fontSize: 12, // Уменьшенный размер шрифта
               ),
             ),
           ),
         ),
         PopupMenuItem<String>(
           value: 'Custom',
+          height: 25, // Фиксированная высота
           child: Container(
-            padding: const EdgeInsets.all(8), // Отступы для удобства
+            padding: const EdgeInsets.symmetric(vertical: 2, horizontal: 8), // Уменьшенные отступы
             child: Text(
               tr('custom'),
               style: TextStyle(
                 color: _selectedFilter == 'Custom' ? Color(0xFF5F33E1) : Colors.black,
-                fontWeight: _selectedFilter == 'Custom' ? FontWeight.bold : FontWeight.normal,
+                fontWeight: FontWeight.bold ,
+                fontSize: 12, // Уменьшенный размер шрифта
               ),
             ),
           ),
@@ -670,6 +884,7 @@ class _StatsPageState extends State<StatsPage> {
       }
     });
   }
+
 
   Future<void> _updateTasks() async {
     DatabaseHelper dbHelper = DatabaseHelper.instance;
@@ -750,13 +965,7 @@ class _StatsPageState extends State<StatsPage> {
       decoration: BoxDecoration(
         color: const Color(0xFFEEE9FF),
         borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 8,
-            offset: Offset(0, -2),
-          ),
-        ],
+
       ),
       height: 60,
       child: Row(

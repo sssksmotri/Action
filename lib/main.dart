@@ -12,16 +12,14 @@ import 'package:table_calendar/table_calendar.dart';
 import 'package:action_notes/Service/NotificationService.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:action_notes/Service/HabitReminderService.dart';
+import 'package:action_notes/Screens/edit.dart';
 import 'package:device_info_plus/device_info_plus.dart';
-import 'package:permission_handler/permission_handler.dart';
+import 'package:action_notes/Widgets/loggable_screen.dart';
 
-
-
-
+final RouteObserver<PageRoute> routeObserver = RouteObserver<PageRoute>();
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await EasyLocalization.ensureInitialized();
-
   NotificationService notificationService = NotificationService();
   await notificationService.init();
   await DatabaseHelper.instance.database;
@@ -36,8 +34,65 @@ void main() async {
   );
 }
 
-class MyApp extends StatelessWidget {
+class MyApp extends StatefulWidget {
   const MyApp({super.key});
+
+  @override
+  State<MyApp> createState() => _MyAppState();
+}
+
+class _MyAppState extends State<MyApp> {
+  int? _currentSessionId;
+  bool _sessionInitialized = false; // Добавляем флаг для контроля однократной инициализации
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Инициализируем сессию только один раз
+    if (!_sessionInitialized) {
+      _sessionInitialized = true;
+      _startSession();
+    }
+  }
+
+  Future<void> _startSession() async {
+    // Получаем язык и устройство
+    String language = context.locale.languageCode;
+    String deviceInfo = await _getDeviceInfo();
+
+    // Запуск сессии и запись sessionId
+    int sessionId = await DatabaseHelper.instance.logSessionStart(language, deviceInfo);
+    setState(() {
+      _currentSessionId = sessionId;
+    });
+  }
+  Future<void> _endSession() async {
+    if (_currentSessionId != null) {
+      await DatabaseHelper.instance.logSessionEnd(_currentSessionId!);
+    }
+  }
+
+  @override
+  void dispose() {
+    _endSession();
+    super.dispose();
+  }
+
+  Future<String> _getDeviceInfo() async {
+    DeviceInfoPlugin deviceInfoPlugin = DeviceInfoPlugin();
+    try {
+      if (Theme.of(context).platform == TargetPlatform.android) {
+        AndroidDeviceInfo androidInfo = await deviceInfoPlugin.androidInfo;
+        return 'Android: ${androidInfo.model}, ${androidInfo.brand}, Android version: ${androidInfo.version.release}';
+      } else if (Theme.of(context).platform == TargetPlatform.iOS) {
+        IosDeviceInfo iosInfo = await deviceInfoPlugin.iosInfo;
+        return 'iOS: ${iosInfo.name}, ${iosInfo.systemVersion}, Model: ${iosInfo.utsname.machine}';
+      }
+    } catch (e) {
+      return 'Failed to get device info: $e';
+    }
+    return 'Unknown platform';
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -50,19 +105,20 @@ class MyApp extends StatelessWidget {
       localizationsDelegates: context.localizationDelegates,
       supportedLocales: context.supportedLocales,
       locale: context.locale,
-
-      home: const HomePage(),
+      navigatorObservers: [routeObserver],
+      home: _currentSessionId != null ? HomePage(sessionId: _currentSessionId!) : const Center(child: CircularProgressIndicator()),
     );
   }
 }
 
 class HomePage extends StatefulWidget {
-  const HomePage({super.key});
+  final int sessionId;
+
+  const HomePage({super.key, required this.sessionId});
 
   @override
   State<HomePage> createState() => _HomePageState();
 }
-
 class _HomePageState extends State<HomePage> {
   bool _isTextVisible = false;
   List<Map<String, dynamic>> _habits = [];
@@ -72,11 +128,12 @@ class _HomePageState extends State<HomePage> {
   DateTime _today = DateTime.now();
   final HabitReminderService habitReminderService = HabitReminderService();
   bool _showDragHint = true;
-  DateTime? _loginTime;
-  Map<String, int> _sectionTimes = {}; // Для записи времени в разделах
-  int _habitCount = 0;
-  String deviceInfo = "Unknown";
   bool _isDialogShownBefore = false;
+  String deviceInfo = "Unknown";
+  int? _currentSessionId;
+  DateTime? _startTime;
+  String _currentSection = 'HomePage';
+  bool _isMenuOpen = false;
 
   @override
   void initState() {
@@ -86,219 +143,104 @@ class _HomePageState extends State<HomePage> {
     DatabaseHelper db = DatabaseHelper.instance;
     db.archiveExpiredHabits();
     _loadTextVisibility();
-    _loginTime = DateTime.now(); // Записываем время входа
-    _loadHabitCount();
-    _checkIfDialogShownBefore();
+    _startTime = DateTime.now();
+    _queryAppUsageLogs();
+    _currentSessionId = widget.sessionId;
   }
+
   @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    _getDeviceInfo(); // Перемещаем вызов в didChangeDependencies
+  void dispose() {
+    _logSectionTime();
+    DatabaseHelper.instance.logSessionEnd(widget.sessionId);
+    super.dispose();
   }
 
-  Future<void> _getDeviceInfo() async {
-    DeviceInfoPlugin deviceInfoPlugin = DeviceInfoPlugin();
-    String deviceData;
 
+
+  Future<void> _queryAppUsageLogs() async {
+    final logs = await DatabaseHelper.instance.queryAllAppUsageLogs();
+    for (var log in logs) {
+      print(log); // Выводим каждую запись лога в консоль
+    }
+  }
+
+  Future<String> _getDeviceInfo() async {
+    DeviceInfoPlugin deviceInfoPlugin = DeviceInfoPlugin();
     try {
       if (Theme.of(context).platform == TargetPlatform.android) {
         AndroidDeviceInfo androidInfo = await deviceInfoPlugin.androidInfo;
-        deviceData = 'Android: ${androidInfo.model}, ${androidInfo.brand}, Android version: ${androidInfo.version.release}';
-        print('Device Info: Android device detected: $deviceData');
+        return 'Android: ${androidInfo.model}, ${androidInfo.brand}, Android version: ${androidInfo.version.release}';
       } else if (Theme.of(context).platform == TargetPlatform.iOS) {
         IosDeviceInfo iosInfo = await deviceInfoPlugin.iosInfo;
-        deviceData = 'iOS: ${iosInfo.name}, ${iosInfo.systemVersion}, Model: ${iosInfo.utsname.machine}';
-        print('Device Info: iOS device detected: $deviceData');
-      } else {
-        deviceData = 'Other platform';
-        print('Device Info: Other platform detected.');
+        return 'iOS: ${iosInfo.name}, ${iosInfo.systemVersion}, Model: ${iosInfo.utsname.machine}';
       }
     } catch (e) {
-      deviceData = 'Failed to get device info: $e';
-      print('Error: Failed to retrieve device info: $e');
+      return 'Failed to get device info: $e';
     }
-
-    setState(() {
-      deviceInfo = deviceData;
-    });
-
-    // Логируем сохранение информации о девайсе
-    print('Saving device info to the database: $deviceInfo');
-
-    // Сохраняем информацию о девайсе в таблицу
-    DatabaseHelper dbHelper = DatabaseHelper.instance;
-    await dbHelper.addDeviceInfo(deviceInfo);
-
-    // Логируем успешное завершение операции
-    print('Device info successfully saved to the database.');
+    return 'Unknown platform';
   }
 
-  // Проверка, показывался ли диалог ранее
-  Future<void> _checkIfDialogShownBefore() async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    _isDialogShownBefore = prefs.getBool('isDialogShown') ?? false;
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _getDeviceInfo(); // Получаем информацию о устройстве
+  }
 
-    if (!_isDialogShownBefore) {
-      _checkNotificationPermission();
+
+
+  void _logSectionTime() async {
+    if (_startTime != null) {
+      final timeSpent = DateTime.now().difference(_startTime!).inMinutes;
+      await DatabaseHelper.instance.logSectionTime(widget.sessionId, _currentSection, timeSpent);
     }
   }
-
-  // Проверка разрешений
-  Future<void> _checkNotificationPermission() async {
-    var status = await Permission.notification.status;
-    if (status.isDenied || status.isPermanentlyDenied) {
-      _showPermissionDialog();
-    }
-  }
-
-  // Показ диалога с запросом разрешения
-  void _showPermissionDialog() {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
-          ),
-          title: Row(
-            children: [
-              Icon(Icons.notifications_active, color: Colors.blueAccent),
-              SizedBox(width: 10),
-              Text(
-                'Разрешить уведомления',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize:18),
-              ),
-            ],
-          ),
-          content: Text(
-            'Для получения важных уведомлений, пожалуйста, разрешите отправку уведомлений.',
-            style: TextStyle(fontSize: 16),
-          ),
-          actionsPadding: EdgeInsets.symmetric(horizontal: 15, vertical: 10),
-          actions: [
-            TextButton(
-              child: Text(
-                'Отмена',
-                style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold),
-              ),
-              onPressed: () {
-                Navigator.of(context).pop();
-              },
-            ),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.blueAccent,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-              ),
-              child: Text(
-                'Разрешить',
-                style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-              ),
-              onPressed: () async {
-                Navigator.of(context).pop();
-                await _requestNotificationPermission();  // Запрос разрешения
-              },
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-
-  // Запрос разрешения на уведомления
-  Future<void> _requestNotificationPermission() async {
-    var status = await Permission.notification.request();
-
-    if (status.isGranted) {
-      // Сохранить состояние, чтобы не показывать диалог повторно
-      SharedPreferences prefs = await SharedPreferences.getInstance();
-      await prefs.setBool('isDialogShown', true);
-    }
-  }
-
 
   void _onItemTapped(int index) {
     setState(() {
       _selectedIndex = index;
     });
-    if (index == 0) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const HomePage()),
-      );
-    }
-    if (index == 1) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const NotesPage()),
-      );
+
+    // Определим имя экрана вручную
+    String screenName;
+    Widget page;
+
+    switch (index) {
+      case 0:
+        screenName = 'HomePage';
+        page = HomePage(sessionId: widget.sessionId);
+        break;
+      case 1:
+        screenName = 'NotesPage';
+        page = NotesPage(sessionId: widget.sessionId);
+        break;
+      case 2:
+        screenName = 'AddActionPage';
+        page = AddActionPage(sessionId: widget.sessionId);
+        break;
+      case 3:
+        screenName = 'StatsPage';
+        page = StatsPage(sessionId: widget.sessionId);
+        break;
+      case 4:
+        screenName = 'SettingsPage';
+        page = SettingsPage(sessionId: widget.sessionId);
+        break;
+      default:
+        return;
     }
 
-    if (index == 4) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const SettingsPage()),
-      );
-    }
-    if (index == 2) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const AddActionPage()),
-      );
-    }
-    if (index == 3) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const StatsPage()),
-      );
-    }
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(
+        builder: (context) => LoggableScreen(
+          screenName: screenName, // Передаем четко определенное имя экрана
+          child: page,
+          currentSessionId: widget.sessionId,
+        ),
+      ),
+    );
   }
 
-  void _loadHabitCount() async {
-    List<Map<String, dynamic>> habits = await DatabaseHelper.instance.queryAllHabits();
-    setState(() {
-      _habitCount = habits.length; // Записываем количество привычек
-    });
-  }
-
-
-
-  void _logAppUsage() async {
-    // Вычисляем длительность сессии
-    final int duration = DateTime.now().difference(_loginTime!).inSeconds;
-
-    // Получаем язык приложения
-    final String language = context.locale.languageCode;
-
-    // Получаем текущую дату
-    final String currentDate = DateTime.now().toIso8601String().split('T')[0];
-
-    // Логирование времени, проведенного в разделах
-    final Map<String, dynamic> appUsageLog = {
-      'language': language,                        // Язык
-      'login_time': _loginTime!.toIso8601String(), // Время входа
-      'duration': duration,                        // Длительность активности
-      'date': currentDate,                         // Дата
-      'habit_count': _habitCount,                  // Количество привычек
-      'section_times': _sectionTimes.toString(),   // Время в разделах
-    };
-
-
-    // Вставляем запись в таблицу AppUsageLog
-    await DatabaseHelper.instance.insertAppUsageLog(appUsageLog);
-  }
-
-  // Метод для обновления времени на странице
-  void _updateSectionTime(String section) {
-    if (_sectionTimes.containsKey(section)) {
-      _sectionTimes[section] = _sectionTimes[section]! + 1; // Обновляем счетчик времени
-    } else {
-      _sectionTimes[section] = 1;
-    }
-  }
 
 
   // Метод для подтверждения удаления
@@ -323,6 +265,7 @@ class _HomePageState extends State<HomePage> {
                 borderRadius: BorderRadius.circular(20),
               ),
               contentPadding: const EdgeInsets.fromLTRB(24, 20, 24, 10),
+              insetPadding: const EdgeInsets.all(10),
               content: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.center,
@@ -333,7 +276,9 @@ class _HomePageState extends State<HomePage> {
                       text: "are_you_sure".tr(),
                       style: const TextStyle(
                         color: Colors.black,
-                        fontSize: 18,
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+
                       ),
                       children: [
                         TextSpan(
@@ -365,9 +310,10 @@ class _HomePageState extends State<HomePage> {
                         style: TextButton.styleFrom(
                           backgroundColor: const Color(0xFFEEE9FF), // Легкий фиолетовый фон
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(24),
+                            borderRadius: BorderRadius.circular(16),
                           ),
-                          padding: const EdgeInsets.symmetric(vertical: 15),
+                          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 20), // Уменьшение горизонтальных отступов
+
                         ),
                         child: Text(
                           "no_leave_it".tr(),
@@ -389,9 +335,9 @@ class _HomePageState extends State<HomePage> {
                         style: TextButton.styleFrom(
                           backgroundColor: Colors.red, // Красный фон
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(24),
+                            borderRadius: BorderRadius.circular(16),
                           ),
-                          padding: const EdgeInsets.symmetric(vertical: 15),
+                          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 20), // Уменьшение горизонтальных отступов
                         ),
                         child: Text(
                           "yes_delete".tr(),
@@ -402,6 +348,7 @@ class _HomePageState extends State<HomePage> {
                         ),
                       ),
                     ),
+
                   ],
                 ),
               ],
@@ -414,7 +361,6 @@ class _HomePageState extends State<HomePage> {
 
   @override
   Widget build(BuildContext context) {
-    _updateSectionTime('HomePage');
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9F9),
       appBar: AppBar(
@@ -430,19 +376,19 @@ class _HomePageState extends State<HomePage> {
                     fontWeight: FontWeight.bold,
                   ),
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: 10),
                 Container(
-                  padding: const EdgeInsets.all(8),
+                  padding: const EdgeInsets.all(6),
                   decoration: BoxDecoration(
                     color: Color(0xFFEEE9FF),
                     shape: BoxShape.circle,
                   ),
                   child: Text(
-                    '${_habits.length}', // Динамическое отображение количества привычек
+                    '${_habits.length}',
                     style: TextStyle(
                       color: Color(0xFF5F33E1),
                       fontWeight: FontWeight.bold,
-                      fontSize: 16,
+                      fontSize: 14,
                     ),
                   ),
                 ),
@@ -459,25 +405,36 @@ class _HomePageState extends State<HomePage> {
                 IconButton(
                   icon: Image.asset('assets/images/Folder.png'),
                   onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => ArchivePage(),
-                      ),
-                    ).then((result) {
-                      if (result != null) {
-                        setState(() {
-                          _loadHabits();
-                        });
-                      }
-                    });
+                    if (_currentSessionId != null) {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => LoggableScreen(
+                            screenName: 'ArchivePage',
+                            child: ArchivePage(sessionId: _currentSessionId!),
+                            currentSessionId: _currentSessionId!,
+                          ),
+                        ),
+                      ).then((result) {
+                        // Check if the result is not null and then reload the habits
+                        if (result != null && result == true) {
+                          setState(() {
+                            _loadHabitsForSelectedDate(); // Call a method to reload the habits
+                          });
+                        }
+                      });
+                    } else {
+                      // Action when _currentSessionId is null
+                      print("Error: session ID is null");
+                      // Show a message to the user or perform another action
+                    }
                   },
                 ),
-              ],
+          ],
             ),
           ],
         ),
-        backgroundColor: Colors.white,
+        backgroundColor: Color(0xFFF8F9F9),
       ),
       body: SafeArea(
         child: Column(
@@ -693,38 +650,58 @@ class _HomePageState extends State<HomePage> {
                   // Текст под карточками
                   if (_isTextVisible)
 
-                       Row(
-                        mainAxisSize: MainAxisSize.min,
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        crossAxisAlignment: CrossAxisAlignment.center,
-                        children: [
-                          Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 2, horizontal: 6),
-                            child: Text(
-                              "Hold down the habit bar to move it around",
-                              style: TextStyle(
-                                color: const Color(0xFF5F33E1),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 30), // Отступы от краев экрана
+                      child: Card(
+                        color: const Color(0xFFEEE9FF),
+                        elevation: 0, // Убираем тени
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(18), // Углы карточки
+                        ),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8), // Отступы внутри карточки слева и справа
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            children: [
+                              Padding(
+                                padding: const EdgeInsets.symmetric(vertical: 2),
+                                child: Text(
+                                  "Hold down the habit bar to move it around",
+                                  style: TextStyle(
+                                    color: const Color(0xFF5F33E1),
+                                    fontWeight: FontWeight.w400, // Обычный текст
+                                    fontSize: 12,
+                                  ),
+                                ),
                               ),
-                            ),
-                          ),
-                          GestureDetector(
-                            onTap: () {
-                              setState(() {
-                                _isTextVisible = false;
-                                 _saveTextVisibility();
-                              });
-                            },
-                            child: Container(
-                              padding: const EdgeInsets.all(2),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFF5F33E1),
-                                borderRadius: BorderRadius.circular(6),
+                              const SizedBox(width: 6),
+                              GestureDetector(
+                                onTap: () {
+                                  setState(() {
+                                    _isTextVisible = false;
+                                  });
+                                },
+                                child: Container(
+                                  padding: const EdgeInsets.all(5),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0x995F33E1), // Прозрачный фон с 40% видимости
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: Image.asset(
+                                    'assets/images/krest.png', // Путь к вашему изображению
+                                    width: 9,  // Размер изображения (как у иконки)
+                                    height: 9,
+                                    color: const Color(0xFF5F33E1),  // Цвет картинки (если нужно перекрасить)
+                                  ),
+                                ),
                               ),
-                              child: const Icon(Icons.close, size: 12, color: Colors.white),
-                            ),
+                            ],
                           ),
-                        ],
+                        ),
                       ),
+                    )
 
                 ],
               ),
@@ -738,13 +715,6 @@ class _HomePageState extends State<HomePage> {
         decoration: BoxDecoration(
           color: const Color(0xFFEEE9FF),
           borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.1),
-              blurRadius: 8,
-              offset: Offset(0, -2),
-            ),
-          ],
         ),
         height: 60,
         child: Row(
@@ -764,13 +734,23 @@ class _HomePageState extends State<HomePage> {
 
 
 
+
   Future<void> _loadTextVisibility() async {
+    // Получаем список привычек
+    await _loadHabitsForSelectedDate(); // Загрузите привычки перед проверкой видимости текста
+
     SharedPreferences prefs = await SharedPreferences.getInstance();
+    bool isPreviouslyVisible = prefs.getBool('isTextVisible') ?? true;
+
     setState(() {
-      _isTextVisible = prefs.getBool('isTextVisible') ?? true; // Значение по умолчанию - true
+      // Устанавливаем видимость текста в зависимости от наличия привычек и состояния в SharedPreferences
+      if (_habits.isNotEmpty && isPreviouslyVisible) {
+        _isTextVisible = true; // Показываем текст, если есть привычки и состояние сохранено как true
+      } else {
+        _isTextVisible = false; // Скрываем текст, если привычек нет или состояние не true
+      }
     });
   }
-
   Future<void> _saveTextVisibility() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     await prefs.setBool('isTextVisible', _isTextVisible);
@@ -849,7 +829,6 @@ class _HomePageState extends State<HomePage> {
       _habits = filteredHabits.map((habit) {
         int habitId = habit['id'] as int;
         double currentProgress = habitProgress[habitId] ?? 0.0;
-        _isTextVisible=true;
         return {
           ...habit,
           'currentProgress': currentProgress,  // Прогресс за выбранный день
@@ -916,32 +895,56 @@ class _HomePageState extends State<HomePage> {
 
   void _showPopupMenu(BuildContext context) {
     showMenu(
+      constraints: BoxConstraints.tightFor(
+        width: context.locale.languageCode == 'en' ? 180 : 200, // Используем locale от Easy Localization
+      ),
       context: context,
-      position: RelativeRect.fromLTRB(100, 50, 50, 0),
+      position: RelativeRect.fromLTRB(100, 100, 50, 0), // Позиция попапа
       items: [
         PopupMenuItem<String>(
           value: 'Completed first',
-          child: Text(tr('completed_first'),
+          height: 25, // Фиксированная высота для уменьшения отступов
+          child: Container(
+            padding: const EdgeInsets.symmetric(vertical: 2, horizontal: 8), // Уменьшенные отступы
+            child: Text(
+              tr('completed_first'),
               style: TextStyle(
-                  color: _selectedFilter == 'Completed first'
-                      ? Color(0xFF5F33E1)
-                      : Colors.black)),
+                color: _selectedFilter == 'Completed first' ? Color(0xFF5F33E1) : Colors.black,
+                fontWeight:FontWeight.bold,
+                fontSize: 14, // Уменьшенный размер шрифта
+              ),
+            ),
+          ),
         ),
         PopupMenuItem<String>(
           value: 'Not completed at first',
-          child: Text(tr('not_completed_first'),
+          height: 25, // Фиксированная высота для уменьшения отступов
+          child: Container(
+            padding: const EdgeInsets.symmetric(vertical: 2, horizontal: 8), // Уменьшенные отступы
+            child: Text(
+              tr('not_completed_first'),
               style: TextStyle(
-                  color: _selectedFilter == 'Not completed at first'
-                      ? Color(0xFF5F33E1)
-                      : Colors.black)),
+                color: _selectedFilter == 'Not completed at first' ? Color(0xFF5F33E1) : Colors.black,
+                fontWeight:FontWeight.bold,
+                fontSize: 14, // Уменьшенный размер шрифта
+              ),
+            ),
+          ),
         ),
         PopupMenuItem<String>(
           value: 'Custom',
-          child: Text(tr('custom'),
+          height: 25, // Фиксированная высота для уменьшения отступов
+          child: Container(
+            padding: const EdgeInsets.symmetric(vertical: 2, horizontal: 8), // Уменьшенные отступы
+            child: Text(
+              tr('custom'),
               style: TextStyle(
-                  color: _selectedFilter == 'Custom'
-                      ? Color(0xFF5F33E1)
-                      : Colors.black)),
+                color: _selectedFilter == 'Custom' ? Color(0xFF5F33E1) : Colors.black,
+                fontWeight:FontWeight.bold,
+                fontSize: 14, // Уменьшенный размер шрифта
+              ),
+            ),
+          ),
         ),
       ],
       color: Colors.white,
@@ -960,7 +963,11 @@ class _HomePageState extends State<HomePage> {
   }
 
 
+
   void _filterHabits() {
+    print('Фильтр перед применением: $_selectedFilter');
+    print('Данные перед фильтрацией: $_habits');
+
     if (_selectedFilter == 'Completed first') {
       _habits.sort((a, b) {
         bool aCompleted = a['currentProgress'] == 1;
@@ -971,19 +978,15 @@ class _HomePageState extends State<HomePage> {
       _habits.sort((a, b) {
         bool aCompleted = a['currentProgress'] == 1;
         bool bCompleted = b['currentProgress'] == 1;
-        // Сначала незавершенные (false) должны идти выше завершенных (true)
-        if (!aCompleted && bCompleted) {
-          return -1; // a выше b
-        } else if (aCompleted && !bCompleted) {
-          return 1; // b выше a
-        } else {
-          return 0; // Оба имеют одинаковый статус завершенности
-        }
+        return !aCompleted && bCompleted ? -1 : (aCompleted && !bCompleted ? 1 : 0);
       });
     } else if (_selectedFilter == 'Custom') {
-      // Добавьте свою логику для "Custom" фильтра
+      _loadHabitsForSelectedDate();
     }
+
+    print('Данные после фильтрации: $_habits');
   }
+
 
 
 
@@ -1013,87 +1016,140 @@ class _HomePageState extends State<HomePage> {
   }
 
   // Функция для создания карточки привычки
-  Widget _buildHabitItem(String title, bool isCompleted, VoidCallback onTap, int habitId, {Key? key}) {
-    // Проверяем, выполнена ли привычка
+  Widget _buildHabitItem(
+      String title, bool isCompleted, VoidCallback onTap, int habitId, {Key? key}) {
+
     bool isChecked = isCompleted;
 
     return _buildCard(
       key: key,
       child: GestureDetector(
-        onTap: onTap, // При нажатии обновляем состояние привычки
+        onTap: onTap,
         child: Container(
-          color: Colors.white,
-          child: ListTile(
-            title: Text(title),
-            trailing: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // Если привычка выполнена - показываем галочку
-                if (isChecked)
-                  Padding(
-                    padding: const EdgeInsets.only(right: 8.0),
-                    child: const Icon(Icons.check, color: Colors.green, size: 28),
-                  )
-                // Если привычка не выполнена в конце дня - показываем крестик
-                else if (DateTime.now().hour == 23 && DateTime.now().minute > 55)  // Крестик если день закончился
-                  Padding(
-                    padding: const EdgeInsets.only(right: 8.0),
-                    child: const Icon(Icons.close, color: Colors.red, size: 28),
-                  ),
-                // Иначе показываем пустое место для нажатия
-                Transform.rotate(
-                  angle: -90 * (3.141592653589793238 / 180),
-                  child: PopupMenuButton<String>(
-                    onSelected: (value) {
-                      if (value == 'Delete') {
-                        _showDeleteDialog(context, title, habitId, () {});
-                      } else if (value == 'Archive') {
-                        _archiveHabit(habitId);
-                      } else {
-                        print('Selected: $value');
-                      }
-                    },
-                    itemBuilder: (BuildContext context) {
-                      return [
-                         PopupMenuItem<String>(
-                          value: 'Archive',
-                          child: Padding(
-                            padding: EdgeInsets.symmetric(vertical: 4),
-                            child: Text('archive'.tr()),
-                          ),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              // Левая колонка с названием
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.only(left: 10.0, top: 8.0, bottom: 8.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Название
+                      Text(
+                        title,
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
                         ),
-                         PopupMenuItem<String>(
-                          value: 'Edit',
-                          child: Padding(
-                            padding: EdgeInsets.symmetric(vertical: 4),
-                            child: Text('edit'.tr()),
-                          ),
-                        ),
-                         PopupMenuItem<String>(
-                          value: 'Delete',
-                          child: Padding(
-                            padding: EdgeInsets.symmetric(vertical: 4),
-                            child: Text('delete'.tr(), style: const TextStyle(color: Colors.red)),
-                          ),
-                        ),
-                      ];
-                    },
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    color: Colors.white,
+                      ),
+                    ],
                   ),
                 ),
-              ],
-            ),
+              ),
+              // Галочка или крестик справа
+              Padding(
+                padding: const EdgeInsets.only(right: 10.0),
+                child: isChecked
+                    ? Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    // Тень иконки для эффекта "жирного" отображения
+                    const Icon(
+                      Icons.check,
+                      size: 40,
+                      color: Color(0xFF0AC70A),
+                    ),
+                    // Основная иконка
+                    const Icon(
+                      Icons.check,
+                      color: Color(0xFF0AC70A),
+                      size: 35,
+                    ),
+                  ],
+                )
+                    : (DateTime.now().hour == 23 && DateTime.now().minute > 55
+                    ? const Icon(Icons.close, color: Colors.red, size: 28)
+                    : const SizedBox.shrink()),
+              ),
+              // Кнопка с тремя точками по центру справа
+              PopupMenuButton<String>(
+                icon: Image.asset('assets/images/menu.png', width: 24, height: 24),
+                onSelected: (value) {
+                  if (value == 'Delete') {
+                    _showDeleteDialog(context, title, habitId, () {});
+                  } else if (value == 'Archive') {
+                    _archiveHabit(habitId);
+                  } else if (value == 'Edit') {
+                    Navigator.pushReplacement(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => LoggableScreen(
+                          screenName: 'EditPage',
+                          child: EditPage(
+                            habitId: habitId,
+                            ActionName: title,
+                            sessionId: _currentSessionId!,
+                          ),
+                          currentSessionId: _currentSessionId!,
+                        ),
+                      ),
+                    );
+                  }
+                },
+                constraints: BoxConstraints.tightFor(
+                  width: context.locale.languageCode == 'en' ? 85 : 135,
+                ),
+                itemBuilder: (BuildContext context) {
+                  return [
+                    PopupMenuItem<String>(
+                      value: 'Archive',
+                      height: 25,
+                      child: Padding(
+                        padding: EdgeInsets.symmetric(vertical: 4),
+                        child: Text('archive'.tr(), style: TextStyle(fontSize: 14)),
+                      ),
+                    ),
+                    PopupMenuItem<String>(
+                      value: 'Edit',
+                      height: 25,
+                      child: Padding(
+                        padding: EdgeInsets.symmetric(vertical: 4),
+                        child: Text('edit'.tr(), style: TextStyle(fontSize: 14)),
+                      ),
+                    ),
+                    PopupMenuItem<String>(
+                      value: 'Delete',
+                      height: 25,
+                      child: Padding(
+                        padding: EdgeInsets.symmetric(vertical: 4),
+                        child: Text('delete'.tr(), style: const TextStyle(color: Colors.red, fontSize: 14)),
+                      ),
+                    ),
+                  ];
+                },
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                color: Colors.white,
+                offset: const Offset(0, 40),
+              ),
+            ],
           ),
         ),
       ),
     );
   }
 
+
 // И аналогичные изменения для _buildCountItem
-  Widget _buildCountItem(String title, int count, int maxCount,
+  Widget _buildCountItem(
+      String title, int count, int maxCount,
       VoidCallback onIncrement, VoidCallback onDecrement, VoidCallback onDelete,
       int habitId, {Key? key}) {
 
@@ -1104,94 +1160,136 @@ class _HomePageState extends State<HomePage> {
       child: GestureDetector(
         onTap: () => onIncrement(),
         child: Container(
-          color: Colors.white,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              ListTile(
-                title: Text(title),
-                trailing: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    // Если привычка выполнена - показываем галочку
-                    if (isCompleted)
-                      Padding(
-                        padding: const EdgeInsets.only(right: 8.0),
-                        child: const Icon(Icons.check, color: Colors.green, size: 28),
-                      )
-                    // Если день закончился и привычка не выполнена - показываем крестик
-                    else if (DateTime.now().hour == 23 && DateTime.now().minute < 55 && count < maxCount)
-                      Padding(
-                        padding: const EdgeInsets.only(right: 8.0),
-                        child: const Icon(Icons.close, color: Colors.red, size: 28),
-                      )
-                    // Если привычка в процессе выполнения - показываем цифры прогресса
-                    else
+              // Левая колонка с названием и кнопкой
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.only(left: 10.0, top: 8.0, bottom: 8.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Название
                       Text(
-                        '$count/$maxCount',
+                        title,
                         style: TextStyle(
-                          fontSize: 20,
-                          color: isCompleted ? Colors.green : Colors.red,
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
                         ),
                       ),
-                    const SizedBox(height: 8),
-                    Transform.rotate(
-                      angle: -90 * (3.141592653589793238 / 180),
-                      child: PopupMenuButton<String>(
-                        onSelected: (value) {
-                          if (value == 'Delete') {
-                            _showDeleteDialog(context, title, habitId, onDelete);
-                          } else if (value == 'Archive') {
-                            _archiveHabit(habitId);
-                          }
-                        },
-                        itemBuilder: (BuildContext context) {
-                          return [
-                            const PopupMenuItem<String>(
-                              value: 'Archive',
-                              child: Padding(
-                                padding: EdgeInsets.symmetric(vertical: 4),
-                                child: Text('Archive'),
-                              ),
-                            ),
-                            const PopupMenuItem<String>(
-                              value: 'Edit',
-                              child: Padding(
-                                padding: EdgeInsets.symmetric(vertical: 4),
-                                child: Text('Edit'),
-                              ),
-                            ),
-                            const PopupMenuItem<String>(
-                              value: 'Delete',
-                              child: Padding(
-                                padding: EdgeInsets.symmetric(vertical: 4),
-                                child: Text('Delete', style: TextStyle(color: Colors.red)),
-                              ),
-                            ),
-                          ];
-                        },
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
+                      const SizedBox(height: 4),
+                      // Кнопка "Cancel" под названием
+                      TextButton(
+                        onPressed: count > 0 ? onDecrement : null,
+                        style: TextButton.styleFrom(
+                          backgroundColor: const Color(0xFF5F33E1),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(30),
+                          ),
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                          minimumSize: Size(80, 30),
                         ),
-                        color: Colors.white,
+                        child: const Text(
+                          "Cancel",
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 14,
+                          ),
+                        ),
                       ),
-                    )
-                  ],
+                    ],
+                  ),
                 ),
               ),
+              // Галочка справа, если задача выполнена, иначе показываем прогресс
               Padding(
-                padding: const EdgeInsets.only(left: 10.0, bottom: 2.0),
-                child: TextButton(
-                  onPressed: count > 0 ? onDecrement : null,
-                  style: TextButton.styleFrom(
-                    backgroundColor: const Color(0xFF5F33E1),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(30),
+                padding: const EdgeInsets.only(right: 10.0),
+                child: isCompleted
+                    ? Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    // Тень иконки для эффекта "жирного" отображения
+                    const Icon(
+                      Icons.check,
+                      size: 40,
+                      color: Color(0xFF0AC70A),
                     ),
-                    foregroundColor: Colors.white,
-                  ),
-                  child: const Text("Cancel"),
+                    // Основная иконка
+                    const Icon(
+                      Icons.check,
+                      color: Color(0xFF0AC70A),
+                      size: 35,
+                    ),
+                  ],
+                )
+                    : buildDiagonalText(count, maxCount, isCompleted),
+              ),
+              // Кнопка с тремя точками по центру справа
+              PopupMenuButton<String>(
+                icon: Image.asset('assets/images/menu.png', width: 24, height: 24),
+                onSelected: (value) {
+                  if (value == 'Delete') {
+                    _showDeleteDialog(context, title, habitId, onDelete);
+                  } else if (value == 'Archive') {
+                    _archiveHabit(habitId);
+                  } else if (value == 'Edit') {
+                    Navigator.pushReplacement(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => LoggableScreen(
+                          screenName: 'EditPage',
+                          child: EditPage(
+                            habitId: habitId,
+                            ActionName: title,
+                            sessionId: _currentSessionId!,
+                          ),
+                          currentSessionId: _currentSessionId!,
+                        ),
+                      ),
+                    );
+                  }
+                },
+                constraints: BoxConstraints.tightFor(
+                  width: context.locale.languageCode == 'en' ? 85 : 140,
                 ),
+                itemBuilder: (BuildContext context) {
+                  return [
+                    PopupMenuItem<String>(
+                      value: 'Archive',
+                      height: 25,
+                      child: Padding(
+                        padding: EdgeInsets.symmetric(vertical: 4),
+                        child: Text('archive'.tr(), style: TextStyle(fontSize: 14)),
+                      ),
+                    ),
+                    PopupMenuItem<String>(
+                      value: 'Edit',
+                      height: 25,
+                      child: Padding(
+                        padding: EdgeInsets.symmetric(vertical: 4),
+                        child: Text('edit'.tr(), style: TextStyle(fontSize: 14)),
+                      ),
+                    ),
+                    PopupMenuItem<String>(
+                      value: 'Delete',
+                      height: 25,
+                      child: Padding(
+                        padding: EdgeInsets.symmetric(vertical: 4),
+                        child: Text('delete'.tr(), style: const TextStyle(color: Colors.red, fontSize: 14)),
+                      ),
+                    ),
+                  ];
+                },
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                color: Colors.white,
+                offset: const Offset(0, 40),
               ),
             ],
           ),
@@ -1201,9 +1299,112 @@ class _HomePageState extends State<HomePage> {
   }
 
 
-  Widget _buildPressCountHabit(Map<String, dynamic> habit,
-      VoidCallback onIncrement, VoidCallback onDecrement,
-      VoidCallback onEdit, VoidCallback onDelete, int habitId, {Key? key}) {
+
+  Widget buildDiagonalText(int count, int maxCount, bool isCompleted) {
+    return Stack(
+      alignment: Alignment.center,
+      children: [
+        // Линия
+        Transform.rotate(
+          angle: -0.785398, // угол в радианах (приблизительно -45 градусов)
+          child: Container(
+            width: 40, // длина линии
+            height: 2, // толщина линии
+            color: isCompleted ? Colors.green : Colors.red,
+          ),
+        ),
+        // Числа сверху и снизу линии
+        Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
+              padding: const EdgeInsets.only(right: 24.0), // смещение влево
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  '$count',
+                  style: TextStyle(
+                    fontSize: 18,
+                    color: isCompleted ? Colors.green : Colors.red,
+                  ),
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.only(left: 24.0), // смещение вправо
+              child: Align(
+                alignment: Alignment.centerRight,
+                child: Text(
+                  '$maxCount',
+                  style: TextStyle(
+                    fontSize: 18,
+                    color: isCompleted ? Colors.green : Colors.red,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget buildDiagonalTextdouble(double count, double maxCount, bool isCompleted) {
+    return Stack(
+      alignment: Alignment.center,
+      children: [
+        // Линия
+        Transform.rotate(
+          angle: -0.785398, // угол в радианах (приблизительно -45 градусов)
+          child: Container(
+            width: 40, // длина линии
+            height: 2, // толщина линии
+            color: isCompleted ? Colors.green : Colors.red,
+          ),
+        ),
+        // Числа сверху и снизу линии
+        Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
+              padding: const EdgeInsets.only(right: 36.0), // смещение влево
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  '$count',
+                  style: TextStyle(
+                    fontSize: 18,
+                    color: isCompleted ? Colors.green : Colors.red,
+                  ),
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.only(left: 36.0), // смещение вправо
+              child: Align(
+                alignment: Alignment.centerRight,
+                child: Text(
+                  '$maxCount',
+                  style: TextStyle(
+                    fontSize: 18,
+                    color: isCompleted ? Colors.green : Colors.red,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPressCountHabit(
+      Map<String, dynamic> habit,
+      VoidCallback onIncrement,
+      VoidCallback onDecrement,
+      VoidCallback onEdit,
+      VoidCallback onDelete,
+      int habitId, {Key? key}) {
 
     String title = habit['name'];
     double currentProgress = habit['currentProgress'] ?? 0.0;
@@ -1215,101 +1416,136 @@ class _HomePageState extends State<HomePage> {
       child: GestureDetector(
         onTap: onIncrement,
         child: Container(
-          color: Colors.white,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              ListTile(
-                title: Text(title),
-                trailing: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    // Галочка при достижении цели
-                    if (isCompleted)
-                      Padding(
-                        padding: const EdgeInsets.only(right: 8.0),
-                        child: const Icon(Icons.check, color: Colors.green, size: 28),
-                      )
-                    // Крестик при окончании дня и недостижении цели
-                    else if (DateTime.now().hour == 23 && DateTime.now().minute < 55 && currentProgress < maxProgress)
-                      Padding(
-                        padding: const EdgeInsets.only(right: 8.0),
-                        child: const Icon(Icons.close, color: Colors.red, size: 28),
-                      )
-                    // Прогресс до достижения цели
-                    else
+              // Левая колонка с названием и кнопкой
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.only(left: 10.0, top: 8.0, bottom: 8.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Название
                       Text(
-                        '${currentProgress.toStringAsFixed(1)}/${maxProgress.toStringAsFixed(1)}',
+                        title,
                         style: TextStyle(
-                          fontSize: 20,
-                          color: isCompleted ? Colors.green : Colors.red,
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
                         ),
                       ),
-                    const SizedBox(height: 8),
-                    Transform.rotate(
-                      angle: -90 * (3.141592653589793238 / 180), // Поворот для отображения меню
-                      child: PopupMenuButton<String>(
-                        onSelected: (value) {
-                           if (value == 'Archive') {
-                          _archiveHabit(habitId); // Передаем habitId в функцию архивирования
-                          }
-                           else if (value == 'Delete') {
-                            _showDeleteDialog(context, title,habitId, onDelete);
-                          } else if (value == 'Edit') {
-                            onEdit(); // Открываем форму для редактирования
-                          }
-                        },
-                        itemBuilder: (BuildContext context) {
-                          return [
-                            const PopupMenuItem<String>(
-                              value: 'Archive',
-                              child: Padding(
-                                padding: EdgeInsets.symmetric(vertical: 4),
-                                child: Text('Archive'),
-                              ),
-                            ),
-                            const PopupMenuItem<String>(
-                              value: 'Edit',
-                              child: Padding(
-                                padding: EdgeInsets.symmetric(vertical: 4),
-                                child: Text('Edit'),
-                              ),
-                            ),
-                            const PopupMenuItem<String>(
-                              value: 'Delete',
-                              child: Padding(
-                                padding: EdgeInsets.symmetric(vertical: 4),
-                                child: Text('Delete', style: TextStyle(color: Colors.red)),
-                              ),
-                            ),
-
-                          ];
-                        },
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
+                      const SizedBox(height: 4),
+                      // Кнопка "Cancel" под названием
+                      TextButton(
+                        onPressed: currentProgress > 0 ? onDecrement : null,
+                        style: TextButton.styleFrom(
+                          backgroundColor: const Color(0xFF5F33E1),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(30),
+                          ),
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                          minimumSize: Size(80, 30),
                         ),
-                        color: Colors.white,
+                        child: const Text(
+                          "Cancel",
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 14,
+                          ),
+                        ),
                       ),
+                    ],
+                  ),
+                ),
+              ),
+              // Отображение галочки, если цель выполнена, либо прогресса
+              Padding(
+                padding: const EdgeInsets.only(right: 10.0),
+                child: isCompleted
+                    ? Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    // Тень иконки для эффекта "жирного" отображения
+                    const Icon(
+                      Icons.check,
+                      size: 40,
+                      color: Color(0xFF0AC70A),
+                    ),
+                    // Основная иконка
+                    const Icon(
+                      Icons.check,
+                      color: Color(0xFF0AC70A),
+                      size: 35,
                     ),
                   ],
-                ),
+                )
+                    : buildDiagonalTextdouble(currentProgress, maxProgress, isCompleted),
               ),
-              Padding(
-                padding: const EdgeInsets.only(left: 10.0, bottom: 2.0),
-                child: TextButton(
-                  onPressed: currentProgress > 0 ? onDecrement : null, // Уменьшаем прогресс
-                  style: TextButton.styleFrom(
-                    backgroundColor: const Color(0xFF5F33E1), // Фон кнопки
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(30),
+              // Кнопка с тремя точками по центру справа
+              PopupMenuButton<String>(
+                icon: Image.asset('assets/images/menu.png', width: 24, height: 24),
+                onSelected: (value) {
+                  if (value == 'Archive') {
+                    _archiveHabit(habitId);
+                  } else if (value == 'Delete') {
+                    _showDeleteDialog(context, title, habitId, onDelete);
+                  } else if (value == 'Edit') {
+                    Navigator.pushReplacement(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => LoggableScreen(
+                          screenName: 'EditPage',
+                          child: EditPage(
+                            habitId: habitId,
+                            ActionName: title,
+                            sessionId: _currentSessionId!,
+                          ),
+                          currentSessionId: _currentSessionId!,
+                        ),
+                      ),
+                    );
+                  }
+                },
+                constraints: BoxConstraints.tightFor(
+                  width: context.locale.languageCode == 'en' ? 85 : 140,
+                ),
+                itemBuilder: (BuildContext context) {
+                  return [
+                    PopupMenuItem<String>(
+                      value: 'Archive',
+                      height: 25,
+                      child: Padding(
+                        padding: EdgeInsets.symmetric(vertical: 4),
+                        child: Text('archive'.tr(), style: TextStyle(fontSize: 14)),
+                      ),
                     ),
-                    foregroundColor: Colors.white, // Цвет текста
-                  ),
-                  child: const Text("Cancel"),
+                    PopupMenuItem<String>(
+                      value: 'Edit',
+                      height: 25,
+                      child: Padding(
+                        padding: EdgeInsets.symmetric(vertical: 4),
+                        child: Text('edit'.tr(), style: TextStyle(fontSize: 14)),
+                      ),
+                    ),
+                    PopupMenuItem<String>(
+                      value: 'Delete',
+                      height: 25,
+                      child: Padding(
+                        padding: EdgeInsets.symmetric(vertical: 4),
+                        child: Text('delete'.tr(), style: const TextStyle(color: Colors.red, fontSize: 14)),
+                      ),
+                    ),
+                  ];
+                },
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
                 ),
-              ),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4.0),
+                color: Colors.white,
+                offset: const Offset(0, 40),
               ),
             ],
           ),
@@ -1318,19 +1554,33 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
+
+
+
   void _archiveHabit(int habitId) async {
-        DatabaseHelper db = DatabaseHelper.instance; // Получаем экземпляр вашего помощника по базе данных
+    DatabaseHelper db = DatabaseHelper.instance;
 
-        // Обновляем привычку в базе данных, устанавливая archived в 1
-        await db.updateHabit({'id': habitId, 'archived': 1}); // Архивируем привычку
-        habitReminderService.cancelAllReminders(habitId);
-        // Обновляем состояние
-        setState(() {
-          // Создаем новый список на основе существующего, чтобы избежать ошибок с изменяемыми объектами
-          _habits = List.from(_habits)..removeWhere((habit) => habit['id'] == habitId);
+    // Fetch the current habit from the database to preserve other fields
+    var currentHabit = await db.queryHabitById(habitId);
+    if (currentHabit == null) {
+      print('Ошибка: привычка с ID $habitId не найдена.');
+      return;
+    }
 
-        });
-      }
+    // Merge the current habit with the updated values
+    Map<String, dynamic> updatedHabit = {
+      ...currentHabit,
+      'archived': 1,
+    };
+
+    await db.updateHabit(updatedHabit); // Archive the habit with all fields intact
+    habitReminderService.cancelAllReminders(habitId);
+
+    setState(() {
+      _habits = List.from(_habits)..removeWhere((habit) => habit['id'] == habitId);
+    });
+  }
+
 
 
 
@@ -1341,14 +1591,8 @@ class _HomePageState extends State<HomePage> {
       margin: const EdgeInsets.symmetric(vertical: 6.0, horizontal: 16.0),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12.0),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
+        borderRadius: BorderRadius.circular(16.0),
+
       ),
       child: child,
     );
@@ -1370,9 +1614,19 @@ class _HomePageState extends State<HomePage> {
 
   }
 
+  String capitalize(String text) {
+    if (text.isEmpty) return '';
+    return text[0].toUpperCase() + text.substring(1);
+  }
+
+
   Widget _buildBottomDateSelector() {
     // Форматируем дату в виде "July, 15" с учетом локализации
-    String formattedDate = DateFormat('MMMM, d', Localizations.localeOf(context).toString()).format(_selectedDate);
+    String formattedMonth = capitalize(
+        DateFormat('MMMM', Localizations.localeOf(context).toString()).format(_selectedDate)
+    );
+
+    String formattedDay = DateFormat('d', Localizations.localeOf(context).toString()).format(_selectedDate);      // Пример: "23"
 
     return GestureDetector(
       onTap: () {
@@ -1389,7 +1643,12 @@ class _HomePageState extends State<HomePage> {
           children: [
             // Левая стрелка
             IconButton(
-              icon: const Icon(Icons.chevron_left, color: Color(0xFF5F33E1)),
+              icon: Image.asset(
+                'assets/images/arr_left.png', // путь к вашей картинке
+                color: const Color(0xFF5F33E1), // если нужно применить цвет
+                width: 18, // установите ширину
+                height: 18,
+              ),
               onPressed: () {
                 setState(() {
                   _selectedDate = _selectedDate.subtract(const Duration(days: 1));
@@ -1398,23 +1657,41 @@ class _HomePageState extends State<HomePage> {
               },
             ),
 
+
             // Дата
-            Text(
-              formattedDate,
-              style: const TextStyle(
-                color: Colors.black,
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
+            RichText(
+              text: TextSpan(
+                children: [
+                  TextSpan(
+                    text: "$formattedMonth, ", // Месяц
+                    style: const TextStyle(
+                      color: Colors.black, // Черный цвет для месяца
+                      fontSize: 20,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  TextSpan(
+                    text: "$formattedDay", // Число с пробелом перед ним
+                    style: const TextStyle(
+                      color: Color(0xFF5F33E1), // Цвет для числа
+                      fontSize: 20,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
               ),
             ),
 
+
             // Правая стрелка
             IconButton(
-              icon: Icon(
-                Icons.chevron_right,
+              icon: Image.asset(
+                'assets/images/arr_right.png', // путь к вашей картинке для стрелки вправо
                 color: isSameDay(_selectedDate, _today)
-                    ? const Color(0x4D5F33E1)
+                    ? const Color(0x4D5F33E1)  // Полупрозрачный цвет, если выбран сегодняшний день
                     : const Color(0xFF5F33E1), // Обычный цвет
+                width: 18, // Устанавливаем ширину
+                height: 18, // Устанавливаем высоту (необязательно)
               ),
               onPressed: isSameDay(_selectedDate, _today)
                   ? null  // Блокируем стрелку, если выбранная дата — сегодняшняя
@@ -1425,6 +1702,7 @@ class _HomePageState extends State<HomePage> {
                 });
               },
             ),
+
 
 
             // Кнопка возврата к сегодняшней дате, если выбранная дата не сегодняшняя
@@ -1458,97 +1736,128 @@ class _HomePageState extends State<HomePage> {
 
 
   // Функция для показа календаря в виде прозрачного окна
+
   void _showCalendarDialog() {
     showDialog(
       context: context,
       barrierColor: Colors.black.withOpacity(0.1),
+      barrierDismissible: true, // Позволяем закрывать диалог при нажатии вне области
       builder: (BuildContext context) {
-        return Stack(
-          children: [
-            // Эффект размытия
-            BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5), // Эффект размытия
-              child: Container(
-                color: Colors.black.withOpacity(0), // Прозрачный контейнер для сохранения размытия
+        return Dialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
+            child: Container(
+              padding: const EdgeInsets.all(16.0),
+              decoration: BoxDecoration(
+                color: Colors.white, // цвет фона календаря
+                borderRadius: BorderRadius.circular(10),
               ),
-            ),
-            Positioned(
-              bottom: 90, // Отступ выше BottomNavigationBar
-              left: 10, // Отступы для более узкого окна
-              right: 10,
-              child: Opacity(
-                opacity: 1, // Делаем окно непрозрачным
-                child: Dialog(
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Container(
-                    padding: const EdgeInsets.all(16.0),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        TableCalendar(
-                          firstDay: DateTime.utc(2010, 10, 16),
-                          lastDay: DateTime.utc(2030, 3, 14),
-                          focusedDay: _selectedDate,
-                          calendarStyle: CalendarStyle(
-                            selectedDecoration: BoxDecoration(
-                              color: const Color(0xFF5F33E1),
-                              shape: BoxShape.circle,
-                            ),
-                            todayDecoration: BoxDecoration(
-                              color: Colors.transparent, // Без фона
-                              shape: BoxShape.circle,
-                              border: Border.all(
-                                color: const Color(0xFF5F33E1), // Цвет контура
-                                width: 1, // Толщина контура
-                              ),
-                            ),
-                            todayTextStyle: TextStyle(
-                              color: Colors.black, // Цвет текста для сегодняшнего дня
-                            ),
-                            outsideDaysVisible: false,
-                          ),
-                          headerStyle: HeaderStyle(
-                            formatButtonVisible: false,
-                            titleCentered: true,
-                            titleTextFormatter: (date, locale) {
-                              return DateFormat.MMMM(locale).format(date); // Показываем только месяц
-                            },
-
-                            leftChevronIcon: const Icon(
-                                Icons.chevron_left, color: Color(0xFF5F33E1)),
-                            rightChevronIcon: const Icon(
-                                Icons.chevron_right, color: Color(0xFF5F33E1)),
-                          ),
-                          daysOfWeekVisible: true,
-                          selectedDayPredicate: (day) {
-                            return isSameDay(_selectedDate, day);
-                          },
-                          onDaySelected: (selectedDay, focusedDay) {
-                            if (selectedDay.isBefore(_today)) {
-                              setState(() {
-                                _selectedDate = selectedDay;
-                                _loadHabitsForSelectedDate();
-                              });
-                              // Закрываем диалог сразу после выбора даты
-                              Navigator.pop(context);
-                            }
-                          },
-                          enabledDayPredicate: (day) {
-                            return day.isBefore(_today); // Блокируем завтрашние дни
-                          },
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TableCalendar(
+                    firstDay: DateTime.utc(2010, 10, 16),
+                    lastDay: DateTime.utc(2030, 3, 14),
+                    focusedDay: _selectedDate,
+                    locale: Localizations.localeOf(context).toString(),
+                    calendarStyle: CalendarStyle(
+                      selectedDecoration: BoxDecoration(
+                        color: const Color(0xFF5F33E1),
+                        shape: BoxShape.circle,
+                      ),
+                      todayDecoration: BoxDecoration(
+                        color: Colors.transparent,
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: const Color(0xFF5F33E1),
+                          width: 1,
                         ),
-                      ],
+                      ),
+                      todayTextStyle: TextStyle(
+                        color: Colors.black,
+                      ),
+                      outsideDaysVisible: false,
                     ),
+                    headerStyle: HeaderStyle(
+                      formatButtonVisible: false,
+                      titleCentered: true,
+                      titleTextStyle: const TextStyle(
+                        fontSize: 18, // Размер шрифта для месяца
+                        fontWeight: FontWeight.bold, // Жирный шрифт
+                        color: Colors.black, // Цвет текста для названия месяца
+                      ),
+                      titleTextFormatter: (date, locale) {
+                        String formattedMonth = DateFormat.MMMM(locale).format(date);
+
+                        // Преобразуем первую букву в верхний регистр только для русского языка
+                        if (locale == 'ru') {
+                          formattedMonth = formattedMonth[0].toUpperCase() + formattedMonth.substring(1);
+                        }
+
+                        return formattedMonth;
+                      },
+                      leftChevronIcon: Padding(
+                        padding: const EdgeInsets.only(left: 42.0),
+                        child: Image.asset(
+                          'assets/images/arr_left.png',
+                          width: 20,
+                          height: 20,
+                          color: const Color(0xFF5F33E1),
+                        ),
+                      ),
+                      rightChevronIcon: Padding(
+                        padding: const EdgeInsets.only(right: 42.0),
+                        child: Image.asset(
+                          'assets/images/arr_right.png',
+                          width: 20,
+                          height: 20,
+                          color: const Color(0xFF5F33E1),
+                        ),
+                      ),
+                    ),
+                    daysOfWeekVisible: true,
+                    daysOfWeekStyle: DaysOfWeekStyle(
+                      weekdayStyle: const TextStyle(
+                        fontSize: 13, // Размер шрифта для дней недели
+                        fontWeight: FontWeight.normal, // Не жирный шрифт
+                        color: Colors.grey, // Цвет текста для будних дней
+                      ),
+                      weekendStyle: const TextStyle(
+                        fontSize: 13, // Размер шрифта для выходных
+                        fontWeight: FontWeight.normal, // Не жирный шрифт
+                        color: Colors.grey,
+                      ),
+                      dowTextFormatter: (date, locale) =>
+                          DateFormat.E(locale).format(date).toUpperCase(),
+                    ),
+                    selectedDayPredicate: (day) {
+                      return isSameDay(_selectedDate, day);
+                    },
+                    onDaySelected: (selectedDay, focusedDay) {
+                      if (selectedDay.isBefore(_today)) {
+                        setState(() {
+                          _selectedDate = selectedDay;
+                          _loadHabitsForSelectedDate();
+                        });
+                        Navigator.pop(context);
+                      }
+                    },
+                    enabledDayPredicate: (day) {
+                      return day.isBefore(_today);
+                    },
                   ),
-                ),
+
+                ],
               ),
             ),
-          ],
+          ),
         );
       },
     );
   }
+
 
 }

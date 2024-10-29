@@ -2,8 +2,14 @@ import 'package:action_notes/Screens/suggest.dart';
 import 'package:flutter/material.dart';
 import '../main.dart';
 import 'package:easy_localization/easy_localization.dart';
+import 'add.dart';
+import 'notes.dart';
+import 'stat.dart';
+import 'settings_screen.dart';
+import 'package:action_notes/Widgets/loggable_screen.dart';
 class FeedbackPage extends StatefulWidget {
-  const FeedbackPage({Key? key}) : super(key: key);
+  final int sessionId;
+  const FeedbackPage({Key? key, required this.sessionId}) : super(key: key);
 
   @override
   _FeedbackPageState createState() => _FeedbackPageState();
@@ -11,25 +17,65 @@ class FeedbackPage extends StatefulWidget {
 
 class _FeedbackPageState extends State<FeedbackPage> {
   int _selectedIndex = 4;
+  int? _currentSessionId;
+  @override
+  void initState() {
+    super.initState();
+    _currentSessionId = widget.sessionId;
+  }
 
   void _onItemTapped(int index) {
     setState(() {
       _selectedIndex = index;
     });
 
-    if (index == 0) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const HomePage()),
-      );
+    // Определим имя экрана вручную
+    String screenName;
+    Widget page;
+
+    switch (index) {
+      case 0:
+        screenName = 'HomePage';
+        page = HomePage(sessionId: widget.sessionId);
+        break;
+      case 1:
+        screenName = 'NotesPage';
+        page = NotesPage(sessionId: widget.sessionId);
+        break;
+      case 2:
+        screenName = 'AddActionPage';
+        page = AddActionPage(sessionId: widget.sessionId);
+        break;
+      case 3:
+        screenName = 'StatsPage';
+        page = StatsPage(sessionId: widget.sessionId);
+        break;
+      case 4:
+        screenName = 'SettingsPage';
+        page = SettingsPage(sessionId: widget.sessionId);
+        break;
+      default:
+        return;
     }
+
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(
+        builder: (context) => LoggableScreen(
+          screenName: screenName, // Передаем четко определенное имя экрана
+          child: page,
+          currentSessionId: widget.sessionId,
+        ),
+      ),
+    );
   }
+
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: const Color(0xFFF8F9F9),
         leading: IconButton(
           icon: Image.asset(
             'assets/images/ar_back.png',
@@ -41,11 +87,18 @@ class _FeedbackPageState extends State<FeedbackPage> {
           },
         ),
         elevation: 0,
-        title: Text(
-          'feedback'.tr(),
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-          ),
+        title: Row(
+          children: [
+            Transform.translate(
+              offset: Offset(-16, 0), // Смещение текста влево
+              child: Text(
+                'feedback'.tr(),
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ],
         ),
       ),
       body: Padding(
@@ -71,27 +124,32 @@ class _FeedbackPageState extends State<FeedbackPage> {
               'we_will_fix'.tr(),  // Локализованная часть "we will fix the error."
               'suggest_improvements'.tr(),  // Локализованная кнопка "Suggest improvements"
                   () {
-                Navigator.push(context, MaterialPageRoute(builder: (context) => SuggestPage()));
-              },
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => LoggableScreen(
+                          screenName: 'SuggestPage',
+                          child: SuggestPage(
+                            sessionId: _currentSessionId!, // Передаем sessionId в SuggestPage
+                          ),
+                          currentSessionId: _currentSessionId!, // Передаем currentSessionId в LoggableScreen
+                        ),
+                      ),
+                    );
+                  },
               isSecondSection: true,  // Указывает, что это вторая секция для стилизации
             ),
           ],
         ),
       ),
-      backgroundColor: Colors.white,
+      backgroundColor: const Color(0xFFF8F9F9),
 
       bottomNavigationBar: Container(
         margin: const EdgeInsets.only(bottom: 30, right: 16, left: 16),
         decoration: BoxDecoration(
           color: const Color(0xFFEEE9FF),
           borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.1),
-              blurRadius: 8,
-              offset: const Offset(0, -2),
-            ),
-          ],
+
         ),
         height: 60,
         child: Row(
@@ -141,21 +199,24 @@ class _FeedbackPageState extends State<FeedbackPage> {
   }
 
   Widget _buildActionButton(String buttonText, VoidCallback onPressed) {
-    return ElevatedButton(
-      style: ElevatedButton.styleFrom(
-        backgroundColor: const Color(0xFF5F33E1), // Button color
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(22), // Rounded corners
+    return Container(
+      width: 200,
+      height: 40,
+      child: ElevatedButton(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: const Color(0xFF5F33E1), // Цвет кнопки
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(18), // Закругленные углы
+          ),
         ),
-        padding: const EdgeInsets.symmetric(vertical: 15, horizontal: 50), // Padding inside button
-      ),
-      onPressed: onPressed,
-      child: Text(
-        buttonText,
-        style: const TextStyle(
-          color: Colors.white,
-          fontWeight: FontWeight.bold,
-          fontSize: 14,
+        onPressed: onPressed,
+        child: Text(
+          buttonText,
+          style: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+            fontSize: 12,
+          ),
         ),
       ),
     );

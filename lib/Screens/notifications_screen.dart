@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 import '../main.dart';
 import 'package:action_notes/Service/database_helper.dart';
@@ -8,8 +10,13 @@ import 'stat.dart';
 import 'add.dart';
 import 'notes.dart';
 import 'settings_screen.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'dart:ui';
+import 'package:action_notes/Widgets/loggable_screen.dart';
+
 class NotificationsPage extends StatefulWidget {
-  const NotificationsPage({Key? key}) : super(key: key);
+  final int sessionId;
+  const NotificationsPage({Key? key, required this.sessionId}) : super(key: key);
 
   @override
   _NotificationsPageState createState() => _NotificationsPageState();
@@ -21,10 +28,21 @@ class _NotificationsPageState extends State<NotificationsPage> {
   List<Map<String, dynamic>> habits = []; // Список привычек
   List<Map<String, dynamic>> notificationTimes = []; // Времена уведомлений для каждой привычки
   final HabitReminderService habitReminderService = HabitReminderService();
+  FocusNode hourFocusNode = FocusNode();
+  FocusNode minuteFocusNode = FocusNode();
+  int? _currentSessionId;
+  @override
+  void dispose() {
+    hourFocusNode.dispose();
+    minuteFocusNode.dispose();
+    super.dispose();
+  }
+
 
   @override
   void initState() {
     super.initState();
+    _currentSessionId = widget.sessionId;
     _loadNotifications();
     _fetchHabits().then((_) {
       // Загружаем состояние основного тумблера
@@ -81,44 +99,54 @@ class _NotificationsPageState extends State<NotificationsPage> {
     setState(() {
       _selectedIndex = index;
     });
-    if (index == 0) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const HomePage()),
-      );
-    }
-    if (index == 1) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const NotesPage()),
-      );
+
+    // Определим имя экрана вручную
+    String screenName;
+    Widget page;
+
+    switch (index) {
+      case 0:
+        screenName = 'HomePage';
+        page = HomePage(sessionId: widget.sessionId);
+        break;
+      case 1:
+        screenName = 'NotesPage';
+        page = NotesPage(sessionId: widget.sessionId);
+        break;
+      case 2:
+        screenName = 'AddActionPage';
+        page = AddActionPage(sessionId: widget.sessionId);
+        break;
+      case 3:
+        screenName = 'StatsPage';
+        page = StatsPage(sessionId: widget.sessionId);
+        break;
+      case 4:
+        screenName = 'SettingsPage';
+        page = SettingsPage(sessionId: widget.sessionId);
+        break;
+      default:
+        return;
     }
 
-    if (index == 4) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const SettingsPage()),
-      );
-    }
-    if (index == 2) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const AddActionPage()),
-      );
-    }
-    if (index == 3) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const StatsPage()),
-      );
-    }
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(
+        builder: (context) => LoggableScreen(
+          screenName: screenName, // Передаем четко определенное имя экрана
+          child: page,
+          currentSessionId: widget.sessionId,
+        ),
+      ),
+    );
   }
+
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: const Color(0xFFF8F9F9),
         leading: IconButton(
           icon: Image.asset(
             'assets/images/ar_back.png',
@@ -130,9 +158,18 @@ class _NotificationsPageState extends State<NotificationsPage> {
           },
         ),
         elevation: 0,
-        title: Text(
-          'notifications'.tr(),
-          style: TextStyle(fontWeight: FontWeight.bold),
+        title: Row(
+          children: [
+            Transform.translate(
+              offset: Offset(-16, 0), // Смещение текста влево
+              child: Text(
+                'notifications'.tr(),
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ],
         ),
       ),
       body: SingleChildScrollView(
@@ -152,19 +189,12 @@ class _NotificationsPageState extends State<NotificationsPage> {
           ],
         ),
       ),
-      backgroundColor: Colors.white,
+      backgroundColor: const Color(0xFFF8F9F9),
       bottomNavigationBar: Container(
         margin: const EdgeInsets.only(bottom: 30, right: 16, left: 16),
         decoration: BoxDecoration(
           color: const Color(0xFFEEE9FF),
           borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.1),
-              blurRadius: 8,
-              offset: const Offset(0, -2),
-            ),
-          ],
         ),
         height: 60,
         child: Row(
@@ -188,13 +218,6 @@ class _NotificationsPageState extends State<NotificationsPage> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12.0),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
       ),
       child: child,
     );
@@ -224,6 +247,251 @@ class _NotificationsPageState extends State<NotificationsPage> {
     );
   }
 
+  Future<void> _checkNotificationPermission() async {
+    var status = await Permission.notification.status;
+
+    if (status.isDenied) {
+      // Если статус "Denied", выводим диалог для запроса разрешения
+      await _showPermissionDialog();
+    } else if (status.isPermanentlyDenied) {
+      // Если статус "PermanentlyDenied", показываем диалог с предложением открыть настройки
+      await _showSettingsDialog();
+    }
+  }
+
+  Future<void> _requestNotificationPermission() async {
+    var status = await Permission.notification.request();
+
+    if (status.isGranted) {
+      SharedPreferences prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('isDialogShown', true);
+    }
+  }
+
+  Future<void> _showPermissionDialog() async {
+    return showDialog(
+      context: context,
+      barrierColor: Colors.black.withOpacity(0.1),
+      builder: (BuildContext context) {
+        return Stack(
+          children: [
+            BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
+              child: Container(color: Colors.black.withOpacity(0)),
+            ),
+            AlertDialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+              contentPadding: const EdgeInsets.fromLTRB(24, 20, 24, 10),
+              insetPadding: const EdgeInsets.all(5),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  RichText(
+                    textAlign: TextAlign.center,
+                    text: TextSpan(
+                      text: "want_to_allow_notifications".tr(),
+                      style: TextStyle(
+                        color: Colors.black,
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      children: [
+                        TextSpan(
+                          text: "reminders".tr(),
+                          style: TextStyle(
+                            color: Color(0xFF5F33E1),
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        TextSpan(text: "?"),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              actionsPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              actions: <Widget>[
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: TextButton(
+                        onPressed: () {
+                          Navigator.of(context).pop();
+                        },
+                        style: TextButton.styleFrom(
+                          backgroundColor: const Color(0xFFEEE9FF),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          padding: const EdgeInsets.symmetric(
+                            vertical: 10,
+                            horizontal: 20,
+                          ),
+                        ),
+                        child: Text(
+                          "no_thanks".tr(),
+                          style: TextStyle(
+                            color: Color(0xFF5F33E1),
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: TextButton(
+                        onPressed: () async {
+                          Navigator.of(context).pop();
+                          await _requestNotificationPermission();
+                        },
+                        style: TextButton.styleFrom(
+                          backgroundColor: Color(0xFF5F33E1),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          padding: const EdgeInsets.symmetric(
+                            vertical: 10,
+                            horizontal: 20,
+                          ),
+                        ),
+                        child: Text(
+                          "yes_allow".tr(),
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+// Диалог для перенаправления в настройки
+  Future<void> _showSettingsDialog() async {
+    return showDialog(
+      context: context,
+      barrierColor: Colors.black.withOpacity(0.1),
+      builder: (BuildContext context) {
+        return Stack(
+          children: [
+            // Эффект размытия фона
+            BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
+              child: Container(color: Colors.black.withOpacity(0)),
+            ),
+            // Основное содержимое диалогового окна
+            AlertDialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(24),
+              ),
+              contentPadding: const EdgeInsets.fromLTRB(24, 20, 24, 10),
+              insetPadding: const EdgeInsets.all(16),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.notifications_off_outlined, // Иконка уведомлений
+                    size: 50,
+                    color: Colors.deepPurple,
+                  ),
+                  const SizedBox(height: 16),
+                  RichText(
+                    textAlign: TextAlign.center,
+                    text: TextSpan(
+                      text: "notifications_denied_permanently".tr(),
+                      style: const TextStyle(
+                        color: Colors.black,
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        height: 1.3,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    "please_enable_notifications_in_settings".tr(),
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontSize: 15,
+                    ),
+                  ),
+                ],
+              ),
+              actionsPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              actions: <Widget>[
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    // Кнопка "Нет, спасибо"
+                    Expanded(
+                      child: TextButton(
+                        onPressed: () {
+                          Navigator.of(context).pop();
+                        },
+                        style: TextButton.styleFrom(
+                          backgroundColor: const Color(0xFFEEE9FF),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                        ),
+                        child: Text(
+                          "no_thanks".tr(),
+                          style: TextStyle(
+                            color: const Color(0xFF5F33E1),
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    // Кнопка "Открыть настройки"
+                    Expanded(
+                      child: TextButton(
+                        onPressed: () async {
+                          Navigator.of(context).pop();
+                          await openAppSettings();
+                        },
+                        style: TextButton.styleFrom(
+                          backgroundColor: const Color(0xFF5F33E1),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                        ),
+                        child: Text(
+                          "open_settings".tr(),
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+
+
   Widget _buildMainNotificationToggle() {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
@@ -232,19 +500,11 @@ class _NotificationsPageState extends State<NotificationsPage> {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(12.0),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.grey.withOpacity(0.2),
-              spreadRadius: 2,
-              blurRadius: 5,
-              offset: const Offset(0, 3),
-            ),
-          ],
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-              Text(
+            Text(
               "All_Notifications".tr(),
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black),
             ),
@@ -262,32 +522,26 @@ class _NotificationsPageState extends State<NotificationsPage> {
                   borderRadius: BorderRadius.circular(15), // Скругление углов
                 ),
                 child: GestureDetector(
-                  onTap: () {
-                    setState(() {
-                      allNotificationsEnabled = !allNotificationsEnabled;
-
-                      habits = habits.map((habit) {
-                        return {
-                          ...habit,
-                          'notifications_enabled': allNotificationsEnabled ? 1 : 0, // Обновляем состояние привычек
-                        };
-                      }).toList();
-
-                      print('значение $allNotificationsEnabled');
-
-                      _updateAllHabitsNotificationState(allNotificationsEnabled);
-
-                      if (allNotificationsEnabled) {
-                        for (var habit in habits) {
-                          HabitReminderService().initializeReminders();
-                        }
+                  onTap: () async {
+                    if (!allNotificationsEnabled) {
+                      var status = await Permission.notification.status;
+                      if (status.isGranted) {
+                        setState(() {
+                          allNotificationsEnabled = true;
+                          _updateAllHabitsNotificationState(allNotificationsEnabled);
+                        });
+                        await _saveToggleState('allNotificationsEnabled', true); // Сохранение состояния
                       } else {
-                        for (var habit in habits) {
-                          HabitReminderService().cancelAllReminders(habit['id']);
-                        }
+                        allNotificationsEnabled = false;
+                        _checkNotificationPermission();
                       }
-                      _saveToggleState('allNotificationsEnabled', allNotificationsEnabled);
-                    });
+                    } else {
+                      setState(() {
+                        allNotificationsEnabled = false;
+                        _updateAllHabitsNotificationState(allNotificationsEnabled);
+                      });
+                      await _saveToggleState('allNotificationsEnabled', false); // Сохранение состояния
+                    }
                   },
                   child: Stack(
                     children: [
@@ -438,25 +692,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
 
     // Если нет напоминаний, создаем одно с временем по умолчанию и днями недели в пределах диапазона
     if (habitReminders.isEmpty) {
-      // Инициализируем дни, которые входят в диапазон, как выбранные
-      List<bool> defaultDays = List.generate(7, (dayIndex) {
-        // Используем DateTime.now().weekday (1=понедельник, 7=воскресенье) для точного определения индекса дня недели
-        int currentDay = (startDate.add(Duration(days: dayIndex)).weekday - 1) % 7;
-        bool isSelected = currentDay >= startDate.weekday - 1 && currentDay <= endDate.weekday - 1;
-        print("Day index: $dayIndex, isSelected: $isSelected"); // Логируем индексы и значения
-        return isSelected; // Выбираем только дни в диапазоне
-      });
-
-      print("Default days for new reminder: $defaultDays"); // Логируем результат
-
-      habitReminders = [
-        {
-          'time': '08:00',
-          'days': defaultDays, // Все дни, попадающие в диапазон, выбраны
-          'habitId': habit['id'], // Привязываем уведомление к привычке
-        }
-      ];
-
+      _addNewReminder(habit);
       setState(() {
         notificationTimes.addAll(habitReminders);
       });
@@ -498,7 +734,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
           children: [
             // Поле для ввода часов
             Container(
-              width: 60,
+              width: 80,
               height: 50,
               alignment: Alignment.center,
               decoration: BoxDecoration(
@@ -513,13 +749,14 @@ class _NotificationsPageState extends State<NotificationsPage> {
                 style: TextStyle(fontSize: 20, color: Colors.black),
                 onFieldSubmitted: (String value) {
                   _updateHour(reminder, habit, hourController, minuteController);
+                  hourFocusNode.unfocus();
                 },
               ),
             ),
             Text(' : ', style: TextStyle(fontSize: 24, color: Colors.black)),
             // Поле для ввода минут
             Container(
-              width: 60,
+              width: 80,
               height: 50,
               alignment: Alignment.center,
               decoration: BoxDecoration(
@@ -534,6 +771,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
                 style: TextStyle(fontSize: 20, color: Colors.black),
                 onFieldSubmitted: (String value) {
                   _updateHour(reminder, habit, hourController, minuteController);
+                  minuteFocusNode.unfocus();
                 },
               ),
             ),
@@ -550,7 +788,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
                   color: Color(0xFFEEE9FF),
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: Icon(Icons.add, color: Color(0xFF5F33E1), size: 24),
+                child: Icon(Icons.add, color: Color(0xFF5F33E1), size: 20),
               ),
             ),
             Spacer(),
@@ -634,7 +872,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
                 days[dayIndex],
                 style: const TextStyle(
                   fontSize: 14,
-                  color: Color(0xFF212121),  // Цвет текста всегда активен
+                  color: Colors.grey,  // Цвет текста всегда активен
                 ),
               ),
             ),
@@ -716,13 +954,22 @@ class _NotificationsPageState extends State<NotificationsPage> {
       return;
     }
 
+    // Преобразуем дни недели в индексы от 0 (Воскресенье) до 6 (Суббота)
     final int startDayIndex = startDate.weekday % 7;
     final int endDayIndex = endDate.weekday % 7;
 
     // Сбрасываем дни вне диапазона (если диапазон меньше недели)
     for (int i = 0; i < 7; i++) {
-      if (i < startDayIndex || i > endDayIndex) {
-        selectedDays[i] = false; // Сбрасываем дни вне диапазона
+      if (startDayIndex <= endDayIndex) {
+        // Когда диапазон не "переходит" через воскресенье
+        if (i < startDayIndex || i > endDayIndex) {
+          selectedDays[i] = false; // Сбрасываем дни вне диапазона
+        }
+      } else {
+        // Когда диапазон "переходит" через воскресенье
+        if (i < startDayIndex && i > endDayIndex) {
+          selectedDays[i] = false; // Сбрасываем дни вне диапазона
+        }
       }
     }
 
@@ -736,8 +983,12 @@ class _NotificationsPageState extends State<NotificationsPage> {
   bool _isWithinDateRange(DateTime start, DateTime end, int selectedIndex) {
     final int totalDaysRange = end.difference(start).inDays;
 
+    // Печатаем диапазон дат и общее количество дней
+    print('Start date: $start, End date: $end, Total days range: $totalDaysRange');
+
     // Если диапазон больше недели, возвращаем true для всех дней
     if (totalDaysRange >= 7) {
+      print('Total days range is greater than or equal to 7, returning true.');
       return true;
     }
 
@@ -745,9 +996,22 @@ class _NotificationsPageState extends State<NotificationsPage> {
     final int startDayIndex = start.weekday % 7;
     final int endDayIndex = end.weekday % 7;
 
-    // Возвращаем true, если день находится в диапазоне, иначе false
-    return selectedIndex >= startDayIndex && selectedIndex <= endDayIndex;
+    // Печатаем индексы начала и конца диапазона
+    print('Start day index: $startDayIndex, End day index: $endDayIndex, Selected index: $selectedIndex');
+
+    // Проверяем, попадает ли выбранный индекс в диапазон
+    bool isWithinRange;
+    if (startDayIndex <= endDayIndex) {
+      isWithinRange = selectedIndex >= startDayIndex && selectedIndex <= endDayIndex;
+    } else {
+      isWithinRange = selectedIndex >= startDayIndex || selectedIndex <= endDayIndex;
+    }
+
+    print('Is selected index within range: $isWithinRange');
+
+    return isWithinRange;
   }
+
 
   Future<void> _loadNotifications() async {
     try {
@@ -777,8 +1041,6 @@ class _NotificationsPageState extends State<NotificationsPage> {
       print('Ошибка при загрузке уведомлений: $e');
     }
   }
-
-
 
 
 
@@ -930,14 +1192,5 @@ class _NotificationsPageState extends State<NotificationsPage> {
       print('Нет данных для обновления.');
     }
   }
-
-
-
-
-
-
-
-
-
 
 }
