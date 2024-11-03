@@ -9,8 +9,8 @@ allprojects {
 }
 
 ext {
-    compileSdkVersion = 33 // или выше
-    targetSdkVersion = 33 // или выше
+    compileSdkVersion = 34 // или выше
+    targetSdkVersion = 34 // или выше
 }
 
 rootProject.buildDir = "../build"
