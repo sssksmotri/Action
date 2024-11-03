@@ -794,7 +794,7 @@ class DatabaseHelper {
           'activity_duration': logEntry['total_duration'] as String? ?? '',
           'section_time': logEntry['section_times'] as String? ?? '',
           'habits_added': logEntry['habit_count']?.toString() ?? '0',
-          'days_active': logEntry['days_active']?.toString() ?? '0',
+
         };
 
         final url = Uri.parse(dbUrl!);
@@ -811,7 +811,13 @@ class DatabaseHelper {
             print('Данные успешно отправлены: ${response.body}');
             // Покажите пользователю сообщение о успешной отправке
             _showSuccessDialog('Данные успешно отправлены!');
-          } else {
+          }
+          if (response.statusCode == 200) {
+            print('Данные успешно отправлены: ${response.body}');
+            // Покажите пользователю сообщение о успешной отправке
+            _showSuccessDialog('Данные успешно отправлены!');
+          }
+          else {
             print('Ошибка при отправке данных: ${response.statusCode} - ${response.body}');
           }
         } catch (e) {

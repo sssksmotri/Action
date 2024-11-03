@@ -49,8 +49,7 @@ void backgroundFetchHeadlessTask(HeadlessTask task) async {
   DateTime now = DateTime.now();
   int currentHour = now.hour;
 
-  // Отправляем данные один раз в период с 12:00 до 13:00
-  if (currentHour >= 12 && currentHour < 13 && !_dataSentInAfternoonPeriod) {
+  if (currentHour >= 12 && currentHour < 16 && !_dataSentInAfternoonPeriod) {
     try {
       print("Sending analytics data for the afternoon period at ${now.toIso8601String()}...");
       await DatabaseHelper.instance.sendAnalyticsDataForLast12Hours();
@@ -58,10 +57,10 @@ void backgroundFetchHeadlessTask(HeadlessTask task) async {
       _dataSentInAfternoonPeriod = true;
     } catch (e) {
       print("Error while sending analytics data: $e");
+      _dataSentInAfternoonPeriod = false;
     }
   }
-  // Отправляем данные один раз в период с 00:00 до 1:00
-  else if (currentHour >= 0 && currentHour < 1 && !_dataSentInMidnightPeriod) {
+  else if (currentHour >= 0 && currentHour < 2 && !_dataSentInMidnightPeriod) {
     try {
       print("Sending analytics data for the midnight period at ${now.toIso8601String()}...");
       await DatabaseHelper.instance.sendAnalyticsDataForLast12Hours();
@@ -69,16 +68,17 @@ void backgroundFetchHeadlessTask(HeadlessTask task) async {
       _dataSentInMidnightPeriod = true;
     } catch (e) {
       print("Error while sending analytics data: $e");
+      _dataSentInMidnightPeriod = false;
     }
   } else {
     print("Not the correct time for sending data. Current time is: ${now.hour}:${now.minute}");
   }
 
   // Сброс флагов после завершения периодов
-  if (currentHour >= 13) {
+  if (currentHour >= 16) {
     _dataSentInAfternoonPeriod = false;
   }
-  if (currentHour >= 1) {
+  if (currentHour >= 2) {
     _dataSentInMidnightPeriod = false;
   }
 
@@ -169,13 +169,14 @@ class _MyAppState extends State<MyApp> {
     int currentHour = now.hour;
 
     // Проверка времени для отправки данных с 12:00 до 13:00
-    if (currentHour >= 12 && currentHour < 15 && !_dataSentInAfternoonPeriod) {
+    if (currentHour >= 12 && currentHour < 16 && !_dataSentInAfternoonPeriod) {
       try {
         print("Sending analytics data for the afternoon period at ${now.toIso8601String()}...");
         await DatabaseHelper.instance.sendAnalyticsDataForLast12Hours();
         print("Analytics data sent successfully.");
         _dataSentInAfternoonPeriod = true;
       } catch (e) {
+        _dataSentInAfternoonPeriod = false;
         print("Error while sending analytics data: $e");
       }
     }
@@ -187,6 +188,7 @@ class _MyAppState extends State<MyApp> {
         print("Analytics data sent successfully.");
         _dataSentInMidnightPeriod = true;
       } catch (e) {
+        _dataSentInMidnightPeriod = false;
         print("Error while sending analytics data: $e");
       }
     } else {
@@ -194,7 +196,7 @@ class _MyAppState extends State<MyApp> {
     }
 
     // Сбрасываем флаги после завершения временного интервала
-    if (currentHour >= 15) {
+    if (currentHour >= 16) {
       _dataSentInAfternoonPeriod = false;
     }
     if (currentHour >= 2) {
