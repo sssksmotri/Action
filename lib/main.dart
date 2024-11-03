@@ -60,7 +60,7 @@ void backgroundFetchHeadlessTask(HeadlessTask task) async {
       _dataSentInAfternoonPeriod = false;
     }
   }
-  else if (currentHour >= 0 && currentHour < 2 && !_dataSentInMidnightPeriod) {
+  else if (currentHour >= 0 && currentHour < 10 && !_dataSentInMidnightPeriod) {
     try {
       print("Sending analytics data for the midnight period at ${now.toIso8601String()}...");
       await DatabaseHelper.instance.sendAnalyticsDataForLast12Hours();
@@ -78,7 +78,7 @@ void backgroundFetchHeadlessTask(HeadlessTask task) async {
   if (currentHour >= 16) {
     _dataSentInAfternoonPeriod = false;
   }
-  if (currentHour >= 2) {
+  if (currentHour >= 10) {
     _dataSentInMidnightPeriod = false;
   }
 
@@ -181,7 +181,7 @@ class _MyAppState extends State<MyApp> {
       }
     }
     // Проверка времени для отправки данных с 00:00 до 1:00
-    else if (currentHour >= 0 && currentHour < 2 && !_dataSentInMidnightPeriod) {
+    else if (currentHour >= 0 && currentHour < 10 && !_dataSentInMidnightPeriod) {
       try {
         print("Sending analytics data for the midnight period at ${now.toIso8601String()}...");
         await DatabaseHelper.instance.sendAnalyticsDataForLast12Hours();
@@ -199,7 +199,7 @@ class _MyAppState extends State<MyApp> {
     if (currentHour >= 16) {
       _dataSentInAfternoonPeriod = false;
     }
-    if (currentHour >= 2) {
+    if (currentHour >= 10) {
       _dataSentInMidnightPeriod = false;
     }
 
