@@ -743,32 +743,37 @@ class DatabaseHelper {
     final db = await instance.database;
     final now = DateTime.now();
 
-    // Форматируем текущую дату в нужный формат
-    final formattedDate = "${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}";
+    // Форматируем текущую и предыдущую даты
+    final formattedTodayDate = "${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}";
+    final formattedYesterdayDate = "${now.subtract(Duration(days: 1)).year}-${now.subtract(Duration(days: 1)).month.toString().padLeft(2, '0')}-${now.subtract(Duration(days: 1)).day.toString().padLeft(2, '0')}";
+
     final apiKey = dotenv.env['API_KEY'];
     final dbUrl = dotenv.env['DATABASE_URL_SEND12H'];
-    // Задаем начало и конец временного интервала в зависимости от времени суток
+
     String startTime;
     String endTime;
+    String targetDate;
 
     if (now.hour < 12) {
-      // Время от 00:00 до 12:00
-      startTime = "00:00:00";
-      endTime = "12:00:00";
-    } else {
-      // Время от 12:00 до 23:59
+      // Если сейчас до 12:00, берем данные с 12:00 предыдущего дня до 00:00 текущего дня
+      targetDate = formattedYesterdayDate;
       startTime = "12:00:00";
       endTime = "23:59:59";
+    } else {
+      // Если сейчас после 12:00, берем данные с 00:00 до 12:00 текущего дня
+      targetDate = formattedTodayDate;
+      startTime = "00:00:00";
+      endTime = "12:00:00";
     }
 
-    // Делаем запрос по текущей дате и времени в заданном интервале
+    // Выполняем запрос к базе данных с заданными параметрами
     final result = await db.query(
       'AppUsageLog',
       where: 'login_date = ? AND login_time BETWEEN ? AND ?',
-      whereArgs: [formattedDate, startTime, endTime],
+      whereArgs: [targetDate, startTime, endTime],
     );
 
-    // Проверяем и обрабатываем записи
+    // Проверка наличия записей и отправка данных
     if (result.isNotEmpty) {
       for (var logEntry in result) {
         final userId = logEntry['user_id'];
@@ -777,13 +782,13 @@ class DatabaseHelper {
 
         if (userId == null || device.isEmpty || language.isEmpty) {
           print('Ошибка: недостающие данные для отправки. user_id: $userId, device: $device, language: $language');
-          continue; // Пропустить этот лог, если данные недоступны
+          continue;
         }
 
         String action = logEntry['action'] as String? ?? '';
         String loginDate = logEntry['login_date'] as String;
         String loginTime = logEntry['login_time'] as String;
-        String lastLogin = '$loginDate' + 'T' + loginTime.split('.').first; // Убираем миллисекунды
+        String lastLogin = '$loginDate' + 'T' + loginTime.split('.').first;
 
         final data = {
           'user_id': userId.toString(),
@@ -794,7 +799,6 @@ class DatabaseHelper {
           'activity_duration': logEntry['total_duration'] as String? ?? '',
           'section_time': logEntry['section_times'] as String? ?? '',
           'habits_added': logEntry['habit_count']?.toString() ?? '0',
-
         };
 
         final url = Uri.parse(dbUrl!);
@@ -802,22 +806,14 @@ class DatabaseHelper {
         try {
           final response = await http.post(
             url,
-            headers: {'Content-Type': 'application/json',
-            'X-API-Key':apiKey!},
+            headers: {'Content-Type': 'application/json', 'X-API-Key': apiKey!},
             body: jsonEncode(data),
           );
 
-          if (response.statusCode == 201) {
+          if (response.statusCode == 201 || response.statusCode == 200) {
             print('Данные успешно отправлены: ${response.body}');
-            // Покажите пользователю сообщение о успешной отправке
             _showSuccessDialog('Данные успешно отправлены!');
-          }
-          if (response.statusCode == 200) {
-            print('Данные успешно отправлены: ${response.body}');
-            // Покажите пользователю сообщение о успешной отправке
-            _showSuccessDialog('Данные успешно отправлены!');
-          }
-          else {
+          } else {
             print('Ошибка при отправке данных: ${response.statusCode} - ${response.body}');
           }
         } catch (e) {
@@ -825,7 +821,7 @@ class DatabaseHelper {
         }
       }
     } else {
-      print('Записей за указанный интервал сегодня не найдено.');
+      print('Записей за указанный интервал не найдено.');
     }
   }
 

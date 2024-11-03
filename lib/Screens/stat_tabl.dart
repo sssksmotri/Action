@@ -29,7 +29,7 @@ class _ChartScreenState extends State<ChartScreen> {
   int _selectedIndex = 0;
   DateTime _selectedDateRangeStart = DateTime.now().subtract(Duration(days: 7)); // Инициализация начальной даты на 7 дней раньше
   DateTime _selectedDateRangeEnd = DateTime.now(); // Инициализация конечной даты
-  late TrackballBehavior _trackballBehavior;
+
   List<_ChartData> data = [];
   List<_ChartData> weekData = [];
 
@@ -45,15 +45,7 @@ class _ChartScreenState extends State<ChartScreen> {
     _currentSessionId = widget.sessionId;
     data = weekData; // По умолчанию показываем данные за неделю
     loadChartData();
-    _trackballBehavior = TrackballBehavior(
-        enable: true, // Включаем trackball
-        activationMode: ActivationMode.singleTap, // Режим активации при одиночном нажатии
-        tooltipSettings: InteractiveTooltip(
-        enable: true, // Включаем отображение всплывающей подсказки
-        color: Colors.black,
-        format: _showPercent ? 'День: point.x\nПроцент: point.y%' : 'День: point.x\nВыполнено: point.y',
-        ),
-    );
+
   }
 
   void loadChartData() async {
@@ -307,8 +299,8 @@ class _ChartScreenState extends State<ChartScreen> {
 
           Expanded(
             child: Container(
-              padding: const EdgeInsets.all(8.0),
-              height: MediaQuery.of(context).size.height * 0.15,
+                padding: const EdgeInsets.fromLTRB(0.0, 8.0, 0.0, 0.0), // Увеличили верхний отступ
+                height: MediaQuery.of(context).size.height * 0.35,
               child: _selectedChart == 0
                   ? Stack(
                 children: [
@@ -417,7 +409,7 @@ class _ChartScreenState extends State<ChartScreen> {
                             widget: Container(
                               width: 35, // Установите фиксированную ширину
                               height: 17, // Установите фиксированную высоту
-                              padding: EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                              padding: EdgeInsets.symmetric(horizontal: 1, vertical: 2),
                               decoration: BoxDecoration(
                                 color: Color(0xFFECEAFF), // Цвет фона аннотаций
                                 borderRadius: BorderRadius.circular(18),
@@ -539,6 +531,84 @@ class _ChartScreenState extends State<ChartScreen> {
                     ),
                   ),
                 ],
+                annotations: [
+                  if(_selectedTab==0) ...[
+                    if (_showPercent) ...[
+                      CartesianChartAnnotation(
+                        widget: Container(
+                          width: double.infinity,
+                          height: 46,
+                          color: Color(0xFFF8F9F9), // Цвет фона для значений процентов выше 110
+                        ),
+                        coordinateUnit: CoordinateUnit.point,
+                        x: data.isNotEmpty ? data.first.day : DateTime.now(),
+                        y: 110,
+                      ),
+                      CartesianChartAnnotation(
+                        widget: Container(
+                          width: double.infinity,
+                          height: 46,
+                          color: Color(0xFFF8F9F9), // Цвет фона для значений процентов выше 110
+                        ),
+                        coordinateUnit: CoordinateUnit.point,
+                        y: 110,
+                        x: data.isNotEmpty ? data.last.day : DateTime.now(),
+                      ),
+                    ],
+                    if (!_showPercent) ...[
+                      CartesianChartAnnotation(
+                        widget: Container(
+                          width: double.infinity,
+                          height: 46,
+                          color: Color(0xFFF8F9F9), // Цвет фона для значений количества выше 10
+                          child: Center(
+                          ),
+                        ),
+                        coordinateUnit: CoordinateUnit.point,
+                        x: data.isNotEmpty ? data.first.day : DateTime.now(),
+                        y: 11, // Задайте Y, когда значение количества превышает 10
+                      ),
+                      CartesianChartAnnotation(
+                        widget: Container(
+                          width: double.infinity,
+                          height: 46,
+                          color: Color(0xFFF8F9F9), // Цвет фона для значений количества выше 10
+                          child: Center(
+                          ),
+                        ),
+                        coordinateUnit: CoordinateUnit.point,
+                        y: 11,
+                        x: data.isNotEmpty ? data.last.day : DateTime.now(),
+                      ),
+                    ],
+                    ...data.map((entry) {
+                      return CartesianChartAnnotation(
+                        widget: Container(
+                          width: 45, // Установите фиксированную ширину
+                          height: 17, // Установите фиксированную высоту
+                          padding: EdgeInsets.symmetric(horizontal: 4, vertical: 2), // Можно оставить один вариант
+                          decoration: BoxDecoration(
+                            color: Color(0xFFECEAFF), // Цвет фона аннотации
+                            borderRadius: BorderRadius.circular(18),
+                          ),
+                          child: Center( // Центрируем содержимое
+                            child: Text(
+                              _showPercent ? '${entry.percent}%' : '${entry.completed}',
+                              style: TextStyle(
+                                color: Color(0xFF5F33E1),
+                                fontWeight: FontWeight.bold,
+                                fontSize: 10,
+                              ),
+                            ),
+                          ),
+                        ),
+                        coordinateUnit: CoordinateUnit.point,
+                        x: entry.day,
+                        y: _showPercent ? 105 : 10.55,
+                      );
+                    }).toList(),
+                  ],
+                ],
                 trackballBehavior: TrackballBehavior(
                   enable: true,
                   activationMode: ActivationMode.singleTap,
@@ -589,84 +659,7 @@ class _ChartScreenState extends State<ChartScreen> {
                   },
                 ),
 
-                annotations: [
-                  if(_selectedTab==0) ...[
-                  if (_showPercent) ...[
-                    CartesianChartAnnotation(
-                      widget: Container(
-                        width: double.infinity,
-                        height: 60,
-                        color: Color(0xFFF8F9F9), // Цвет фона для значений процентов выше 110
-                      ),
-                      coordinateUnit: CoordinateUnit.point,
-                      x: data.isNotEmpty ? data.first.day : DateTime.now(),
-                      y: 110,
-                    ),
-                    CartesianChartAnnotation(
-                      widget: Container(
-                        width: double.infinity,
-                        height: 60,
-                        color: Color(0xFFF8F9F9), // Цвет фона для значений процентов выше 110
-                      ),
-                      coordinateUnit: CoordinateUnit.point,
-                      y: 110,
-                      x: data.isNotEmpty ? data.last.day : DateTime.now(),
-                    ),
-                  ],
-                  if (!_showPercent) ...[
-                    CartesianChartAnnotation(
-                      widget: Container(
-                        width: double.infinity,
-                        height: 60,
-                        color: Color(0xFFF8F9F9), // Цвет фона для значений количества выше 10
-                        child: Center(
-                        ),
-                      ),
-                      coordinateUnit: CoordinateUnit.point,
-                      x: data.isNotEmpty ? data.first.day : DateTime.now(),
-                      y: 11, // Задайте Y, когда значение количества превышает 10
-                    ),
-                    CartesianChartAnnotation(
-                      widget: Container(
-                        width: double.infinity,
-                        height: 60,
-                        color: Color(0xFFF8F9F9), // Цвет фона для значений количества выше 10
-                        child: Center(
-                        ),
-                      ),
-                      coordinateUnit: CoordinateUnit.point,
-                      y: 11,
-                      x: data.isNotEmpty ? data.last.day : DateTime.now(),
-                    ),
-                  ],
-                  ...data.map((entry) {
-                    return CartesianChartAnnotation(
-                      widget: Container(
-                        width: 45, // Установите фиксированную ширину
-                        height: 17, // Установите фиксированную высоту
-                        padding: EdgeInsets.symmetric(horizontal: 8, vertical: 2), // Можно оставить один вариант
-                        decoration: BoxDecoration(
-                          color: Color(0xFFECEAFF), // Цвет фона аннотации
-                          borderRadius: BorderRadius.circular(18),
-                        ),
-                        child: Center( // Центрируем содержимое
-                          child: Text(
-                            _showPercent ? '${entry.percent}%' : '${entry.completed}',
-                            style: TextStyle(
-                              color: Color(0xFF5F33E1),
-                              fontWeight: FontWeight.bold,
-                              fontSize: 10,
-                            ),
-                          ),
-                        ),
-                      ),
-                      coordinateUnit: CoordinateUnit.point,
-                      x: entry.day,
-                      y: _showPercent ? 105 : 10.55,
-                    );
-                  }).toList(),
-                ],
-                ],
+
               )
             ),
           ),
