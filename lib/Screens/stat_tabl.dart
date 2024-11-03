@@ -324,7 +324,7 @@ class _ChartScreenState extends State<ChartScreen> {
                       ),
                       primaryYAxis: NumericAxis(
                         minimum: 0,
-                        maximum: _showPercent ? 100 : 10,
+                        maximum: _showPercent ? 109 : 10.9,
                         interval: _showPercent ? 10 : 1,
                         majorGridLines: MajorGridLines(width: 0),
                       ),
@@ -355,7 +355,7 @@ class _ChartScreenState extends State<ChartScreen> {
                       ),
                       primaryYAxis: NumericAxis(
                         minimum: 0,
-                        maximum: _showPercent ? 100 : 10,
+                        maximum: _showPercent ? 109 : 10.9,
                         interval: _showPercent ? 10 : 1,
                         majorGridLines: MajorGridLines(width: 0),
                       ),
@@ -374,85 +374,156 @@ class _ChartScreenState extends State<ChartScreen> {
                         ),
 
                       ],
-                      trackballBehavior: TrackballBehavior(
-                        enable: true,
-                        activationMode: ActivationMode.singleTap,
-                        tooltipSettings: InteractiveTooltip(
-                          enable: true,
-                          color: Colors.white, // основной фон тултипа белый
-                          textStyle: TextStyle(color: Color(0xFF5F33E1), fontSize: 12),
+                    ),
+                  ),
+                  if(_selectedTab==0)
+                  Positioned.fill(
+                    child: Padding(
+                      padding: const EdgeInsets.all(8.0),
+                      child: SfCartesianChart(
+                        primaryXAxis: DateTimeAxis(
+                          majorGridLines: MajorGridLines(width: 0), // Убрать основные сеточные линии
+                          axisLine: AxisLine(width: 1, color: Colors.white), // Белая ось X
+                          dateFormat: DateFormat('dd.MM'),
+                          interval: _selectedTab == 0 ? 1 : (_selectedTab == 1 ? 2 : 5),
+                          intervalType: DateTimeIntervalType.days,
+                          labelStyle: TextStyle(color: Colors.transparent), // Прозрачный цвет меток на оси X
+                          majorTickLines: MajorTickLines(size: 0), // Убрать тире на оси X
                         ),
-
-                        lineWidth: 0,
-                        lineColor: Colors.transparent,
-                        builder: (BuildContext context, TrackballDetails details) {
-                          final date = DateFormat('dd.MM').format(details.point!.x);
-                          final value = _showPercent
-                              ? '${details.point!.y}%' // Процентное значение
-                              : details.point!.y.toString(); // Количество
-
-                          return Container(
-                            padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 10),
-                            decoration: BoxDecoration(
-                              color: Color(0xFFEEE9FF), // задний фон тултипа #EEE9FF
-                              borderRadius: BorderRadius.circular(12),
-                                boxShadow: [
-                            BoxShadow(
-                            color: Colors.black.withOpacity(0.1), // subtle shadow
-                            offset: Offset(0, 2),
-                            blurRadius: 4,
+                        primaryYAxis: NumericAxis(
+                          minimum: 0,
+                          maximum: _showPercent ? 110 : 10.9,
+                          interval: _showPercent ? 10 : 1,
+                          majorGridLines: MajorGridLines(width: 0), // Убрать основные сеточные линии
+                          axisLine: AxisLine(color: Colors.transparent), // Прозрачная ось Y
+                          labelStyle: TextStyle(color: Colors.transparent), // Прозрачный цвет меток на оси Y
+                          majorTickLines: MajorTickLines(size: 0), // Убрать тире на оси Y
+                        ),
+                        plotAreaBorderWidth: 0,
+                        series: <CartesianSeries>[
+                          ColumnSeries<_ChartData, DateTime>(
+                            dataSource: data,
+                            xValueMapper: (_ChartData sales, _) => sales.day,
+                            yValueMapper: (_ChartData sales, _) =>
+                            _showPercent ? sales.percent : sales.completed,
+                            color: Colors.transparent, // Полностью прозрачный цвет
+                            borderRadius: BorderRadius.circular(10),
+                            width: 0.9,
+                            spacing: 0.0,
                           ),
-                          ]
-                            ),
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text(
-                                  date,
-                                  style: TextStyle(color: Colors.black, fontSize: 10), // Дата черным цветом, размер 8 пикселей
-                                ),
-                                Text(
-                                  value,
+                        ],
+                        annotations: data.map((entry) {
+                          return CartesianChartAnnotation(
+                            widget: Container(
+                              width: 35, // Установите фиксированную ширину
+                              height: 17, // Установите фиксированную высоту
+                              padding: EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: Color(0xFFECEAFF), // Цвет фона аннотаций
+                                borderRadius: BorderRadius.circular(18),
+                              ),
+                              child: Center( // Центрируем содержимое
+                                child: Text(
+                                  _showPercent ? '${entry.percent}%' : '${entry.completed}',
                                   style: TextStyle(
-                                    color: Color(0xFF5F33E1), // Цвет темно-фиолетовый для значения
-                                    fontSize: 14,
+                                    color: Color(0xFF5F33E1),
                                     fontWeight: FontWeight.bold,
+                                    fontSize: 10,
                                   ),
                                 ),
-                              ],
+                              ),
                             ),
+                            coordinateUnit: CoordinateUnit.point,
+                            x: entry.day,
+                            // Установите y над графиком
+                            y: (_showPercent ? 106 : 10.5), // Установите фиксированное значение Y, превышающее максимальное значение графика
                           );
-                        },
+                        }).toList(),
+                        trackballBehavior: TrackballBehavior(
+                          enable: true,
+                          activationMode: ActivationMode.singleTap,
+                          tooltipSettings: InteractiveTooltip(
+                            enable: true,
+                            color: Colors.white, // основной фон тултипа белый
+                            textStyle: TextStyle(color: Color(0xFF5F33E1), fontSize: 12),
+                          ),
+
+                          lineWidth: 0,
+                          lineColor: Colors.transparent,
+                          builder: (BuildContext context, TrackballDetails details) {
+                            final date = DateFormat('dd.MM').format(details.point!.x);
+                            final value = _showPercent
+                                ? '${details.point!.y}%' // Процентное значение
+                                : details.point!.y.toString(); // Количество
+
+                            return Container(
+                              padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 10),
+                              decoration: BoxDecoration(
+                                  color: Color(0xFFEEE9FF), // задний фон тултипа #EEE9FF
+                                  borderRadius: BorderRadius.circular(12),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black.withOpacity(0.1), // subtle shadow
+                                      offset: Offset(0, 2),
+                                      blurRadius: 4,
+                                    ),
+                                  ]
+                              ),
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    date,
+                                    style: TextStyle(color: Colors.black, fontSize: 10), // Дата черным цветом, размер 8 пикселей
+                                  ),
+                                  Text(
+                                    value,
+                                    style: TextStyle(
+                                      color: Color(0xFF5F33E1), // Цвет темно-фиолетовый для значения
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
+                        ),
                       ),
                     ),
                   ),
+
                 ],
               )
-              :SfCartesianChart(
+              : SfCartesianChart(
                 primaryXAxis: DateTimeAxis(
                   majorGridLines: MajorGridLines(width: 0),
                   dateFormat: DateFormat('dd.MM'),
                   interval: _selectedTab == 0 ? 1 : (_selectedTab == 1 ? 2 : 5),
                   intervalType: DateTimeIntervalType.days,
                   edgeLabelPlacement: EdgeLabelPlacement.shift,
+                  maximum: data.isNotEmpty
+                      ? data.last.day.add(Duration(days: 0, hours: 12))
+                      : DateTime.now(),
+                  minimum: data.isNotEmpty
+                      ? data.first.day.subtract(Duration(days: 0, hours: 10))
+                      : DateTime.now(),
                 ),
                 primaryYAxis: NumericAxis(
-                  minimum: 0.0, // Указываем 0.0, чтобы он распознал значение как double
-                  maximum: _showPercent
-                      ? (data.isNotEmpty ? data.map((e) => e.percent).reduce((a, b) => a > b ? a : b).toDouble() + 10.0 : 100.0)
-                      : (data.isNotEmpty ? data.map((e) => e.completed).reduce((a, b) => a > b ? a : b).toDouble() + 2.0 : 10.0),
-                  interval: _showPercent ? 10.0 : 1.0, // Интервалы тоже указываем как double
+                  minimum: 0,
+                  maximum: _showPercent ? 109 : 10.9,
+                  interval: _showPercent ? 10 : 1,
                   majorGridLines: MajorGridLines(width: 1),
+                  axisLine: AxisLine(width: 0),
                 ),
-
                 plotAreaBackgroundColor: Color(0xFFFFF0EC),
                 plotAreaBorderWidth: 0,
+                margin: EdgeInsets.only(right: 10),
                 series: <CartesianSeries>[
                   LineSeries<_ChartData, DateTime>(
                     dataSource: data,
                     xValueMapper: (_ChartData sales, _) => sales.day,
                     yValueMapper: (_ChartData sales, _) {
-                      // Вывод каждого значения точки в зависимости от состояния _showPercent
                       final yValue = _showPercent ? sales.percent : sales.completed;
                       print('Point for ${sales.day}: Y-Value = $yValue');
                       return yValue;
@@ -484,7 +555,6 @@ class _ChartScreenState extends State<ChartScreen> {
                     final value = _showPercent
                         ? '${details.point!.y}%'
                         : details.point!.y.toString();
-
                     return Container(
                       padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 10),
                       decoration: BoxDecoration(
@@ -518,8 +588,86 @@ class _ChartScreenState extends State<ChartScreen> {
                     );
                   },
                 ),
-              ),
 
+                annotations: [
+                  if(_selectedTab==0) ...[
+                  if (_showPercent) ...[
+                    CartesianChartAnnotation(
+                      widget: Container(
+                        width: double.infinity,
+                        height: 60,
+                        color: Color(0xFFF8F9F9), // Цвет фона для значений процентов выше 110
+                      ),
+                      coordinateUnit: CoordinateUnit.point,
+                      x: data.isNotEmpty ? data.first.day : DateTime.now(),
+                      y: 110,
+                    ),
+                    CartesianChartAnnotation(
+                      widget: Container(
+                        width: double.infinity,
+                        height: 60,
+                        color: Color(0xFFF8F9F9), // Цвет фона для значений процентов выше 110
+                      ),
+                      coordinateUnit: CoordinateUnit.point,
+                      y: 110,
+                      x: data.isNotEmpty ? data.last.day : DateTime.now(),
+                    ),
+                  ],
+                  if (!_showPercent) ...[
+                    CartesianChartAnnotation(
+                      widget: Container(
+                        width: double.infinity,
+                        height: 60,
+                        color: Color(0xFFF8F9F9), // Цвет фона для значений количества выше 10
+                        child: Center(
+                        ),
+                      ),
+                      coordinateUnit: CoordinateUnit.point,
+                      x: data.isNotEmpty ? data.first.day : DateTime.now(),
+                      y: 11, // Задайте Y, когда значение количества превышает 10
+                    ),
+                    CartesianChartAnnotation(
+                      widget: Container(
+                        width: double.infinity,
+                        height: 60,
+                        color: Color(0xFFF8F9F9), // Цвет фона для значений количества выше 10
+                        child: Center(
+                        ),
+                      ),
+                      coordinateUnit: CoordinateUnit.point,
+                      y: 11,
+                      x: data.isNotEmpty ? data.last.day : DateTime.now(),
+                    ),
+                  ],
+                  ...data.map((entry) {
+                    return CartesianChartAnnotation(
+                      widget: Container(
+                        width: 45, // Установите фиксированную ширину
+                        height: 17, // Установите фиксированную высоту
+                        padding: EdgeInsets.symmetric(horizontal: 8, vertical: 2), // Можно оставить один вариант
+                        decoration: BoxDecoration(
+                          color: Color(0xFFECEAFF), // Цвет фона аннотации
+                          borderRadius: BorderRadius.circular(18),
+                        ),
+                        child: Center( // Центрируем содержимое
+                          child: Text(
+                            _showPercent ? '${entry.percent}%' : '${entry.completed}',
+                            style: TextStyle(
+                              color: Color(0xFF5F33E1),
+                              fontWeight: FontWeight.bold,
+                              fontSize: 10,
+                            ),
+                          ),
+                        ),
+                      ),
+                      coordinateUnit: CoordinateUnit.point,
+                      x: entry.day,
+                      y: _showPercent ? 105 : 10.55,
+                    );
+                  }).toList(),
+                ],
+                ],
+              )
             ),
           ),
 
