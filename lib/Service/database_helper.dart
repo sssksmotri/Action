@@ -2,6 +2,8 @@ import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 import 'dart:convert';
 import 'package:uuid/uuid.dart';
+import 'package:http/http.dart' as http;
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class DatabaseHelper {
   // Путь к базе данных
@@ -87,16 +89,19 @@ class DatabaseHelper {
 
       await db.execute('''
   CREATE TABLE $tableAppUsageLog (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
+   id INTEGER PRIMARY KEY AUTOINCREMENT,
     session_id TEXT UNIQUE,
+    user_id TEXT,
     language TEXT,
+    login_date TEXT, 
     login_time TEXT,
     end_time TEXT,
-    total_duration INTEGER,
+    total_duration TEXT,
     habit_count INTEGER DEFAULT 0,
-    date TEXT,
     deviceInfo TEXT,
-    section_times TEXT
+    section_times TEXT,
+    action TEXT,
+    datetime_action TEXT
   );
 ''');
 
@@ -478,6 +483,12 @@ class DatabaseHelper {
       };
     }).toList();
   }
+  Future<String> generateUserId() async {
+    final db = await database;
+    String userId = uuid.v4();
+    await db.insert('AppUsageLog', {'user_id': userId});
+    return userId;
+  }
 
   Future<List<Map<String, dynamic>>> queryAllAppUsageLogs() async {
     final db = await instance.database;
@@ -501,41 +512,61 @@ class DatabaseHelper {
     );
   }
 
-  Future<int> logSessionStart(String language, String deviceInfo) async {
+  Future<int> logSessionStart(String language, String deviceInfo, int userId) async {
     final db = await database;
-    String sessionId = uuid.v4(); // Генерация уникального session_id
+    String sessionId = uuid.v4();
+    String loginDate = DateTime.now().toIso8601String().split("T")[0];
+    String loginTime = DateTime.now().toIso8601String().split("T")[1];
 
     int id = await db.insert(
       'AppUsageLog',
       {
         'session_id': sessionId,
+        'user_id': userId,
         'language': language,
-        'login_time': DateTime.now().toIso8601String(),
+        'login_date': loginDate,
+        'login_time': loginTime,
         'deviceInfo': deviceInfo,
       },
     );
     return id;
   }
 
+
   Future<void> logSessionEnd(int sessionId) async {
     final db = await database;
-
-    final loginTimeResult = await db.query(
+    final result = await db.query(
       'AppUsageLog',
-      columns: ['login_time'],
+      columns: ['login_date', 'login_time'],
       where: 'id = ?',
       whereArgs: [sessionId],
     );
 
-    if (loginTimeResult.isNotEmpty) {
-      final loginTime = loginTimeResult.first['login_time'] as String?;
-      if (loginTime != null) {
-        final duration = DateTime.now().difference(DateTime.parse(loginTime)).inSeconds;
+    if (result.isNotEmpty) {
+      final loginDate = result.first['login_date'] as String?;
+      final loginTime = result.first['login_time'] as String?;
+
+      if (loginDate != null && loginTime != null) {
+        // Объединяем дату и время в одну строку
+        final loginDateTimeString = '$loginDate $loginTime';
+        DateTime parsedLoginTime;
+
+        // Попробуйте распарсить время входа
+        try {
+          parsedLoginTime = DateTime.parse(loginDateTimeString); // Парсим полное значение даты и времени
+        } catch (e) {
+          print('Ошибка парсинга времени входа: $e');
+          return; // Выход из метода, если формат неверный
+        }
+
+        final duration = DateTime.now().difference(parsedLoginTime);
+        String formattedDuration = _formatDuration(duration); // Форматируем продолжительность
+
         await db.update(
           'AppUsageLog',
           {
-            'total_duration': duration,
-            'end_time': DateTime.now().toIso8601String(),
+            'total_duration': formattedDuration,
+            'end_time': DateTime.now().toIso8601String(), // Сохраняем полное время завершения
           },
           where: 'id = ?',
           whereArgs: [sessionId],
@@ -544,9 +575,18 @@ class DatabaseHelper {
     }
   }
 
+  String _formatDuration(Duration duration) {
+    final hours = duration.inHours.toString().padLeft(2, '0');
+    final minutes = (duration.inMinutes % 60).toString().padLeft(2, '0');
+    final seconds = (duration.inSeconds % 60).toString().padLeft(2, '0');
+    return '$hours:$minutes:$seconds';
+  }
+
+
   Future<void> logSectionTime(int sessionId, String sectionName, int timeSpent) async {
     final db = await database;
 
+    // Запрашиваем текущее значение section_times
     final result = await db.query(
       'AppUsageLog',
       columns: ['section_times'],
@@ -554,19 +594,125 @@ class DatabaseHelper {
       whereArgs: [sessionId],
     );
 
-    Map<String, int> sectionTimes = result.isNotEmpty && result.first['section_times'] != null
-        ? Map<String, int>.from(json.decode(result.first['section_times'] as String))
-        : {};
+    // Инициализируем пустую строку для section_times
+    String sectionTimes = '';
 
-    sectionTimes[sectionName] = (sectionTimes[sectionName] ?? 0) + timeSpent;
+    if (result.isNotEmpty && result.first['section_times'] is String) {
+      // Получаем текущее значение section_times
+      sectionTimes = result.first['section_times'] as String;
+    }
+
+    // Проверяем, существует ли уже запись для текущего раздела
+    bool sectionFound = false;
+
+    // Разбиваем существующие записи на отдельные секции
+    List<String> sectionEntries = sectionTimes.split(',').map((e) => e.trim()).toList();
+
+    for (int i = 0; i < sectionEntries.length; i++) {
+      // Проверяем, содержит ли запись имя текущего раздела
+      if (sectionEntries[i].startsWith(sectionName)) {
+        // Если раздел найден, прибавляем время
+        int existingTimeInSeconds = _parseTimeToSeconds(sectionEntries[i]);
+        int updatedTimeInSeconds = existingTimeInSeconds + timeSpent;
+        String updatedEntry = _formatSecondsToTime(updatedTimeInSeconds);
+        sectionEntries[i] = '$sectionName-$updatedEntry'; // Обновляем запись
+        sectionFound = true;
+        break;
+      }
+    }
+
+    // Если раздел не найден, добавляем новую запись
+    if (!sectionFound) {
+      String newEntry = _formatSecondsToTime(timeSpent);
+      if (sectionTimes.isNotEmpty) {
+        sectionEntries.add('$sectionName-$newEntry'); // Добавляем с запятой только если есть существующие записи
+      } else {
+        sectionEntries.add('$sectionName-$newEntry'); // Если строка пустая, просто добавляем
+      }
+    }
+
+    // Удаляем пустые записи и убираем лишние запятые
+    sectionEntries = sectionEntries.where((entry) => entry.isNotEmpty).toList();
+
+    // Объединяем записи обратно в строку через запятую
+    String updatedSectionTimes = sectionEntries.join(',').trim(); // Используем trim() чтобы убрать пробелы по краям
 
     await db.update(
       'AppUsageLog',
-      {'section_times': json.encode(sectionTimes)},
+      {'section_times': updatedSectionTimes},
       where: 'id = ?',
       whereArgs: [sessionId],
     );
   }
+
+
+
+// Пример функции для форматирования секунд в формат часы:минуты:секунды
+  String _formatSecondsToTime(int seconds) {
+    final hours = (seconds ~/ 3600).toString().padLeft(2, '0');
+    final minutes = ((seconds % 3600) ~/ 60).toString().padLeft(2, '0');
+    final secs = (seconds % 60).toString().padLeft(2, '0');
+    return '$hours:$minutes:$secs';
+  }
+
+// Пример функции для парсинга времени из строки
+  int _parseTimeToSeconds(String entry) {
+    final parts = entry.split('-');
+    if (parts.length < 2) return 0;
+
+    final timePart = parts[1];
+    final timeParts = timePart.split(':');
+
+    int hours = int.parse(timeParts[0]);
+    int minutes = int.parse(timeParts[1]);
+    int seconds = int.parse(timeParts[2]);
+
+    return hours * 3600 + minutes * 60 + seconds;
+  }
+
+
+  Future<void> logAction(int sessionId, String actionName) async {
+    final db = await database;
+
+    // Получаем текущее значение action
+    final result = await db.query(
+      'AppUsageLog',
+      columns: ['action'],
+      where: 'id = ?',
+      whereArgs: [sessionId],
+    );
+
+    // Инициализируем пустой список для действий
+    List<String> actionList = [];
+
+    if (result.isNotEmpty) {
+      // Получаем значение поля action
+      String? currentActions = result.first['action'] as String?;
+
+      if (currentActions != null) {
+        // Если значение не null, разбиваем его по новой строке
+        actionList = currentActions.split('\n').toList();
+      }
+    }
+
+    // Формируем запись для текущего действия
+    String actionTime = '$actionName - ${DateTime.now().toIso8601String().split("T")[1].split('.').first}'; // Убираем миллисекунды
+
+    // Добавляем новое действие
+    actionList.add(actionTime);
+
+    // Объединяем список обратно в строку через новую строку
+    String updatedActions = actionList.join('\n');
+
+    await db.update(
+      'AppUsageLog',
+      {'action': updatedActions},
+      where: 'id = ?',
+      whereArgs: [sessionId],
+    );
+  }
+
+
 
   Future<void> incrementHabitCount(int sessionId) async {
     final db = await database;
@@ -591,6 +737,101 @@ class DatabaseHelper {
       whereArgs: [sessionId],
     );
   }
+
+
+  Future<void> sendAnalyticsDataForLast12Hours() async {
+    final db = await instance.database;
+    final now = DateTime.now();
+
+    // Форматируем текущую дату в нужный формат
+    final formattedDate = "${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}";
+    final apiKey = dotenv.env['API_KEY'];
+    final dbUrl = dotenv.env['DATABASE_URL_SEND12H'];
+    // Задаем начало и конец временного интервала в зависимости от времени суток
+    String startTime;
+    String endTime;
+
+    if (now.hour < 12) {
+      // Время от 00:00 до 12:00
+      startTime = "00:00:00";
+      endTime = "12:00:00";
+    } else {
+      // Время от 12:00 до 23:59
+      startTime = "12:00:00";
+      endTime = "23:59:59";
+    }
+
+    // Делаем запрос по текущей дате и времени в заданном интервале
+    final result = await db.query(
+      'AppUsageLog',
+      where: 'login_date = ? AND login_time BETWEEN ? AND ?',
+      whereArgs: [formattedDate, startTime, endTime],
+    );
+
+    // Проверяем и обрабатываем записи
+    if (result.isNotEmpty) {
+      for (var logEntry in result) {
+        final userId = logEntry['user_id'];
+        final device = logEntry['deviceInfo'] as String? ?? '';
+        final language = logEntry['language'] as String? ?? '';
+
+        if (userId == null || device.isEmpty || language.isEmpty) {
+          print('Ошибка: недостающие данные для отправки. user_id: $userId, device: $device, language: $language');
+          continue; // Пропустить этот лог, если данные недоступны
+        }
+
+        String action = logEntry['action'] as String? ?? '';
+        String loginDate = logEntry['login_date'] as String;
+        String loginTime = logEntry['login_time'] as String;
+        String lastLogin = '$loginDate' + 'T' + loginTime.split('.').first; // Убираем миллисекунды
+
+        final data = {
+          'user_id': userId.toString(),
+          'device': device,
+          'action': action,
+          'language': language,
+          'last_login': lastLogin,
+          'activity_duration': logEntry['total_duration'] as String? ?? '',
+          'section_time': logEntry['section_times'] as String? ?? '',
+          'habits_added': logEntry['habit_count']?.toString() ?? '0',
+          'days_active': logEntry['days_active']?.toString() ?? '0',
+        };
+
+        final url = Uri.parse(dbUrl!);
+
+        try {
+          final response = await http.post(
+            url,
+            headers: {'Content-Type': 'application/json',
+            'X-API-Key':apiKey!},
+            body: jsonEncode(data),
+          );
+
+          if (response.statusCode == 201) {
+            print('Данные успешно отправлены: ${response.body}');
+            // Покажите пользователю сообщение о успешной отправке
+            _showSuccessDialog('Данные успешно отправлены!');
+          } else {
+            print('Ошибка при отправке данных: ${response.statusCode} - ${response.body}');
+          }
+        } catch (e) {
+          print('Ошибка: $e');
+        }
+      }
+    } else {
+      print('Записей за указанный интервал сегодня не найдено.');
+    }
+  }
+
+
+// Метод для отображения диалогового окна с успешным сообщением
+  void _showSuccessDialog(String message) {
+    // Реализуйте показ сообщения пользователю
+  }
+
+
+
+
 }
 
 

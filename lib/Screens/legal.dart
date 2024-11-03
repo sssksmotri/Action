@@ -6,6 +6,7 @@ import 'add.dart';
 import 'notes.dart';
 import 'stat.dart';
 import 'settings_screen.dart';
+import 'package:action_notes/Service/database_helper.dart';
 class legalPage extends StatefulWidget {
   final int sessionId;
   const legalPage({Key? key, required this.sessionId}) : super(key: key);
@@ -18,13 +19,14 @@ class _legalPageState extends State<legalPage> {
   int _selectedIndex = 4;
   bool isEnglish = true;
   int? _currentSessionId;
+  String _currentScreenName = "LegalPage";
   @override
   void initState() {
     super.initState();
     _currentSessionId = widget.sessionId;
   }
 
-  void _onItemTapped(int index) {
+  void _onItemTapped(int index) async {
     setState(() {
       _selectedIndex = index;
     });
@@ -57,6 +59,7 @@ class _legalPageState extends State<legalPage> {
       default:
         return;
     }
+    await DatabaseHelper.instance.logAction(widget.sessionId, "Переход с экрана: $_currentScreenName на экран: $screenName");
 
     Navigator.pushReplacement(
       context,
@@ -82,6 +85,10 @@ class _legalPageState extends State<legalPage> {
               height: 30,
             ),
             onPressed: () {
+              DatabaseHelper.instance.logAction(
+                  _currentSessionId!,
+                  "Пользователь нажал кнопку назад и вернулся в SetingPage из: $_currentScreenName"
+              );
               Navigator.of(context).pop();
             },
           ),

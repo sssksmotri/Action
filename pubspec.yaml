@@ -21,7 +21,7 @@ dependencies:
   table_calendar: ^3.1.2
   sqflite: ^2.3.3+2
   path_provider: ^2.1.4
-  flutter_local_notifications: ^17.2.3
+  flutter_local_notifications: ^17.2.4
   flutter_timezone: ^3.0.1
   fl_chart: ^0.69.0
   syncfusion_flutter_charts: ^27.1.52
@@ -30,6 +30,11 @@ dependencies:
   device_info_plus: ^11.1.0
   permission_handler: ^11.3.1
   uuid: ^4.5.1
+  dropdown_button2: ^2.3.9
+  http: ^1.2.2
+  connectivity_plus: ^6.1.0
+  background_fetch: ^1.3.7
+  flutter_dotenv: ^5.2.1
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -65,4 +70,6 @@ flutter:
     - assets/images/krest.png
     - assets/images/menu.png
     - assets/images/Check.png
+    - assets/images/menu_open.png
+    - .env
 

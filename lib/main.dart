@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:intl/intl.dart';
+import 'package:sqflite/sqflite.dart';
 import 'Screens/add.dart';
 import 'Screens/settings_screen.dart';
 import 'Screens/notes.dart';
@@ -15,12 +16,84 @@ import 'package:action_notes/Service/HabitReminderService.dart';
 import 'package:action_notes/Screens/edit.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:action_notes/Widgets/loggable_screen.dart';
+import 'package:timezone/data/latest.dart' as tz;
+import 'package:background_fetch/background_fetch.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+
 
 final RouteObserver<PageRoute> routeObserver = RouteObserver<PageRoute>();
+
+
+bool _dataSentInAfternoonPeriod = false;
+bool _dataSentInMidnightPeriod = false;
+
+void backgroundFetchHeadlessTask(HeadlessTask task) async {
+  String taskId = task.taskId;
+  print("Headless background task executing: $taskId");
+
+  if (task.timeout) {
+    print("Headless task timeout");
+    BackgroundFetch.finish(taskId);
+    return;
+  }
+
+  // Проверка подключения к сети перед отправкой данных
+  var connectivityResult = await (Connectivity().checkConnectivity());
+  if (connectivityResult == ConnectivityResult.none) {
+    print("No internet connection. Task will be retried later.");
+    BackgroundFetch.finish(taskId);
+    return;
+  }
+
+  DateTime now = DateTime.now();
+  int currentHour = now.hour;
+
+  // Отправляем данные один раз в период с 12:00 до 13:00
+  if (currentHour >= 12 && currentHour < 13 && !_dataSentInAfternoonPeriod) {
+    try {
+      print("Sending analytics data for the afternoon period at ${now.toIso8601String()}...");
+      await DatabaseHelper.instance.sendAnalyticsDataForLast12Hours();
+      print("Analytics data sent successfully.");
+      _dataSentInAfternoonPeriod = true;
+    } catch (e) {
+      print("Error while sending analytics data: $e");
+    }
+  }
+  // Отправляем данные один раз в период с 00:00 до 1:00
+  else if (currentHour >= 0 && currentHour < 1 && !_dataSentInMidnightPeriod) {
+    try {
+      print("Sending analytics data for the midnight period at ${now.toIso8601String()}...");
+      await DatabaseHelper.instance.sendAnalyticsDataForLast12Hours();
+      print("Analytics data sent successfully.");
+      _dataSentInMidnightPeriod = true;
+    } catch (e) {
+      print("Error while sending analytics data: $e");
+    }
+  } else {
+    print("Not the correct time for sending data. Current time is: ${now.hour}:${now.minute}");
+  }
+
+  // Сброс флагов после завершения периодов
+  if (currentHour >= 13) {
+    _dataSentInAfternoonPeriod = false;
+  }
+  if (currentHour >= 1) {
+    _dataSentInMidnightPeriod = false;
+  }
+
+  // Завершение задачи
+  BackgroundFetch.finish(taskId);
+}
+
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await EasyLocalization.ensureInitialized();
   NotificationService notificationService = NotificationService();
+  tz.initializeTimeZones();
+  await dotenv.load();
+  BackgroundFetch.registerHeadlessTask(backgroundFetchHeadlessTask);
   await notificationService.init();
   await DatabaseHelper.instance.database;
 
@@ -34,6 +107,7 @@ void main() async {
   );
 }
 
+
 class MyApp extends StatefulWidget {
   const MyApp({super.key});
 
@@ -44,7 +118,7 @@ class MyApp extends StatefulWidget {
 class _MyAppState extends State<MyApp> {
   int? _currentSessionId;
   bool _sessionInitialized = false; // Добавляем флаг для контроля однократной инициализации
-
+  int? _userId;
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -53,19 +127,118 @@ class _MyAppState extends State<MyApp> {
       _sessionInitialized = true;
       _startSession();
     }
+    _initializeBackgroundFetch();
+
+  }
+  void _initializeBackgroundFetch() async {
+    // Конфигурация BackgroundFetch с улучшенными настройками
+    int status = await BackgroundFetch.configure(
+      BackgroundFetchConfig(
+        minimumFetchInterval: 15,  // Интервал для периодических задач в минутах
+        stopOnTerminate: false,
+        enableHeadless: true,
+        requiresBatteryNotLow: false,
+        requiresCharging: false,
+        requiresStorageNotLow: false,
+        requiresDeviceIdle: false,
+        requiredNetworkType: NetworkType.ANY,
+      ),
+      _onBackgroundFetch,
+    );
+
+    print("Background fetch configured with status: $status");
+    if (status == BackgroundFetch.STATUS_AVAILABLE) {
+      print("Background fetch is available and ready to work.");
+    } else {
+      print("Background fetch is not available on this device.");
+    }
   }
 
+  void _onBackgroundFetch(String taskId) async {
+    print("Background fetch event: $taskId at ${DateTime.now()}");
+
+    // Проверка подключения к интернету
+    var connectivityResult = await (Connectivity().checkConnectivity());
+    if (connectivityResult == ConnectivityResult.none) {
+      print("No internet connection. Task will be retried later.");
+      BackgroundFetch.finish(taskId);
+      return;
+    }
+
+    DateTime now = DateTime.now();
+    int currentHour = now.hour;
+
+    // Проверка времени для отправки данных с 12:00 до 13:00
+    if (currentHour >= 12 && currentHour < 15 && !_dataSentInAfternoonPeriod) {
+      try {
+        print("Sending analytics data for the afternoon period at ${now.toIso8601String()}...");
+        await DatabaseHelper.instance.sendAnalyticsDataForLast12Hours();
+        print("Analytics data sent successfully.");
+        _dataSentInAfternoonPeriod = true;
+      } catch (e) {
+        print("Error while sending analytics data: $e");
+      }
+    }
+    // Проверка времени для отправки данных с 00:00 до 1:00
+    else if (currentHour >= 0 && currentHour < 2 && !_dataSentInMidnightPeriod) {
+      try {
+        print("Sending analytics data for the midnight period at ${now.toIso8601String()}...");
+        await DatabaseHelper.instance.sendAnalyticsDataForLast12Hours();
+        print("Analytics data sent successfully.");
+        _dataSentInMidnightPeriod = true;
+      } catch (e) {
+        print("Error while sending analytics data: $e");
+      }
+    } else {
+      print("Not the correct time for sending data. Current time is: ${now.hour}:${now.minute}");
+    }
+
+    // Сбрасываем флаги после завершения временного интервала
+    if (currentHour >= 15) {
+      _dataSentInAfternoonPeriod = false;
+    }
+    if (currentHour >= 2) {
+      _dataSentInMidnightPeriod = false;
+    }
+
+    BackgroundFetch.finish(taskId);
+  }
+
+
+
+
+
+
+
+
+
+  Future<int> _getOrCreateUserId() async {
+    final prefs = await SharedPreferences.getInstance();
+    int? userId = prefs.getInt('userId');
+
+    // Если userId ещё не существует, создаем его и сохраняем
+    if (userId == null) {
+      // Генерируем положительный уникальный идентификатор
+      userId = DateTime.now().millisecondsSinceEpoch; // Используем время в миллисекундах как уникальный идентификатор
+      await prefs.setInt('userId', userId);
+    }
+
+    return userId;
+  }
+
+
+
   Future<void> _startSession() async {
-    // Получаем язык и устройство
+     _userId ??= await _getOrCreateUserId(); // Генерируем user_id один раз
     String language = context.locale.languageCode;
     String deviceInfo = await _getDeviceInfo();
 
-    // Запуск сессии и запись sessionId
-    int sessionId = await DatabaseHelper.instance.logSessionStart(language, deviceInfo);
+    int sessionId = await DatabaseHelper.instance.logSessionStart(language, deviceInfo, _userId!);
     setState(() {
       _currentSessionId = sessionId;
     });
   }
+
   Future<void> _endSession() async {
     if (_currentSessionId != null) {
       await DatabaseHelper.instance.logSessionEnd(_currentSessionId!);
@@ -94,6 +267,7 @@ class _MyAppState extends State<MyApp> {
     return 'Unknown platform';
   }
 
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
@@ -106,7 +280,13 @@ class _MyAppState extends State<MyApp> {
       supportedLocales: context.supportedLocales,
       locale: context.locale,
       navigatorObservers: [routeObserver],
-      home: _currentSessionId != null ? HomePage(sessionId: _currentSessionId!) : const Center(child: CircularProgressIndicator()),
+      home: _currentSessionId != null
+          ? LoggableScreen(
+        screenName: 'HomePage', // Название экрана для логирования
+        currentSessionId: _currentSessionId!,
+        child: HomePage(sessionId: _currentSessionId!), // Обернутый HomePage
+      )
+          : const Center(child: CircularProgressIndicator()),
     );
   }
 }
@@ -133,7 +313,7 @@ class _HomePageState extends State<HomePage> {
   int? _currentSessionId;
   DateTime? _startTime;
   String _currentSection = 'HomePage';
-  bool _isMenuOpen = false;
+  Map<int, bool> _menuStates = {};
 
   @override
   void initState() {
@@ -169,10 +349,10 @@ class _HomePageState extends State<HomePage> {
     try {
       if (Theme.of(context).platform == TargetPlatform.android) {
         AndroidDeviceInfo androidInfo = await deviceInfoPlugin.androidInfo;
-        return 'Android: ${androidInfo.model}, ${androidInfo.brand}, Android version: ${androidInfo.version.release}';
+        return 'Android: ${androidInfo.model}, ${androidInfo.brand},';
       } else if (Theme.of(context).platform == TargetPlatform.iOS) {
         IosDeviceInfo iosInfo = await deviceInfoPlugin.iosInfo;
-        return 'iOS: ${iosInfo.name}, ${iosInfo.systemVersion}, Model: ${iosInfo.utsname.machine}';
+        return 'iOS: ${iosInfo.name}, Model: ${iosInfo.utsname.machine}';
       }
     } catch (e) {
       return 'Failed to get device info: $e';
@@ -195,7 +375,7 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  void _onItemTapped(int index) {
+  void _onItemTapped(int index) async {
     setState(() {
       _selectedIndex = index;
     });
@@ -228,6 +408,7 @@ class _HomePageState extends State<HomePage> {
       default:
         return;
     }
+    await DatabaseHelper.instance.logAction(widget.sessionId, "Переход с экрана: $HomePage на экран: $screenName");
 
     Navigator.pushReplacement(
       context,
@@ -304,8 +485,10 @@ class _HomePageState extends State<HomePage> {
                     // Кнопка "No, leave it"
                     Expanded(
                       child: TextButton(
-                        onPressed: () {
-                          Navigator.of(context).pop(); // Закрыть диалог
+                        onPressed: () async  {
+                          await DatabaseHelper.instance.logAction(widget.sessionId, "Отменил удаление привычки на экране: $_currentSection");
+                          Navigator.of(context).pop();
+                          // Закрыть диалог
                         },
                         style: TextButton.styleFrom(
                           backgroundColor: const Color(0xFFEEE9FF), // Легкий фиолетовый фон
@@ -328,7 +511,8 @@ class _HomePageState extends State<HomePage> {
                     // Кнопка "Yes, delete"
                     Expanded(
                       child: TextButton(
-                        onPressed: () {
+                        onPressed:  () async {
+                          await DatabaseHelper.instance.logAction(widget.sessionId, "Удалил привычку на экране: $_currentSection");
                           Navigator.of(context).pop(); // Закрыть диалог
                           _deleteHabit(habitId); // Вызов метода удаления
                         },
@@ -398,14 +582,16 @@ class _HomePageState extends State<HomePage> {
               children: [
                 IconButton(
                   icon: Image.asset('assets/images/Filter.png'),
-                  onPressed: () {
+                  onPressed: () async {
+                    await DatabaseHelper.instance.logAction(widget.sessionId, "Открыл фильтры на главном экране");
                     _showPopupMenu(context);
                   },
                 ),
                 IconButton(
                   icon: Image.asset('assets/images/Folder.png'),
-                  onPressed: () {
+                  onPressed: () async {
                     if (_currentSessionId != null) {
+                      await DatabaseHelper.instance.logAction(widget.sessionId, "Перешел на страницу архива");
                       Navigator.push(
                         context,
                         MaterialPageRoute(
@@ -678,10 +864,14 @@ class _HomePageState extends State<HomePage> {
                               ),
                               const SizedBox(width: 6),
                               GestureDetector(
-                                onTap: () {
+                                onTap: () async {
                                   setState(() {
                                     _isTextVisible = false;
+                                    _saveTextVisibility();
                                   });
+
+                                  // Логируем действие скрытия текста подсказки
+                                  await DatabaseHelper.instance.logAction(widget.sessionId, "Скрыт текст подсказки на главном экране");
                                 },
                                 child: Container(
                                   padding: const EdgeInsets.all(5),
@@ -896,52 +1086,52 @@ class _HomePageState extends State<HomePage> {
   void _showPopupMenu(BuildContext context) {
     showMenu(
       constraints: BoxConstraints.tightFor(
-        width: context.locale.languageCode == 'en' ? 180 : 200, // Используем locale от Easy Localization
+        width: context.locale.languageCode == 'en' ? 200 : 210, // Используем locale от Easy Localization
       ),
       context: context,
       position: RelativeRect.fromLTRB(100, 100, 50, 0), // Позиция попапа
       items: [
         PopupMenuItem<String>(
           value: 'Completed first',
-          height: 25, // Фиксированная высота для уменьшения отступов
+          height: 25,
           child: Container(
-            padding: const EdgeInsets.symmetric(vertical: 2, horizontal: 8), // Уменьшенные отступы
+            padding: const EdgeInsets.symmetric(vertical: 2, horizontal: 8),
             child: Text(
               tr('completed_first'),
               style: TextStyle(
                 color: _selectedFilter == 'Completed first' ? Color(0xFF5F33E1) : Colors.black,
-                fontWeight:FontWeight.bold,
-                fontSize: 14, // Уменьшенный размер шрифта
+                fontWeight: FontWeight.bold,
+                fontSize: 14,
               ),
             ),
           ),
         ),
         PopupMenuItem<String>(
           value: 'Not completed at first',
-          height: 25, // Фиксированная высота для уменьшения отступов
+          height: 25,
           child: Container(
-            padding: const EdgeInsets.symmetric(vertical: 2, horizontal: 8), // Уменьшенные отступы
+            padding: const EdgeInsets.symmetric(vertical: 2, horizontal: 8),
             child: Text(
               tr('not_completed_first'),
               style: TextStyle(
                 color: _selectedFilter == 'Not completed at first' ? Color(0xFF5F33E1) : Colors.black,
-                fontWeight:FontWeight.bold,
-                fontSize: 14, // Уменьшенный размер шрифта
+                fontWeight: FontWeight.bold,
+                fontSize: 14,
               ),
             ),
           ),
         ),
         PopupMenuItem<String>(
           value: 'Custom',
-          height: 25, // Фиксированная высота для уменьшения отступов
+          height: 25,
           child: Container(
-            padding: const EdgeInsets.symmetric(vertical: 2, horizontal: 8), // Уменьшенные отступы
+            padding: const EdgeInsets.symmetric(vertical: 2, horizontal: 8),
             child: Text(
               tr('custom'),
               style: TextStyle(
                 color: _selectedFilter == 'Custom' ? Color(0xFF5F33E1) : Colors.black,
-                fontWeight:FontWeight.bold,
-                fontSize: 14, // Уменьшенный размер шрифта
+                fontWeight: FontWeight.bold,
+                fontSize: 14,
               ),
             ),
           ),
@@ -951,16 +1141,20 @@ class _HomePageState extends State<HomePage> {
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
       ),
-    ).then((value) {
+    ).then((value) async {
       if (value != null) {
         setState(() {
           _selectedFilter = value; // Применяем новый фильтр
           _filterHabits(); // Фильтруем привычки
           print('Выбран фильтр: $_selectedFilter');
         });
+
+        // Логируем выбранный фильтр
+        await DatabaseHelper.instance.logAction(widget.sessionId, "Выбран фильтр на главном экране: $value");
       }
     });
   }
+
 
 
 
@@ -1017,14 +1211,28 @@ class _HomePageState extends State<HomePage> {
 
   // Функция для создания карточки привычки
   Widget _buildHabitItem(
-      String title, bool isCompleted, VoidCallback onTap, int habitId, {Key? key}) {
-
+      String title,
+      bool isCompleted,
+      VoidCallback onTap,
+      int habitId, {
+        Key? key,
+      }) {
     bool isChecked = isCompleted;
 
     return _buildCard(
       key: key,
       child: GestureDetector(
-        onTap: onTap,
+        onTap: () async {
+          // Логируем действие при нажатии на всю карточку
+          await DatabaseHelper.instance.logAction(widget.sessionId, "Увеличил счетчик у привычки с типом нажатия 1 раз на экране:$_currentSection");
+          onTap();
+          if(isChecked){
+              await DatabaseHelper.instance.logAction(widget.sessionId, "Выполнил объем у привычки c нажатием 1 раз на экране:$_currentSection");
+          }
+          else{
+            await DatabaseHelper.instance.logAction(widget.sessionId, "Снял чек у привычки с типом нажатия 1 раз на экране:$_currentSection");
+          }
+        },
         child: Container(
           decoration: BoxDecoration(
             color: Colors.white,
@@ -1037,18 +1245,12 @@ class _HomePageState extends State<HomePage> {
               Expanded(
                 child: Padding(
                   padding: const EdgeInsets.only(left: 10.0, top: 8.0, bottom: 8.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Название
-                      Text(
-                        title,
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
+                  child: Text(
+                    title,
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ),
               ),
@@ -1059,13 +1261,11 @@ class _HomePageState extends State<HomePage> {
                     ? Stack(
                   alignment: Alignment.center,
                   children: [
-                    // Тень иконки для эффекта "жирного" отображения
                     const Icon(
                       Icons.check,
                       size: 40,
                       color: Color(0xFF0AC70A),
                     ),
-                    // Основная иконка
                     const Icon(
                       Icons.check,
                       color: Color(0xFF0AC70A),
@@ -1077,15 +1277,31 @@ class _HomePageState extends State<HomePage> {
                     ? const Icon(Icons.close, color: Colors.red, size: 28)
                     : const SizedBox.shrink()),
               ),
-              // Кнопка с тремя точками по центру справа
+              // Кнопка с иконкой меню, которая меняется в зависимости от состояния
               PopupMenuButton<String>(
-                icon: Image.asset('assets/images/menu.png', width: 24, height: 24),
+                padding: EdgeInsets.zero,
+                icon: Image.asset(
+                  _menuStates[habitId] == true
+                      ? 'assets/images/menu_open.png'
+                      : 'assets/images/menu.png',
+                  width: _menuStates[habitId] == true ? 35 : 24,
+                  height: _menuStates[habitId] == true ? 35 : 24,
+                ),
                 onSelected: (value) {
+                  setState(() {
+                    _menuStates[habitId] = false; // Закрываем меню после выбора
+                  });
                   if (value == 'Delete') {
+                     DatabaseHelper.instance.logAction(widget.sessionId, "Выбрал в меню действия: удаления у привычки с типом нажатия 1 раз на экране:$_currentSection");// Открываем меню
+                    _menuStates[habitId] == false;
                     _showDeleteDialog(context, title, habitId, () {});
                   } else if (value == 'Archive') {
+                    DatabaseHelper.instance.logAction(widget.sessionId, "Выбрал в меню действия: архивацию у привычки с типом нажатия 1 раз на экране:$_currentSection");// Открываем меню
+                    _menuStates[habitId] == false;
                     _archiveHabit(habitId);
                   } else if (value == 'Edit') {
+                    DatabaseHelper.instance.logAction(widget.sessionId, "Выбрал в меню действия: изменение у привычки с типом нажатия 1 раз");// Открываем меню
+                    _menuStates[habitId] == false;
                     Navigator.pushReplacement(
                       context,
                       MaterialPageRoute(
@@ -1102,8 +1318,20 @@ class _HomePageState extends State<HomePage> {
                     );
                   }
                 },
+                onCanceled: () async {
+                  await DatabaseHelper.instance.logAction(widget.sessionId, "Закрыл меню действия у привычки с типом нажатия 1 раз на экране:$_currentSection");// Открываем меню
+                  setState(() {
+                    _menuStates[habitId] = false; // Закрываем меню при отмене
+                  });
+                },
+                onOpened: () async {
+                  await DatabaseHelper.instance.logAction(widget.sessionId, "Открыл меню действия у привычки с типом нажатия 1 раз на экране:$_currentSection");// Открываем меню
+                  setState(() {
+                    _menuStates[habitId] = true;
+                  });
+                },
                 constraints: BoxConstraints.tightFor(
-                  width: context.locale.languageCode == 'en' ? 85 : 135,
+                  width: context.locale.languageCode == 'en' ? 95 : 155,
                 ),
                 itemBuilder: (BuildContext context) {
                   return [
@@ -1147,18 +1375,32 @@ class _HomePageState extends State<HomePage> {
   }
 
 
+
+
 // И аналогичные изменения для _buildCountItem
   Widget _buildCountItem(
-      String title, int count, int maxCount,
-      VoidCallback onIncrement, VoidCallback onDecrement, VoidCallback onDelete,
-      int habitId, {Key? key}) {
-
+      String title,
+      int count,
+      int maxCount,
+      VoidCallback onIncrement,
+      VoidCallback onDecrement,
+      VoidCallback onDelete,
+      int habitId, {
+        Key? key,
+      }) {
     bool isCompleted = count >= maxCount;
 
     return _buildCard(
       key: key,
       child: GestureDetector(
-        onTap: () => onIncrement(),
+        onTap: () async {
+          // Логируем действие при нажатии на всю карточку
+          await DatabaseHelper.instance.logAction(widget.sessionId, "Увеличил счетчик у привычки с типом нажатия несколько раз на экране:$_currentSection");
+          onIncrement();
+          if (count + 1 >= maxCount) {
+            await DatabaseHelper.instance.logAction(widget.sessionId, "Выполнил объем у привычки с типом нажатия несколько раз на экране:$_currentSection ");
+          }// Вызываем исходный onTap
+        },
         child: Container(
           decoration: BoxDecoration(
             color: Colors.white,
@@ -1185,7 +1427,15 @@ class _HomePageState extends State<HomePage> {
                       const SizedBox(height: 4),
                       // Кнопка "Cancel" под названием
                       TextButton(
-                        onPressed: count > 0 ? onDecrement : null,
+                        onPressed: count > 0
+                            ? () async {
+                          // Логируем действие пользователя при уменьшении счётчика
+                          await DatabaseHelper.instance.logAction(widget.sessionId, "Уменьшил счетчик у привычки с нажатием несколько раз на экране:$_currentSection");
+
+                          // Выполняем действие уменьшения счётчика
+                          onDecrement();
+                        }
+                            : null,
                         style: TextButton.styleFrom(
                           backgroundColor: const Color(0xFF5F33E1),
                           shape: RoundedRectangleBorder(
@@ -1213,13 +1463,11 @@ class _HomePageState extends State<HomePage> {
                     ? Stack(
                   alignment: Alignment.center,
                   children: [
-                    // Тень иконки для эффекта "жирного" отображения
                     const Icon(
                       Icons.check,
                       size: 40,
                       color: Color(0xFF0AC70A),
                     ),
-                    // Основная иконка
                     const Icon(
                       Icons.check,
                       color: Color(0xFF0AC70A),
@@ -1231,13 +1479,28 @@ class _HomePageState extends State<HomePage> {
               ),
               // Кнопка с тремя точками по центру справа
               PopupMenuButton<String>(
-                icon: Image.asset('assets/images/menu.png', width: 24, height: 24),
+                icon: Image.asset(
+                  _menuStates[habitId] == true
+                      ? 'assets/images/menu_open.png'
+                      : 'assets/images/menu.png',
+                  width: _menuStates[habitId] == true ? 35 : 24,
+                  height: _menuStates[habitId] == true ? 35 : 24,
+                ),
                 onSelected: (value) {
+                  setState(() {
+                    _menuStates[habitId] = false; // Закрываем меню после выбора
+                  });
                   if (value == 'Delete') {
-                    _showDeleteDialog(context, title, habitId, onDelete);
+                    DatabaseHelper.instance.logAction(widget.sessionId, "Выбрал в меню действия: удаления у привычки с типом нажатия несколько раз на экране:$_currentSection");// Открываем меню
+                    _menuStates[habitId] == false;
+                    _showDeleteDialog(context, title, habitId, () {});
                   } else if (value == 'Archive') {
+                    DatabaseHelper.instance.logAction(widget.sessionId, "Выбрал в меню действия: архивацию у привычки с типом нажатия несколько раз на экране:$_currentSection");// Открываем меню
+                    _menuStates[habitId] == false;
                     _archiveHabit(habitId);
                   } else if (value == 'Edit') {
+                    DatabaseHelper.instance.logAction(widget.sessionId, "Выбрал в меню действия: изменение у привычки с типом нажатия несколько раз на экране:$_currentSection");// Открываем меню
+                    _menuStates[habitId] == false;
                     Navigator.pushReplacement(
                       context,
                       MaterialPageRoute(
@@ -1254,8 +1517,20 @@ class _HomePageState extends State<HomePage> {
                     );
                   }
                 },
+                onCanceled: () async {
+                  await DatabaseHelper.instance.logAction(widget.sessionId, "Закрыл меню действия у привычки с типом нажатия несколько раз на экране:$_currentSection");// Открываем меню
+                  setState(() {
+                    _menuStates[habitId] = false; // Закрываем меню при отмене
+                  });
+                },
+                onOpened: () async {
+                  await DatabaseHelper.instance.logAction(widget.sessionId, "Открыл меню действия у привычки с типом нажатия несколько раз на экране:$_currentSection");// Открываем меню
+                  setState(() {
+                    _menuStates[habitId] = true;
+                  });
+                },
                 constraints: BoxConstraints.tightFor(
-                  width: context.locale.languageCode == 'en' ? 85 : 140,
+                  width: context.locale.languageCode == 'en' ? 95 : 155,
                 ),
                 itemBuilder: (BuildContext context) {
                   return [
@@ -1297,6 +1572,7 @@ class _HomePageState extends State<HomePage> {
       ),
     );
   }
+
 
 
 
@@ -1404,8 +1680,9 @@ class _HomePageState extends State<HomePage> {
       VoidCallback onDecrement,
       VoidCallback onEdit,
       VoidCallback onDelete,
-      int habitId, {Key? key}) {
-
+      int habitId, {
+        Key? key,
+      }) {
     String title = habit['name'];
     double currentProgress = habit['currentProgress'] ?? 0.0;
     double maxProgress = habit['volume_specified'] ?? 1.0;
@@ -1414,7 +1691,14 @@ class _HomePageState extends State<HomePage> {
     return _buildCard(
       key: key,
       child: GestureDetector(
-        onTap: onIncrement,
+        onTap: () async {
+          // Логируем действие при нажатии на всю карточку
+          await DatabaseHelper.instance.logAction(widget.sessionId, "Увеличил счетчик у привычки с типом нажатия свой обьем на экране:$_currentSection ");
+          onIncrement();
+          if (currentProgress + 1 >= maxProgress) {
+            await DatabaseHelper.instance.logAction(widget.sessionId, "Выполнил объем у привычки с типом нажатия свой обьем на экране:$_currentSection ");
+          }// Вызываем исходный onTap
+        },
         child: Container(
           decoration: BoxDecoration(
             color: Colors.white,
@@ -1441,7 +1725,15 @@ class _HomePageState extends State<HomePage> {
                       const SizedBox(height: 4),
                       // Кнопка "Cancel" под названием
                       TextButton(
-                        onPressed: currentProgress > 0 ? onDecrement : null,
+                        onPressed: currentProgress > 0
+                            ? () async {
+                          // Логируем действие пользователя при уменьшении счётчика
+                          await DatabaseHelper.instance.logAction(widget.sessionId, "Уменьшил счетчик у привычки с типом нажатия свой обьем на экране:$_currentSection");
+
+                          // Выполняем действие уменьшения счётчика
+                          onDecrement();
+                        }
+                            : null,
                         style: TextButton.styleFrom(
                           backgroundColor: const Color(0xFF5F33E1),
                           shape: RoundedRectangleBorder(
@@ -1469,13 +1761,11 @@ class _HomePageState extends State<HomePage> {
                     ? Stack(
                   alignment: Alignment.center,
                   children: [
-                    // Тень иконки для эффекта "жирного" отображения
                     const Icon(
                       Icons.check,
                       size: 40,
                       color: Color(0xFF0AC70A),
                     ),
-                    // Основная иконка
                     const Icon(
                       Icons.check,
                       color: Color(0xFF0AC70A),
@@ -1487,13 +1777,28 @@ class _HomePageState extends State<HomePage> {
               ),
               // Кнопка с тремя точками по центру справа
               PopupMenuButton<String>(
-                icon: Image.asset('assets/images/menu.png', width: 24, height: 24),
+                icon: Image.asset(
+                  _menuStates[habitId] == true
+                      ? 'assets/images/menu_open.png'
+                      : 'assets/images/menu.png',
+                  width: _menuStates[habitId] == true ? 35 : 24,
+                  height: _menuStates[habitId] == true ? 35 : 24,
+                ),
                 onSelected: (value) {
-                  if (value == 'Archive') {
+                  setState(() {
+                    _menuStates[habitId] = false; // Закрываем меню после выбора
+                  });
+                  if (value == 'Delete') {
+                    DatabaseHelper.instance.logAction(widget.sessionId, "Выбрал в меню действия: удаления у привычки с типом нажатия свой обьем на экране:$_currentSection");// Открываем меню
+                    _menuStates[habitId] == false;
+                    _showDeleteDialog(context, title, habitId, () {});
+                  } else if (value == 'Archive') {
+                    DatabaseHelper.instance.logAction(widget.sessionId, "Выбрал в меню действия: архивацию у привычки с типом нажатия свой обьем на экране:$_currentSection");// Открываем меню
+                    _menuStates[habitId] == false;
                     _archiveHabit(habitId);
-                  } else if (value == 'Delete') {
-                    _showDeleteDialog(context, title, habitId, onDelete);
                   } else if (value == 'Edit') {
+                    DatabaseHelper.instance.logAction(widget.sessionId, "Выбрал в меню действия: изменение у привычки с типом нажатия свой обьем на экране:$_currentSection");// Открываем меню
+                    _menuStates[habitId] == false;
                     Navigator.pushReplacement(
                       context,
                       MaterialPageRoute(
@@ -1510,8 +1815,20 @@ class _HomePageState extends State<HomePage> {
                     );
                   }
                 },
+                onCanceled: () async {
+                  await DatabaseHelper.instance.logAction(widget.sessionId, "Закрыл меню действия у привычки с типом нажатия свой обьем на экране:$_currentSection");// Открываем меню
+                  setState(() {
+                    _menuStates[habitId] = false; // Закрываем меню при отмене
+                  });
+                },
+                onOpened: () async {
+                  await DatabaseHelper.instance.logAction(widget.sessionId, "Открыл меню действия у привычки с типом нажатия свой обьем на экране:$_currentSection");// Открываем меню
+                  setState(() {
+                    _menuStates[habitId] = true;
+                  });
+                },
                 constraints: BoxConstraints.tightFor(
-                  width: context.locale.languageCode == 'en' ? 85 : 140,
+                  width: context.locale.languageCode == 'en' ? 95 : 155,
                 ),
                 itemBuilder: (BuildContext context) {
                   return [
@@ -1629,7 +1946,8 @@ class _HomePageState extends State<HomePage> {
     String formattedDay = DateFormat('d', Localizations.localeOf(context).toString()).format(_selectedDate);      // Пример: "23"
 
     return GestureDetector(
-      onTap: () {
+      onTap: () async {
+        await DatabaseHelper.instance.logAction(widget.sessionId, "пользователь открыл календарь на главном экране");
         _showCalendarDialog(); // Показываем календарь при нажатии на область с датой
       },
       child: Container(
@@ -1649,7 +1967,8 @@ class _HomePageState extends State<HomePage> {
                 width: 18, // установите ширину
                 height: 18,
               ),
-              onPressed: () {
+              onPressed: () async {
+                await DatabaseHelper.instance.logAction(widget.sessionId, "Выбрал новую дату в календаре в главном экране");
                 setState(() {
                   _selectedDate = _selectedDate.subtract(const Duration(days: 1));
                   _loadHabitsForSelectedDate();  // Загружаем привычки за новый выбранный день
@@ -1720,7 +2039,8 @@ class _HomePageState extends State<HomePage> {
                     'assets/images/ar_back.png',
                     color: Colors.white,
                   ),
-                  onPressed: () {
+                  onPressed: () async {
+                    await DatabaseHelper.instance.logAction(widget.sessionId, "Вернулся к сегодняшней дате на главном экране");
                     setState(() {
                       _selectedDate = _today; // Возвращаем сегодняшнюю дату
                       _loadHabitsForSelectedDate();  // Перезагружаем привычки для сегодняшнего дня
@@ -1758,6 +2078,10 @@ class _HomePageState extends State<HomePage> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
+
+
+              // Задаем адаптивный отступ в зависимости от ширины экрана
+
                   TableCalendar(
                     firstDay: DateTime.utc(2010, 10, 16),
                     lastDay: DateTime.utc(2030, 3, 14),
@@ -1800,7 +2124,7 @@ class _HomePageState extends State<HomePage> {
                         return formattedMonth;
                       },
                       leftChevronIcon: Padding(
-                        padding: const EdgeInsets.only(left: 42.0),
+                        padding: const EdgeInsets.only(left: 35.0),
                         child: Image.asset(
                           'assets/images/arr_left.png',
                           width: 20,
@@ -1809,7 +2133,7 @@ class _HomePageState extends State<HomePage> {
                         ),
                       ),
                       rightChevronIcon: Padding(
-                        padding: const EdgeInsets.only(right: 42.0),
+                        padding: const EdgeInsets.only(right: 35.0),
                         child: Image.asset(
                           'assets/images/arr_right.png',
                           width: 20,
@@ -1842,6 +2166,10 @@ class _HomePageState extends State<HomePage> {
                           _selectedDate = selectedDay;
                           _loadHabitsForSelectedDate();
                         });
+                         DatabaseHelper.instance.logAction(
+                            widget.sessionId,
+                            "Пользователь выбрал день: ${selectedDay.toLocal()} на экране: $HomePage"
+                        );
                         Navigator.pop(context);
                       }
                     },

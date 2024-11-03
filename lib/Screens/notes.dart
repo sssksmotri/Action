@@ -19,14 +19,14 @@ class _NotesPageState extends State<NotesPage> {
   int _selectedIndex = 4;
   bool _showArchived = false; // Переменная для отслеживания состояния отображения архивных привычек
   int? _currentSessionId;
-
+  String _currentScreenName = "NotesPage";
   @override
   void initState() {
     super.initState();
     _currentSessionId = widget.sessionId; // Инициализируем _currentSessionId здесь
   }
 
-  void _onItemTapped(int index) {
+  void _onItemTapped(int index) async {
     setState(() {
       _selectedIndex = index;
     });
@@ -59,7 +59,7 @@ class _NotesPageState extends State<NotesPage> {
       default:
         return;
     }
-
+    await DatabaseHelper.instance.logAction(widget.sessionId, "Переход с экрана: $_currentScreenName на экран: $screenName");
     Navigator.pushReplacement(
       context,
       MaterialPageRoute(
@@ -107,7 +107,8 @@ class _NotesPageState extends State<NotesPage> {
         actions: [
           IconButton(
             icon: Image.asset('assets/images/Folder.png'), // Иконка архивной кнопки
-            onPressed: () {
+            onPressed: () async {
+              await DatabaseHelper.instance.logAction(widget.sessionId, "Пользователь нажал показать архивные привычки на экране: $_currentScreenName");
               setState(() {
                 _showArchived = !_showArchived; // Переключаем состояние отображения
               });
@@ -133,7 +134,11 @@ class _NotesPageState extends State<NotesPage> {
                 itemBuilder: (context, index) {
                   final habit = habits[index];
                   return GestureDetector(
-                    onTap: () {
+                    onTap: () async {
+                     await DatabaseHelper.instance.logAction(
+                          _currentSessionId!,
+                          "Пользователь перешел на экран: AddNotesPage для привычки с ID: ${habit['id']}, на экране: $_currentScreenName "
+                      );
                       Navigator.push(
                         context,
                         MaterialPageRoute(

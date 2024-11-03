@@ -55,20 +55,23 @@ class _LoggableScreenState extends State<LoggableScreen> with RouteAware {
   void _logTimeSpent() async {
     if (_startTime != null) {
       final duration = DateTime.now().difference(_startTime!);
-      final seconds = duration.inSeconds;
-      final minutes = duration.inMinutes;
+      final totalSeconds = duration.inSeconds; // Total seconds spent
+      final totalMinutes = duration.inMinutes; // Total minutes spent
 
       // Форматируем вывод
-      String formattedTime = '${seconds % 60} seconds'; // Остаток секунд
-      if (minutes > 0) {
-        formattedTime = '$minutes minutes and ${seconds % 60} seconds';
+      String formattedTime = '${totalSeconds % 60} seconds'; // Остаток секунд
+      if (totalMinutes > 0) {
+        formattedTime = '$totalMinutes minutes and ${totalSeconds % 60} seconds';
       }
 
       print('Logged time for ${widget.screenName}: $formattedTime');
+
+      // Log the time in seconds, which is fine for your existing code
       await DatabaseHelper.instance.logSectionTime(
-          widget.currentSessionId, widget.screenName, seconds);
+          widget.currentSessionId, widget.screenName, totalSeconds);
     }
   }
+
 
   @override
   Widget build(BuildContext context) {

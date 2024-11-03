@@ -7,6 +7,7 @@ import 'notes.dart';
 import 'stat.dart';
 import 'settings_screen.dart';
 import 'package:action_notes/Widgets/loggable_screen.dart';
+import 'package:action_notes/Service/database_helper.dart';
 class FeedbackPage extends StatefulWidget {
   final int sessionId;
   const FeedbackPage({Key? key, required this.sessionId}) : super(key: key);
@@ -18,13 +19,14 @@ class FeedbackPage extends StatefulWidget {
 class _FeedbackPageState extends State<FeedbackPage> {
   int _selectedIndex = 4;
   int? _currentSessionId;
+  String _currentScreenName = "FeedbackPage";
   @override
   void initState() {
     super.initState();
     _currentSessionId = widget.sessionId;
   }
 
-  void _onItemTapped(int index) {
+  void _onItemTapped(int index) async {
     setState(() {
       _selectedIndex = index;
     });
@@ -57,7 +59,7 @@ class _FeedbackPageState extends State<FeedbackPage> {
       default:
         return;
     }
-
+    await DatabaseHelper.instance.logAction(widget.sessionId, "Переход с экрана: $_currentScreenName на экран: $screenName");
     Navigator.pushReplacement(
       context,
       MaterialPageRoute(
@@ -83,6 +85,10 @@ class _FeedbackPageState extends State<FeedbackPage> {
             height: 30,
           ),
           onPressed: () {
+            DatabaseHelper.instance.logAction(
+                _currentSessionId!,
+                "Пользователь нажал кнопку назад и вернулся в SetingPage из: $_currentScreenName"
+            );
             Navigator.of(context).pop();
           },
         ),
@@ -124,6 +130,10 @@ class _FeedbackPageState extends State<FeedbackPage> {
               'we_will_fix'.tr(),  // Локализованная часть "we will fix the error."
               'suggest_improvements'.tr(),  // Локализованная кнопка "Suggest improvements"
                   () {
+                    DatabaseHelper.instance.logAction(
+                        _currentSessionId!,
+                        "Пользователь нажал кнопку и переместился на экран  SuggestPage из: $_currentScreenName"
+                    );
                     Navigator.push(
                       context,
                       MaterialPageRoute(

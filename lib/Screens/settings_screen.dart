@@ -9,6 +9,7 @@ import 'add.dart';
 import 'notes.dart';
 import 'stat.dart';
 import 'package:action_notes/Widgets/loggable_screen.dart';
+import 'package:action_notes/Service/database_helper.dart';
 
 class SettingsPage extends StatefulWidget {
   final int sessionId;
@@ -20,6 +21,7 @@ class SettingsPage extends StatefulWidget {
 class _SettingsPageState extends State<SettingsPage> {
   int _selectedIndex = 4;
   int? _currentSessionId;
+  String _currentScreenName = "SettingPage";
 
   @override
   void initState() {
@@ -27,7 +29,7 @@ class _SettingsPageState extends State<SettingsPage> {
     _currentSessionId = widget.sessionId; // Инициализируем _currentSessionId здесь
   }
 
-  void _onItemTapped(int index) {
+  void _onItemTapped(int index) async {
     setState(() {
       _selectedIndex = index;
     });
@@ -60,7 +62,7 @@ class _SettingsPageState extends State<SettingsPage> {
       default:
         return;
     }
-
+    await DatabaseHelper.instance.logAction(widget.sessionId, "Переход с экрана: $_currentScreenName на экран: $screenName");
     Navigator.pushReplacement(
       context,
       MaterialPageRoute(
@@ -114,12 +116,16 @@ class _SettingsPageState extends State<SettingsPage> {
                       borderRadius: BorderRadius.circular(15), // Скругление углов
                     ),
                     child: GestureDetector(
-                      onTap: () {
+                      onTap: () async {
                         setState(() {
                           // Переключение языка между английским и русским
                           final isEnglish = context.locale.languageCode == 'en';
                           context.setLocale(isEnglish ? const Locale('ru') : const Locale('en'));
                         });
+                        await DatabaseHelper.instance.logAction(
+                          _currentSessionId!,
+                          "Пользователь переключил язык на '${context.locale.languageCode}' на экране: $_currentScreenName.",
+                        );
                       },
                       child: Stack(
                         children: [
@@ -162,7 +168,8 @@ class _SettingsPageState extends State<SettingsPage> {
         child: Column(
           children: [
             GestureDetector(
-              onTap: () {
+              onTap: () async {
+                await DatabaseHelper.instance.logAction(widget.sessionId, "Переход с экрана: $_currentScreenName на экран: NotificationsPage");
                 Navigator.push(
                   context,
                   MaterialPageRoute(
@@ -179,7 +186,8 @@ class _SettingsPageState extends State<SettingsPage> {
               child: _buildSettingContainer('notifications'.tr()),
             ),
             GestureDetector(
-              onTap: () {
+              onTap: () async {
+                await DatabaseHelper.instance.logAction(widget.sessionId, "Переход с экрана: $_currentScreenName на экран: LegalPage");
                 // Переход на LegalPage
                 Navigator.push(
                   context,
@@ -197,7 +205,8 @@ class _SettingsPageState extends State<SettingsPage> {
               child: _buildSettingContainer('legal_information'.tr()),
             ),
             GestureDetector(
-              onTap: () {
+              onTap: () async {
+                await DatabaseHelper.instance.logAction(widget.sessionId, "Переход с экрана: $_currentScreenName на экран: FeedbackPage");
                 Navigator.push(
                   context,
                   MaterialPageRoute(
@@ -214,7 +223,8 @@ class _SettingsPageState extends State<SettingsPage> {
               child: _buildSettingContainer('feedback'.tr()),
             ),
             GestureDetector(
-              onTap: () {
+              onTap: () async {
+                await DatabaseHelper.instance.logAction(widget.sessionId, "Переход с экрана: $_currentScreenName на экран: SuggestPage");
                 Navigator.push(
                   context,
                   MaterialPageRoute(

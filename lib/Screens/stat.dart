@@ -13,7 +13,7 @@ import 'package:table_calendar/table_calendar.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'dart:ui';
 import 'package:action_notes/Widgets/loggable_screen.dart';
-
+import 'package:dropdown_button2/dropdown_button2.dart';
 class StatsPage extends StatefulWidget {
   final int sessionId;
   const StatsPage({Key? key, required this.sessionId}) : super(key: key);
@@ -35,6 +35,7 @@ class _StatsPageState extends State<StatsPage> {
   // Список задач (привычек)
   final List<Map<String, dynamic>> tasks = [];
   int? _currentSessionId;
+  String _currentScreenName = "StatsPage";
   @override
   void initState() {
     super.initState();
@@ -64,7 +65,7 @@ class _StatsPageState extends State<StatsPage> {
     });
   }
 
-  void _onItemTapped(int index) {
+  void _onItemTapped(int index) async {
     setState(() {
       _selectedIndex = index;
     });
@@ -97,6 +98,7 @@ class _StatsPageState extends State<StatsPage> {
       default:
         return;
     }
+    await DatabaseHelper.instance.logAction(widget.sessionId, "Переход с экрана: $_currentScreenName на экран: $screenName");
 
     Navigator.pushReplacement(
       context,
@@ -189,6 +191,10 @@ class _StatsPageState extends State<StatsPage> {
 
       print('Final Tasks List: $tasks');
     });
+    await dbHelper.logAction(
+        _currentSessionId!,
+        "Загрузка задач завершена на экране: $_currentScreenName. Итоговый список задач: $tasks"
+    );
   }
 
 
@@ -387,7 +393,11 @@ class _StatsPageState extends State<StatsPage> {
                 IconButton(
                   iconSize: 32,
                   icon: Image.asset('assets/images/Chart.png'),
-                  onPressed: () {
+                  onPressed: () async {
+                   await DatabaseHelper.instance.logAction(
+                        _currentSessionId!,
+                        "Пользователь нажал кнопку графики и перешел в ChartScreen из: $_currentScreenName"
+                    );
                     Navigator.push(
                       context,
                       MaterialPageRoute(
@@ -406,7 +416,11 @@ class _StatsPageState extends State<StatsPage> {
                 IconButton(
                   iconSize: 32,
                   icon: Image.asset('assets/images/Folder.png'),
-                  onPressed: () {
+                  onPressed: () async {
+                   await DatabaseHelper.instance.logAction(
+                        _currentSessionId!,
+                        "Пользователь нажал кнопку архив и перешел в ArchivePage из: $_currentScreenName"
+                    );
                     Navigator.push(
                       context,
                       MaterialPageRoute(
@@ -471,7 +485,11 @@ class _StatsPageState extends State<StatsPage> {
                     width: 20,
                     height: 20,
                   ),
-                  onPressed: () {
+                  onPressed: () async {
+                    await DatabaseHelper.instance.logAction(
+                        _currentSessionId!,
+                        "Пользователь нажал на стрелку влево для изменения даты на экране: $_currentScreenName"
+                    );
                     setState(() {
                       if (_startDate != null && _startDate!.subtract(Duration(days: 7)).isBefore(_today)) {
                         _startDate = _startDate!.subtract(Duration(days: 7));
@@ -505,7 +523,11 @@ class _StatsPageState extends State<StatsPage> {
                         : const Color(0x4D5F33E1),
                   ),
                   onPressed: (_endDate != null && _endDate!.add(Duration(days: 7)).isBefore(DateTime.now().add(Duration(days: 1))))
-                      ? () {
+                      ? () async {
+                    await DatabaseHelper.instance.logAction(
+                        _currentSessionId!,
+                        "Пользователь нажал на стрелку вправо для изменения даты на экране: $_currentScreenName"
+                    );
                     setState(() {
                       _startDate = _startDate!.add(Duration(days: 7));
                       _endDate = _endDate!.add(Duration(days: 7));
@@ -518,7 +540,14 @@ class _StatsPageState extends State<StatsPage> {
 
                 IconButton(
                   icon: Image.asset('assets/images/Filter.png', width: 24, height: 24),
-                  onPressed: () => _showPopupMenu(context),
+                  onPressed: () async {
+                    _showPopupMenu(context);
+                    // Логирование действия
+                    await DatabaseHelper.instance.logAction(
+                        _currentSessionId!,
+                        "Пользователь открыл меню фильтров на экране: $_currentScreenName"
+                    );
+                  },
                 ),
               // Выпадающий список
               Container(
@@ -527,21 +556,28 @@ class _StatsPageState extends State<StatsPage> {
                   color: Colors.white,
                 ),
                 child: DropdownButtonHideUnderline(
-                  child: DropdownButton<String>(
-                    value: _selectedPeriod,
+                  child: DropdownButton2<String>(
+                    value: _selectedPeriod, // Текущее выбранное значение
                     isDense: true,
-                    items: <String>[tr('week'), tr('two_weeks'), tr('month'), tr('another_period')]
-                        .map<DropdownMenuItem<String>>((String value) {
+                    items: <String>[
+                      tr('week'),
+                      tr('two_weeks'),
+                      tr('month'),
+                      tr('another_period')
+                    ].map<DropdownMenuItem<String>>((String value) {
                       return DropdownMenuItem<String>(
                         value: value,
-                        child: Align(
-                          alignment: Alignment.centerLeft,
-                          child: Text(
-                            value,
-                            style: const TextStyle(
-                              color: Color(0xFF5F33E1),
-                              fontSize: 14,
-                              fontWeight: FontWeight.bold,
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 4.0), // Уменьшение высоты элемента
+                          child: Align(
+                            alignment: Alignment.centerLeft,
+                            child: Text(
+                              value,
+                              style: TextStyle(
+                                color: _selectedPeriod == value ? Color(0xFF5F33E1) : Colors.black, // Цвет текста в зависимости от выбора
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
                           ),
                         ),
@@ -549,24 +585,58 @@ class _StatsPageState extends State<StatsPage> {
                     }).toList(),
                     onChanged: (String? newValue) {
                       setState(() {
-                        _selectedPeriod = newValue!;
+                        _selectedPeriod = newValue!; // Обновляем выбранное значение
                         _updateDates();
                       });
+                        DatabaseHelper.instance.logAction(
+                          _currentSessionId!,
+                          "Пользователь изменил период на $_selectedPeriod из: $_currentScreenName"
+                      );
                     },
-                    icon: Padding(
-                      padding: const EdgeInsets.only(left: 8.0),
-                      child: Image.asset(
-                        'assets/images/arr_vn.png',
-                        width: 20,
-                        height: 20,
+                    menuItemStyleData: const MenuItemStyleData(
+                      height: 30, // Устанавливаем высоту элемента
+                    ),
+                    dropdownStyleData: DropdownStyleData(
+                      decoration: BoxDecoration(
+                        color: Colors.white, // Цвет фона
+                        borderRadius: BorderRadius.circular(8), // Радиус границ
                       ),
                     ),
-                    dropdownColor: Colors.white,
+                    iconStyleData: IconStyleData(
+                      icon: Padding(
+                        padding: const EdgeInsets.only(right: 0.0),
+                        child: Image.asset(
+                          'assets/images/arr_vn.png',
+                          width: 20,
+                          height: 20,
+                        ),
+                      ),
+                    ),
+                    selectedItemBuilder: (BuildContext context) {
+                      return <String>[
+                        tr('week'),
+                        tr('two_weeks'),
+                        tr('month'),
+                        tr('another_period')
+                      ].map<Widget>((String value) {
+                        return Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 0.0),
+                          child: Text(
+                            value,
+                            style: TextStyle(
+                              color: _selectedPeriod == value ? Color(0xFF5F33E1) : Colors.black, // Цвет для выбранного элемента
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        );
+                      }).toList();
+                    },
                   ),
                 ),
               ),
             ],
-          ),
+      ),
           const SizedBox(height: 3),
           // Логика для "Неделя"
           if (_selectedPeriod == tr('week'))
@@ -613,7 +683,11 @@ class _StatsPageState extends State<StatsPage> {
               children: [
                 Expanded(
                   child: GestureDetector(
-                    onTap: () {
+                    onTap: () async {
+                      await DatabaseHelper.instance.logAction(
+                          _currentSessionId!,
+                          "Пользователь нажал выбрать начальную дату в режиме 'Другой период' на экране: $_currentScreenName"
+                      );
                       _showCalendarDialog(isStartDate: true);
                     },
                     child: Container(
@@ -640,7 +714,11 @@ class _StatsPageState extends State<StatsPage> {
                 const SizedBox(width: 5),
                 Expanded(
                   child: GestureDetector(
-                    onTap: () {
+                    onTap: () async {
+                      await DatabaseHelper.instance.logAction(
+                          _currentSessionId!,
+                          "Пользователь нажал выбрать конечную дату в режиме 'Другой период' на экране: $_currentScreenName"
+                      );
                       _showCalendarDialog(isStartDate: false);
                     },
                     child: Container(
@@ -754,7 +832,7 @@ class _StatsPageState extends State<StatsPage> {
                         return formattedMonth;
                       },
                       leftChevronIcon: Padding(
-                        padding: const EdgeInsets.only(left: 42.0),
+                        padding: const EdgeInsets.only(left: 35.0),
                         child: Image.asset(
                           'assets/images/arr_left.png',
                           width: 20,
@@ -763,7 +841,7 @@ class _StatsPageState extends State<StatsPage> {
                         ),
                       ),
                       rightChevronIcon: Padding(
-                        padding: const EdgeInsets.only(right: 42.0),
+                        padding: const EdgeInsets.only(right: 35.0),
                         child: Image.asset(
                           'assets/images/arr_right.png',
                           width: 20,
@@ -797,6 +875,10 @@ class _StatsPageState extends State<StatsPage> {
                           } else {
                             _endDate = selectedDay;
                           }
+                           DatabaseHelper.instance.logAction(
+                              _currentSessionId!,
+                              "Пользователь выбрал ${isStartDate ? 'начальную' : 'конечную'} дату ${DateFormat('dd.MM.yyyy').format(selectedDay)} на экране: $_currentScreenName"
+                          );
                           _loadTasks();
                         });
                         Navigator.pop(context);
@@ -819,7 +901,7 @@ class _StatsPageState extends State<StatsPage> {
   void _showPopupMenu(BuildContext context) {
     showMenu(
       constraints: BoxConstraints.tightFor(
-        width: context.locale.languageCode == 'en' ? 105 : 150, // Используем locale от Easy Localization
+        width: context.locale.languageCode == 'en' ? 115 : 160, // Используем locale от Easy Localization
       ),
       context: context,
       position: RelativeRect.fromLTRB(100, 170, 50, 0), // Позиция попапа
@@ -879,8 +961,11 @@ class _StatsPageState extends State<StatsPage> {
         setState(() {
           _selectedFilter = value; // Применяем новый фильтр
           _updateTasks(); // Обновляем задачи при изменении фильтра
-          print('Выбран фильтр: $_selectedFilter');
         });
+         DatabaseHelper.instance.logAction(
+            _currentSessionId!,
+            "Пользователь выбрал фильтр: $_selectedFilter на экране: $_currentScreenName"
+        );
       }
     });
   }

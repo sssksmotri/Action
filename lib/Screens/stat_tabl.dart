@@ -37,6 +37,7 @@ class _ChartScreenState extends State<ChartScreen> {
 
   List<_ChartData> monthData = [];
   int? _currentSessionId;
+  String _currentScreenName = "ChartScreen";
 
   @override
   void initState() {
@@ -63,7 +64,7 @@ class _ChartScreenState extends State<ChartScreen> {
     setState(() {});
   }
 
-  void _onItemTapped(int index) {
+  void _onItemTapped(int index) async {
     setState(() {
       _selectedIndex = index;
     });
@@ -96,7 +97,7 @@ class _ChartScreenState extends State<ChartScreen> {
       default:
         return;
     }
-
+    await DatabaseHelper.instance.logAction(widget.sessionId, "Переход с экрана: $_currentScreenName на экран: $screenName");
     Navigator.pushReplacement(
       context,
       MaterialPageRoute(
@@ -185,7 +186,10 @@ class _ChartScreenState extends State<ChartScreen> {
   void _updateData(int tabIndex) {
     setState(() {
       _selectedTab = tabIndex;
-
+      DatabaseHelper.instance.logAction(
+          _currentSessionId!,
+          "Пользователь выбрал период: ${tabIndex == 0 ? 'неделя' : tabIndex == 1 ? 'две недели' : 'месяц'} на экране: $_currentScreenName"
+      );
       // Обновляем данные в зависимости от выбранного периода
       if (tabIndex == 0) {
         data = weekData;
@@ -217,6 +221,10 @@ class _ChartScreenState extends State<ChartScreen> {
             height: 30,
           ),
           onPressed: () {
+            DatabaseHelper.instance.logAction(
+                _currentSessionId!,
+                "Пользователь нажал кнопку назад и вернулся в StatsPage из: $_currentScreenName"
+            );
             Navigator.of(context).pop();
           },
         ),
@@ -266,6 +274,10 @@ class _ChartScreenState extends State<ChartScreen> {
                     height: 32, // Высота иконки
                   ),
                   onPressed: () {
+                    DatabaseHelper.instance.logAction(
+                        _currentSessionId!,
+                        "Пользователь нажал кнопку архив и перешел в ArchivePage из: $_currentScreenName"
+                    );
                     Navigator.push(
                       context,
                       MaterialPageRoute(
@@ -292,6 +304,7 @@ class _ChartScreenState extends State<ChartScreen> {
           _buildCustomToggle(),
           _buildChartCard(),
           // График с Trackball для отображения подсказок при касании
+
           Expanded(
             child: Container(
               padding: const EdgeInsets.all(8.0),
@@ -359,6 +372,7 @@ class _ChartScreenState extends State<ChartScreen> {
                           spacing: 0.0,
                           dataLabelSettings: DataLabelSettings(isVisible: false),
                         ),
+
                       ],
                       trackballBehavior: TrackballBehavior(
                         enable: true,
@@ -368,6 +382,9 @@ class _ChartScreenState extends State<ChartScreen> {
                           color: Colors.white, // основной фон тултипа белый
                           textStyle: TextStyle(color: Color(0xFF5F33E1), fontSize: 12),
                         ),
+
+                        lineWidth: 0,
+                        lineColor: Colors.transparent,
                         builder: (BuildContext context, TrackballDetails details) {
                           final date = DateFormat('dd.MM').format(details.point!.x);
                           final value = _showPercent
@@ -637,7 +654,11 @@ class _ChartScreenState extends State<ChartScreen> {
                     children: [
                       // Кнопка для первого графика
                       GestureDetector(
-                        onTap: () {
+                        onTap: () async {
+                          DatabaseHelper.instance.logAction(
+                              _currentSessionId!,
+                              "Пользователь выбрал график: Гистограмма на экране: $_currentScreenName"
+                          );
                           setState(() {
                             _selectedChart = 0; // Гистограмма
                           });
@@ -662,7 +683,11 @@ class _ChartScreenState extends State<ChartScreen> {
                       SizedBox(width: 8), // Отступ между кнопками
                       // Кнопка для второго графика
                       GestureDetector(
-                        onTap: () {
+                        onTap: () async {
+                         await DatabaseHelper.instance.logAction(
+                              _currentSessionId!,
+                              "Пользователь выбрал график: Линейный график на экране: $_currentScreenName"
+                          );
                           setState(() {
                             _selectedChart = 1; // Линейный график
                           });
@@ -705,7 +730,11 @@ class _ChartScreenState extends State<ChartScreen> {
                       width: 1, // Ширина рамки
                     ),
                   ),
-                  onPressed: () {
+                  onPressed: () async {
+                   await DatabaseHelper.instance.logAction(
+                        _currentSessionId!,
+                        "Пользователь выбрал отображение: Количество на экране: $_currentScreenName"
+                    );
                     setState(() {
                       _showPercent = false; // Показать количество
                       loadChartData();
@@ -732,7 +761,11 @@ class _ChartScreenState extends State<ChartScreen> {
                       width: 1, // Ширина рамки
                     ),
                   ),
-                  onPressed: () {
+                  onPressed: () async {
+                   await DatabaseHelper.instance.logAction(
+                        _currentSessionId!,
+                        "Пользователь выбрал отображение: Процент на экране: $_currentScreenName"
+                    );
                     setState(() {
                       _showPercent = true; // Показать процент
                       loadChartData();
@@ -785,7 +818,11 @@ class _ChartScreenState extends State<ChartScreen> {
     String formattedDateRange = '$formattedStartDate - $formattedEndDate';
 
     return GestureDetector(
-      onTap: () {
+      onTap: () async {
+        DatabaseHelper.instance.logAction(
+            _currentSessionId!,
+            "Пользователь открыл календарь на экране: $_currentScreenName"
+        );
         _showCalendarDialog(); // Открытие диалога выбора даты
       },
       child: Container(
@@ -799,7 +836,11 @@ class _ChartScreenState extends State<ChartScreen> {
           children: [
             // Левая стрелка
             GestureDetector(
-              onTap: () {
+              onTap: () async {
+                await DatabaseHelper.instance.logAction(
+                    _currentSessionId!,
+                    "Пользователь нажал на стрелку влево для изменения даты на экране: $_currentScreenName"
+                );
                 setState(() {
                   // Логика для перехода на предыдущий период (неделя, 2 недели, месяц)
                   if (_selectedTab == 0) {
@@ -850,7 +891,11 @@ class _ChartScreenState extends State<ChartScreen> {
             // Правая стрелка
             GestureDetector(
               onTap: _isForwardNavigationAllowed()
-                  ? () {
+                  ? () async {
+                await DatabaseHelper.instance.logAction(
+                    _currentSessionId!,
+                    "Пользователь нажал на стрелку вправо для изменения даты на экране: $_currentScreenName"
+                );
                 setState(() {
                   // Логика для перехода на следующий период (неделя, 2 недели, месяц)
                   if (_selectedTab == 0) {
@@ -903,7 +948,11 @@ class _ChartScreenState extends State<ChartScreen> {
                     'assets/images/ar_back.png',
                     color: Colors.white,
                   ),
-                  onPressed: () {
+                  onPressed: () async {
+                    await DatabaseHelper.instance.logAction(
+                        _currentSessionId!,
+                        "Пользователь выбрал вернуть сегодняшную дату на экране: $_currentScreenName"
+                    );
                     setState(() {
                       _selectedDate = _today;
 
@@ -1017,7 +1066,7 @@ class _ChartScreenState extends State<ChartScreen> {
                         return formattedMonth;
                       },
                       leftChevronIcon: Padding(
-                        padding: const EdgeInsets.only(left: 42.0),
+                        padding: const EdgeInsets.only(left: 35.0),
                         child: Image.asset(
                           'assets/images/arr_left.png', // Путь к изображению стрелки влево
                           width: 20,
@@ -1026,7 +1075,7 @@ class _ChartScreenState extends State<ChartScreen> {
                         ),
                       ),
                       rightChevronIcon: Padding(
-                        padding: const EdgeInsets.only(right: 42.0),
+                        padding: const EdgeInsets.only(right: 35.0),
                         child: Image.asset(
                           'assets/images/arr_right.png', // Путь к изображению стрелки вправо
                           width: 20,
@@ -1062,6 +1111,10 @@ class _ChartScreenState extends State<ChartScreen> {
 
                           loadChartData(); // Обновляем данные графика
                         });
+                        DatabaseHelper.instance.logAction(
+                            _currentSessionId!,
+                            "Пользователь выбрал дату: ${DateFormat('yyyy-MM-dd').format(selectedDay)} на экране: $_currentScreenName"
+                        );
                         Navigator.pop(context);
                       }
                     },

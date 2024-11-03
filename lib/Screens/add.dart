@@ -53,6 +53,7 @@ class _AddActionPageState extends State<AddActionPage> {
   FocusNode minuteFocusNode = FocusNode();
   FocusNode quantityNode = FocusNode();
   int? _currentSessionId;
+  String _currentScreenName = "AddActionPage";
 
   @override
   void dispose() {
@@ -63,12 +64,12 @@ class _AddActionPageState extends State<AddActionPage> {
   }
 
   @override
-  void initState() {
+  void initState()  {
     super.initState();
     _currentSessionId = widget.sessionId; // Инициализируем _currentSessionId здесь
   }
 
-  void _onItemTapped(int index) {
+  void _onItemTapped(int index) async {
     setState(() {
       _selectedIndex = index;
     });
@@ -101,6 +102,7 @@ class _AddActionPageState extends State<AddActionPage> {
       default:
         return;
     }
+    await DatabaseHelper.instance.logAction(widget.sessionId, "Переход с экрана: $_currentScreenName на экран: $screenName");
 
     Navigator.pushReplacement(
       context,
@@ -115,7 +117,7 @@ class _AddActionPageState extends State<AddActionPage> {
   }
 
 
-  void _showDeleteDialog(BuildContext context, String taskTitle, Function() onDelete) {
+  void _showDeleteDialog(BuildContext context, String taskTitle, Function() onDelete)  {
     showDialog(
       context: context,
       barrierColor: Colors.black.withOpacity(0.1), // Легкое затемнение вместе с размытием
@@ -162,7 +164,8 @@ class _AddActionPageState extends State<AddActionPage> {
                         width: 165, // Увеличиваем ширину кнопки
                         height: 45, // Увеличил высоту для улучшения размещения текста
                         child: TextButton(
-                          onPressed: () {
+                          onPressed: () async {
+                            await DatabaseHelper.instance.logAction(widget.sessionId, "Пользователь выбрал вернуться на экран HomePage с экрана: $_currentScreenName");
                             Navigator.of(context).pop();
                             Navigator.pushReplacement(
                               context,
@@ -200,7 +203,8 @@ class _AddActionPageState extends State<AddActionPage> {
                         width: 165, // Увеличиваем ширину кнопки
                         height: 45, // Увеличил высоту
                         child: TextButton(
-                          onPressed: () {
+                          onPressed: () async {
+                            await DatabaseHelper.instance.logAction(widget.sessionId, "Пользователь нажал добавить новую привычку на экране: $_currentScreenName");
                             Navigator.of(context).pop();
                             Navigator.pushReplacement(
                               context,
@@ -271,6 +275,10 @@ class _AddActionPageState extends State<AddActionPage> {
             padding: const EdgeInsets.only(right: 16.0), // Отступ справа
             child: GestureDetector(
               onTap: () {
+                DatabaseHelper.instance.logAction(
+                    _currentSessionId!,
+                    "Пользователь нажал кнопку крестик и вернулся в HomePage из: $_currentScreenName"
+                );
                 // Возврат на главную страницу и удаление всех предыдущих страниц
                 Navigator.of(context).pushAndRemoveUntil(
                   MaterialPageRoute(
@@ -410,13 +418,26 @@ class _AddActionPageState extends State<AddActionPage> {
               setState(() {
                 actionName = value;
               });
-            },
-          textInputAction: TextInputAction.done, // Добавлено для завершения
-          onSubmitted: (value) {
-            FocusScope.of(context).unfocus();
-          },
 
-    ),
+              // Логируем начало ввода имени действия
+              if (value.isNotEmpty) {
+                DatabaseHelper.instance.logAction(
+                    _currentSessionId!,
+                    "Пользователь начал вводить название действия: $value на экране: $_currentScreenName"
+                );
+              }
+            },
+            textInputAction: TextInputAction.done, // Добавлено для завершения
+            onSubmitted: (value) {
+              FocusScope.of(context).unfocus();
+
+              // Логируем завершение ввода имени действия
+              DatabaseHelper.instance.logAction(
+                  _currentSessionId!,
+                  "Пользователь ввел название действия: $value на экране: $_currentScreenName"
+              );
+            },
+          ),
 
           if (nameError != null) // Отображение ошибки под полем ввода
             Padding(
@@ -480,7 +501,11 @@ class _AddActionPageState extends State<AddActionPage> {
       onTap: () {
         setState(() {
           selectedType = index;
-          _resetErrorMessages();// Только один элемент может быть выбран
+          _resetErrorMessages();
+          DatabaseHelper.instance.logAction(
+              _currentSessionId!,
+              "Пользователь выбрал тип выполнения: $label на экране: $_currentScreenName"
+          );
         });
       },
       child: Row(
@@ -544,11 +569,20 @@ class _AddActionPageState extends State<AddActionPage> {
             ),
           ),
           keyboardType: TextInputType.number,
-          textInputAction: TextInputAction.done, // Добавлено для завершения
+          textInputAction: TextInputAction.done,
+          onChanged: (value) {
+            // Логируем ввод количества пользователем
+            DatabaseHelper.instance.logAction(
+                _currentSessionId!,
+                "Пользователь начал вводить количество: $value на экране: $_currentScreenName"
+            );
+          },// Добавлено для завершения
           onSubmitted: (value) {
-        // Действия при нажатии кнопки "Готово"
-        // Например, можно скрыть клавиатуру:
         FocusScope.of(context).unfocus();
+        DatabaseHelper.instance.logAction(
+            _currentSessionId!,
+            "Пользователь завершил вводить количество: $value на экране: $_currentScreenName"
+        );
       },
     ),
 
@@ -581,10 +615,19 @@ class _AddActionPageState extends State<AddActionPage> {
             ),
           ),
           keyboardType: TextInputType.number,
-      textInputAction: TextInputAction.done, // Добавлено для завершения
+      textInputAction: TextInputAction.done,
+          onChanged: (value) {
+            // Логируем ввод объема пользователем
+            DatabaseHelper.instance.logAction(
+                _currentSessionId!,
+                "Пользователь начал вводить объем: $value на экране: $_currentScreenName"
+            );
+          },// Добавлено для завершения
       onSubmitted: (value) {
-        // Действия при нажатии кнопки "Готово"
-        // Например, можно скрыть клавиатуру:
+        DatabaseHelper.instance.logAction(
+            _currentSessionId!,
+            "Пользователь завершил вводить объем: $value на экране: $_currentScreenName"
+        );
         FocusScope.of(context).unfocus();
       },
     ),
@@ -617,10 +660,20 @@ class _AddActionPageState extends State<AddActionPage> {
             ),
           ),
           keyboardType: TextInputType.number,
-      textInputAction: TextInputAction.done, // Добавлено для завершения
+      textInputAction: TextInputAction.done,
+          onChanged: (value) {
+            // Логируем ввод объема на нажим
+            DatabaseHelper.instance.logAction(
+                _currentSessionId!,
+                "Пользователь начал вводить объем на нажатие: $value на экране: $_currentScreenName"
+            );
+          },
+          // Добавлено для завершения
       onSubmitted: (value) {
-        // Действия при нажатии кнопки "Готово"
-        // Например, можно скрыть клавиатуру:
+        DatabaseHelper.instance.logAction(
+            _currentSessionId!,
+            "Пользователь завершил вводить объем на нажатие: $value на экране: $_currentScreenName"
+        );
         FocusScope.of(context).unfocus();
       },
         ),
@@ -636,8 +689,6 @@ class _AddActionPageState extends State<AddActionPage> {
     );
   }
 
-  // Карточка с выбором дат
-  // Метод для отображения диалога календаря
   void _showCalendarDialog(DateTime initialDate, bool isStartDate, ValueChanged<DateTime> onDateSelected) {
     print("Showing calendar dialog with initial date: $initialDate");
 
@@ -702,7 +753,7 @@ class _AddActionPageState extends State<AddActionPage> {
                         return formattedMonth;
                       },
                       leftChevronIcon: Padding(
-                        padding: const EdgeInsets.only(left: 42.0),
+                        padding: const EdgeInsets.only(left: 35.0),
                         child: Image.asset(
                           'assets/images/arr_left.png',
                           width: 20,
@@ -711,7 +762,7 @@ class _AddActionPageState extends State<AddActionPage> {
                         ),
                       ),
                       rightChevronIcon: Padding(
-                        padding: const EdgeInsets.only(right: 42.0),
+                        padding: const EdgeInsets.only(right: 35.0),
                         child: Image.asset(
                           'assets/images/arr_right.png',
                           width: 20,
@@ -744,6 +795,10 @@ class _AddActionPageState extends State<AddActionPage> {
                           _showError(tr("error_start_date_later_than_end"));
                         } else {
                           onDateSelected(selectedDay);
+                          DatabaseHelper.instance.logAction(
+                              _currentSessionId!,
+                              "Пользователь выбрал дату начала: $selectedDay на экране: $_currentScreenName"
+                          );
                           dateError = null;
                           _resetInvalidDays();
                         }
@@ -752,6 +807,10 @@ class _AddActionPageState extends State<AddActionPage> {
                           _showError(tr("error_end_date_earlier_than_start"));
                         } else {
                           onDateSelected(selectedDay);
+                          DatabaseHelper.instance.logAction(
+                              _currentSessionId!,
+                              "Пользователь выбрал дату окончания: $selectedDay на экране: $_currentScreenName"
+                          );
                           dateError = null;
                           _resetInvalidDays();
                         }
@@ -1017,6 +1076,10 @@ class _AddActionPageState extends State<AddActionPage> {
                 const SizedBox(height: 8),
                 GestureDetector(
                   onTap: () {
+                    DatabaseHelper.instance.logAction(
+                        _currentSessionId!,
+                        "пользователь ${selectedDays[index] ? 'выбрал' : 'убрал'} ${days[index]} на экране: $_currentScreenName"
+                    );
                     setState(() {
                       // Проверяем, выбраны ли уже другие чекбоксы
                       int selectedCount = selectedDays.where((day) => day).length;
@@ -1107,6 +1170,10 @@ class _AddActionPageState extends State<AddActionPage> {
                 const SizedBox(height: 8),
                 GestureDetector(
                   onTap: () {
+                    DatabaseHelper.instance.logAction(
+                        _currentSessionId!,
+                        "пользователь ${selectedDays[dayIndex] ? 'выбрал' : 'убрал'} день у уведомления: $index: ${days[dayIndex]} на экране: $_currentScreenName"
+                    );
                     if (isInRange) {
                       setState(() {
                         int selectedCount = selectedDays.where((day) => day).length;
@@ -1170,8 +1237,13 @@ class _AddActionPageState extends State<AddActionPage> {
                   decoration: InputDecoration(border: InputBorder.none),
                   style: TextStyle(fontSize: 20, color: Colors.black),
                   onChanged: (String value) {
+
                     setState(() {
                       int? hour = int.tryParse(value);
+                      DatabaseHelper.instance.logAction(
+                          _currentSessionId!,
+                          "Пользователь изменил час уведомления на ${hour.toString().padLeft(2, '0')} на экране: $_currentScreenName"
+                      );
                       if (hour != null && _isValidTime(hour, selectedMinute)) {
                         notificationWidgets[index]['hour'] = hour;
                         _resetInvalidDays();
@@ -1199,6 +1271,10 @@ class _AddActionPageState extends State<AddActionPage> {
                   onChanged: (String value) {
                     setState(() {
                       int? minute = int.tryParse(value);
+                      DatabaseHelper.instance.logAction(
+                          _currentSessionId!,
+                          "Пользователь изменил минуту уведомления на ${minute.toString().padLeft(2, '0')} на экране: $_currentScreenName"
+                      );
                       if (minute != null && _isValidTime(selectedHour, minute)) {
                         notificationWidgets[index]['minute'] = minute;
                         minuteFocusNode.unfocus();
@@ -1211,6 +1287,10 @@ class _AddActionPageState extends State<AddActionPage> {
               GestureDetector(
                 onTap: () {
                   setState(() {
+                    DatabaseHelper.instance.logAction(
+                        _currentSessionId!,
+                        "Пользователь добавил новое уведомление на экране: $_currentScreenName"
+                    );
                     // Создаем новый элемент с доступными днями
                     List<bool> newDays = List<bool>.generate(7, (dayIndex) {
                       return _isWithinDateRange(startDate!, endDate!, dayIndex);
@@ -1236,6 +1316,10 @@ class _AddActionPageState extends State<AddActionPage> {
               if (notificationWidgets.length > 1)
                 GestureDetector(
                   onTap: () {
+                    DatabaseHelper.instance.logAction(
+                        _currentSessionId!,
+                        "Пользователь удалил уведомление на экране: $_currentScreenName"
+                    );
                     setState(() {
                       if (notificationWidgets.length > 1) {
                         notificationWidgets.removeAt(index);
@@ -1303,6 +1387,10 @@ class _AddActionPageState extends State<AddActionPage> {
                           notificationsEnabled = !notificationsEnabled;
                           // Обновляем дни для всех уведомлений при включении тумблера
                           if (notificationsEnabled) {
+                            DatabaseHelper.instance.logAction(
+                                _currentSessionId!,
+                                "пользователь ${notificationsEnabled ? 'включил' : 'выключил'} уведомления на экране: $_currentScreenName"
+                            );
                             for (var notification in notificationWidgets) {
                               notification['days'] = List<bool>.generate(7, (dayIndex) {
                                 return _isWithinDateRange(startDate!, endDate!, dayIndex);
@@ -1371,6 +1459,10 @@ class _AddActionPageState extends State<AddActionPage> {
   Widget _buildAddButton(String taskTitle) {
     return ElevatedButton(
       onPressed: () {
+        DatabaseHelper.instance.logAction(
+            _currentSessionId!,
+            "Пользователь добавил привычку на экране: $_currentScreenName"
+        );
         _addHabit(taskTitle); // Передаем taskTitle в _addHabit
       },
       style: ElevatedButton.styleFrom(

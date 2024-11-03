@@ -23,6 +23,8 @@ class _ArchivePageState extends State<ArchivePage> {
   bool _isFolderPressed = true; // Состояние для кнопки папки (сразу нажатая)
   List<Map<String, dynamic>> _archivedHabits = []; // Список архивированных привычек
   int? _currentSessionId;
+  Map<int, bool> _menuStates = {};
+  String _currentScreenName = "ArchivePage";
   @override
   void initState() {
     super.initState();
@@ -44,7 +46,7 @@ class _ArchivePageState extends State<ArchivePage> {
   }
 
 
-  void _onItemTapped(int index) {
+  void _onItemTapped(int index) async {
     setState(() {
       _selectedIndex = index;
     });
@@ -77,7 +79,7 @@ class _ArchivePageState extends State<ArchivePage> {
       default:
         return;
     }
-
+    await DatabaseHelper.instance.logAction(widget.sessionId, "Переход с экрана: $_currentScreenName на экран: $screenName");
     Navigator.pushReplacement(
       context,
       MaterialPageRoute(
@@ -151,7 +153,8 @@ class _ArchivePageState extends State<ArchivePage> {
                     // Кнопка "No, leave it"
                     Expanded(
                       child: TextButton(
-                        onPressed: () {
+                        onPressed: () async {
+                          await DatabaseHelper.instance.logAction(widget.sessionId, "Отменил удаление привычки на экране: $_currentScreenName");
                           Navigator.of(context).pop(); // Закрыть диалог
                         },
                         style: TextButton.styleFrom(
@@ -175,7 +178,8 @@ class _ArchivePageState extends State<ArchivePage> {
                     // Кнопка "Yes, delete"
                     Expanded(
                       child: TextButton(
-                        onPressed: () {
+                        onPressed: () async {
+                          await DatabaseHelper.instance.logAction(widget.sessionId, "Удалил привычку на экране: $_currentScreenName");
                           Navigator.of(context).pop(); // Закрыть диалог
                           _deleteHabit(habitId); // Вызов метода удаления
                         },
@@ -217,6 +221,10 @@ class _ArchivePageState extends State<ArchivePage> {
             height: 30,
           ),
           onPressed: () {
+            DatabaseHelper.instance.logAction(
+                _currentSessionId!,
+                "Пользователь нажал кнопку назад и вернулся в HomePage из: $_currentScreenName"
+            );
             Navigator.of(context).pop(true);
           },
         ),
@@ -248,6 +256,10 @@ class _ArchivePageState extends State<ArchivePage> {
                     height: 32,
                   ),
                   onPressed: () {
+                    DatabaseHelper.instance.logAction(
+                        _currentSessionId!,
+                        "Пользователь нажал кнопку графики и перешел в ChartScreen из: $_currentScreenName"
+                    );
                     Navigator.push(
                       context,
                       MaterialPageRoute(
@@ -330,6 +342,7 @@ class _ArchivePageState extends State<ArchivePage> {
   }
 
   Widget _buildSettingContainer(String title, int habitId) {
+
     return Container(
       padding: const EdgeInsets.all(12),
       height: 50,
@@ -353,6 +366,10 @@ class _ArchivePageState extends State<ArchivePage> {
             children: [
               GestureDetector(
                 onTap: () {
+                  DatabaseHelper.instance.logAction(
+                      _currentSessionId!,
+                      "Пользователь вернул из архива действия: $habitId на экране: $_currentScreenName"
+                  );
                   _activeHabit(habitId); // Обработка нажатия на иконку загрузки
                 },
                 child: Image.asset(
@@ -364,11 +381,20 @@ class _ArchivePageState extends State<ArchivePage> {
               const SizedBox(width: 8), // Отступ между иконками
               PopupMenuButton<String>(
                 icon: Transform.scale(
-                  scale: 2.5, // Масштабирование иконки
-                  child: Image.asset('assets/images/menu.png', width: 24, height: 24),
+                  scale: _menuStates[habitId] != null && _menuStates[habitId]! ? 3.4 : 2.3,// Увеличение в 1.5 раза, если меню открыто
+                  child: Image.asset(
+                    _menuStates[habitId] != null && _menuStates[habitId]! ? 'assets/images/menu_open.png' : 'assets/images/menu.png',
+                    width: 24, // Ширина остается постоянной
+                    height: 24, // Высота остается постоянной
+                  ),
                 ),
                 onSelected: (value) {
+                  setState(() {
+
+                    _menuStates[habitId] = false; // Закрываем меню после выбора
+                  });
                   if (value == 'Delete') {
+                    DatabaseHelper.instance.logAction(widget.sessionId, "Выбрал в меню действия: удаления у привычки на экране: $_currentScreenName");// Открываем меню
                     _showDeleteDialog(context, title, habitId, () {});
                   } else {
                     print('Selected: $value');
@@ -390,13 +416,30 @@ class _ArchivePageState extends State<ArchivePage> {
                   ];
                 },
                 constraints: BoxConstraints.tightFor(
-                  width: context.locale.languageCode == 'en' ? 70 : 80, // Используем locale от Easy Localization
+                  width: context.locale.languageCode == 'en' ? 80 : 90, // Используем locale от Easy Localization
                 ),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
                 color: Colors.white,
                 offset: const Offset(0, 30),
+                onOpened: () async {
+                  await DatabaseHelper.instance.logAction(widget.sessionId, "Открыл меню действия у привычки на экране:$_currentScreenName");// Открываем меню
+                  setState(() {
+                    _menuStates[habitId] = true;
+                  });
+                },
+                onCanceled: () async  {
+                  await DatabaseHelper.instance.logAction(widget.sessionId, "закрыл меню действия у привычки на экране:$_currentScreenName");
+                  setState(() {
+                    if (_menuStates[habitId] != null) {
+                      _menuStates[habitId] = !_menuStates[habitId]!;
+                    } else {
+                      // Инициализируем состояние по умолчанию, если его еще нет
+                      _menuStates[habitId] = true; // или false, в зависимости от вашей логики
+                    } // Переключение состояния меню
+                  });
+                },
               ),
             ],
           ),
@@ -404,6 +447,7 @@ class _ArchivePageState extends State<ArchivePage> {
       ),
     );
   }
+
 
   Widget _buildNavItem(int index, String assetPath, {bool isSelected = false}) {
     return GestureDetector(

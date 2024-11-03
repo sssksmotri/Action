@@ -7,7 +7,10 @@ import 'add.dart';
 import 'notes.dart';
 import 'stat.dart';
 import 'package:action_notes/Widgets/loggable_screen.dart';
-
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+import 'package:action_notes/Service/database_helper.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 class SuggestPage extends StatefulWidget {
   final int sessionId;
   const SuggestPage({Key? key, required this.sessionId}) : super(key: key);
@@ -18,6 +21,7 @@ class SuggestPage extends StatefulWidget {
 
 class _SuggestPageState extends State<SuggestPage> {
   int _selectedIndex = 4;
+  final _formKey = GlobalKey<FormState>();
   bool isEnglish = true;
   bool _showSuffix = true;
   // Controllers for the text fields
@@ -25,6 +29,8 @@ class _SuggestPageState extends State<SuggestPage> {
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _suggestionController = TextEditingController();
   int? _currentSessionId;
+  String _currentScreenName = "SuggestPage";
+
 
   @override
   void initState() {
@@ -32,7 +38,7 @@ class _SuggestPageState extends State<SuggestPage> {
     _currentSessionId = widget.sessionId; // Инициализируем _currentSessionId здесь
   }
 
-  void _onItemTapped(int index) {
+  void _onItemTapped(int index) async {
     setState(() {
       _selectedIndex = index;
     });
@@ -65,6 +71,7 @@ class _SuggestPageState extends State<SuggestPage> {
       default:
         return;
     }
+    await DatabaseHelper.instance.logAction(widget.sessionId, "Переход с экрана: $_currentScreenName на экран: $screenName");
 
     Navigator.pushReplacement(
       context,
@@ -78,6 +85,109 @@ class _SuggestPageState extends State<SuggestPage> {
     );
   }
 
+  Future<void> _submitForm() async {
+    final apiKey = dotenv.env['API_KEY'];
+    final dbUrl = dotenv.env['DATABASE_SUG'];
+    // Проверка валидации
+    if (_nameController.text.isEmpty) {
+      _showValidationDialog('Пожалуйста, введите ваше имя.');
+      return;
+    }
+
+    // Проверка валидности электронной почты только если она не пустая
+    if (_emailController.text.isNotEmpty && !_isValidEmail(_emailController.text)) {
+      _showValidationDialog('Пожалуйста, введите корректный адрес электронной почты.');
+      return;
+    }
+
+    if (_suggestionController.text.isEmpty) {
+      _showValidationDialog('Пожалуйста, введите ваше предложение.');
+      return;
+    }
+
+    final url = Uri.parse(dbUrl!);
+
+    // Подготавливаем данные для отправки
+    final data = {
+      'name': _nameController.text,
+      'email': _emailController.text,
+      'text': _suggestionController.text,
+    };
+
+      // Отправка POST-запроса с JSON-данными
+      final response = await http.post(
+        url,
+        headers: {'Content-Type': 'application/json','X-API-Key':apiKey!},
+        body: jsonEncode(data),
+      );
+
+      // Выводим статус и тело ответа для отладки
+      print('Response status: ${response.statusCode}');
+      print('Response body: ${response.body}');
+
+      // Проверка кода ответа от сервера
+      if (response.statusCode == 201) {
+        _showSubmissionDialog(); // Успешная отправка
+      } else if (response.statusCode >= 500) {
+        // Ошибки сервера (5xx)
+        _showErrorDialog('Ошибка сервера. Попробуйте позже.');
+      } else if (response.statusCode >= 400) {
+        // Ошибки клиента (4xx)
+        // Возможно, вы получите информацию о конкретных ошибках из тела ответа
+        final errorMessage = jsonDecode(response.body)['detail'] ?? 'Ошибка отправки данных. Проверьте введенные данные и повторите попытку.';
+        _showErrorDialog(errorMessage);
+      } else {
+        // Другие коды ошибок
+        _showErrorDialog('Неожиданная ошибка: ${response.statusCode}.');
+      }
+    }
+
+
+  void _showErrorDialog(String message) {
+    showDialog(
+      context: context,
+      barrierColor: Colors.black.withOpacity(0.1),
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text('Ошибка'),
+          content: Text(message),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text('OK'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+
+
+  void _showValidationDialog(String message) {
+    showDialog(
+      context: context,
+      barrierColor: Colors.black.withOpacity(0.1),
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text('Ошибка валидации'),
+          content: Text(message),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text('OK'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  bool _isValidEmail(String email) {
+    // Простой паттерн для проверки корректности адреса электронной почты
+    final RegExp emailRegex = RegExp(r'^[^@]+@[^@]+\.[^@]+');
+    return emailRegex.hasMatch(email);
+  }
 
   void _showSubmissionDialog() {
     showDialog(
@@ -167,7 +277,11 @@ class _SuggestPageState extends State<SuggestPage> {
             width: 30,
             height: 30,
           ),
-          onPressed: () {
+          onPressed: () async {
+            await DatabaseHelper.instance.logAction(
+                _currentSessionId!,
+                "Пользователь нажал кнопку назад и вернулся в SetingPage из: $_currentScreenName"
+            );
             Navigator.of(context).pop();
           },
         ),
@@ -243,11 +357,8 @@ class _SuggestPageState extends State<SuggestPage> {
                     padding: const EdgeInsets.symmetric(vertical: 10), // Высота кнопки
                   ),
                   onPressed: () {
-                    // Действие при нажатии на кнопку
-                    print('Name: ${_nameController.text}');
-                    print('Email: ${_emailController.text}');
-                    print('Suggestion: ${_suggestionController.text}');
-                    _showSubmissionDialog();
+                    _submitForm();
+                    DatabaseHelper.instance.logAction(widget.sessionId, "Пользователь нажал кнопку отправить предложение на экране: $_currentScreenName");
                   },
                   child: Text(
                     'send'.tr(), // Локализованный текст
@@ -312,7 +423,18 @@ class _SuggestPageState extends State<SuggestPage> {
       child: Row(
         children: [
           Expanded(
-            child: TextField(
+              child: Focus(
+                onFocusChange: (hasFocus) {
+                  if (hasFocus) {
+                    // Логируем, когда пользователь начал вводить текст
+                    DatabaseHelper.instance.logAction(widget.sessionId, "Пользователь начал вводить текст в поле: $hintText на экране: $_currentScreenName" );
+                  } else {
+                    // Логируем, когда пользователь закончил вводить текст
+                    DatabaseHelper.instance.logAction(widget.sessionId, "Пользователь закончил вводить текст в поле: $hintText на экране: $_currentScreenName");
+                  }
+                },
+
+              child: TextField(
               controller: controller,
               maxLines: maxLines,
               onChanged: (text) {
@@ -327,7 +449,12 @@ class _SuggestPageState extends State<SuggestPage> {
                 border: InputBorder.none, // Без границы
                 contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12), // Отступы внутри текстового поля
               ),
+                onSubmitted: (text) {
+                  // Логируем, когда пользователь завершил ввод текста
+                  DatabaseHelper.instance.logAction(widget.sessionId, "Пользователь завершил ввод текста: $text в поле: $hintText на экране: $_currentScreenName");
+                },
             ),
+              ),
           ),
           // Отображение суффикса всегда
           if (suffixText != null && _showSuffix) // Показывать текст суффикса, если он предоставлен и _showSuffix == true

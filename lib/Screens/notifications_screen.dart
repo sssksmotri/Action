@@ -31,6 +31,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
   FocusNode hourFocusNode = FocusNode();
   FocusNode minuteFocusNode = FocusNode();
   int? _currentSessionId;
+  String _currentScreenName = "NotificationsPage";
   @override
   void dispose() {
     hourFocusNode.dispose();
@@ -95,7 +96,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
   }
 
 
-  void _onItemTapped(int index) {
+  void _onItemTapped(int index) async {
     setState(() {
       _selectedIndex = index;
     });
@@ -128,7 +129,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
       default:
         return;
     }
-
+    await DatabaseHelper.instance.logAction(widget.sessionId, "Переход с экрана: $_currentScreenName на экран: $screenName");
     Navigator.pushReplacement(
       context,
       MaterialPageRoute(
@@ -154,6 +155,10 @@ class _NotificationsPageState extends State<NotificationsPage> {
             height: 30,
           ),
           onPressed: () {
+            DatabaseHelper.instance.logAction(
+                _currentSessionId!,
+                "Пользователь нажал кнопку назад и вернулся в SetingPage из: $_currentScreenName"
+            );
             Navigator.of(context).pop();
           },
         ),
@@ -265,6 +270,12 @@ class _NotificationsPageState extends State<NotificationsPage> {
     if (status.isGranted) {
       SharedPreferences prefs = await SharedPreferences.getInstance();
       await prefs.setBool('isDialogShown', true);
+      allNotificationsEnabled=true;
+      await _saveToggleState('allNotificationsEnabled', true);
+      await DatabaseHelper.instance.logAction(
+        widget.sessionId,
+        "Пользователь дал разрешение на уведомления на экране: $_currentScreenName",
+      );
     }
   }
 
@@ -317,7 +328,8 @@ class _NotificationsPageState extends State<NotificationsPage> {
                   children: [
                     Expanded(
                       child: TextButton(
-                        onPressed: () {
+                        onPressed: () async {
+                          await DatabaseHelper.instance.logAction(widget.sessionId, "Пользователь отказался дать разрешения на уведомления на экране: $_currentScreenName");
                           Navigator.of(context).pop();
                         },
                         style: TextButton.styleFrom(
@@ -343,6 +355,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
                     Expanded(
                       child: TextButton(
                         onPressed: () async {
+                          await DatabaseHelper.instance.logAction(widget.sessionId, "Пользователь дал разрешение на уведомления(появляется окно запроса на разрешение уведомлений) на экране: $_currentScreenName");
                           Navigator.of(context).pop();
                           await _requestNotificationPermission();
                         },
@@ -435,7 +448,11 @@ class _NotificationsPageState extends State<NotificationsPage> {
                     // Кнопка "Нет, спасибо"
                     Expanded(
                       child: TextButton(
-                        onPressed: () {
+                        onPressed: () async {
+                          await DatabaseHelper.instance.logAction(
+                            widget.sessionId,
+                            "Пользователь отказался открыть настройки для уведомлений на экране: $_currentScreenName",
+                          );
                           Navigator.of(context).pop();
                         },
                         style: TextButton.styleFrom(
@@ -460,6 +477,10 @@ class _NotificationsPageState extends State<NotificationsPage> {
                     Expanded(
                       child: TextButton(
                         onPressed: () async {
+                          await DatabaseHelper.instance.logAction(
+                            widget.sessionId,
+                            "Пользователь открыл настройки для уведомлений на экране: $_currentScreenName",
+                          );
                           Navigator.of(context).pop();
                           await openAppSettings();
                         },
@@ -526,6 +547,10 @@ class _NotificationsPageState extends State<NotificationsPage> {
                     if (!allNotificationsEnabled) {
                       var status = await Permission.notification.status;
                       if (status.isGranted) {
+                        await DatabaseHelper.instance.logAction(
+                          _currentSessionId!,
+                          "Пользователь включил все уведомления на экране: $_currentScreenName",
+                        );
                         setState(() {
                           allNotificationsEnabled = true;
                           _updateAllHabitsNotificationState(allNotificationsEnabled);
@@ -536,6 +561,10 @@ class _NotificationsPageState extends State<NotificationsPage> {
                         _checkNotificationPermission();
                       }
                     } else {
+                      await DatabaseHelper.instance.logAction(
+                        _currentSessionId!,
+                        "Пользователь отключил все уведомления на экране: $_currentScreenName",
+                      );
                       setState(() {
                         allNotificationsEnabled = false;
                         _updateAllHabitsNotificationState(allNotificationsEnabled);
@@ -626,8 +655,16 @@ class _NotificationsPageState extends State<NotificationsPage> {
                         });
 
                         if (newValue) {
+                          await DatabaseHelper.instance.logAction(
+                            _currentSessionId!,
+                            "Пользователь включил уведомления для привычки '${habit['name']}' на экране: $_currentScreenName",
+                          );
                           await habitReminderService.initializeReminders();
                         } else {
+                          await DatabaseHelper.instance.logAction(
+                            _currentSessionId!,
+                            "Пользователь отключил уведомления для привычки '${habit['name']}' на экране: $_currentScreenName",
+                          );
                           await habitReminderService.cancelAllReminders(habit['id']);
                         }
                         _saveToggleState('habit_${habit['id']}_notifications_enabled', newValue);
@@ -734,8 +771,8 @@ class _NotificationsPageState extends State<NotificationsPage> {
           children: [
             // Поле для ввода часов
             Container(
-              width: 80,
-              height: 50,
+              width: 70,
+              height: 45,
               alignment: Alignment.center,
               decoration: BoxDecoration(
                 color: Color(0xFFF8F9F9),
@@ -746,18 +783,24 @@ class _NotificationsPageState extends State<NotificationsPage> {
                 textAlign: TextAlign.center,
                 keyboardType: TextInputType.number,
                 decoration: InputDecoration(border: InputBorder.none),
-                style: TextStyle(fontSize: 20, color: Colors.black),
+                style: TextStyle(fontSize: 14, color: Colors.black),
                 onFieldSubmitted: (String value) {
                   _updateHour(reminder, habit, hourController, minuteController);
                   hourFocusNode.unfocus();
+                   DatabaseHelper.instance.logAction(
+                    _currentSessionId!,
+                    "Пользователь установил час '$value' для привычки '${habit['name']}' на экране: $_currentScreenName.",
+                  );
                 },
               ),
             ),
+            SizedBox(width: 4),
             Text(' : ', style: TextStyle(fontSize: 24, color: Colors.black)),
+            SizedBox(width: 4),
             // Поле для ввода минут
             Container(
-              width: 80,
-              height: 50,
+              width: 70,
+              height: 45,
               alignment: Alignment.center,
               decoration: BoxDecoration(
                 color: Color(0xFFF8F9F9),
@@ -767,11 +810,16 @@ class _NotificationsPageState extends State<NotificationsPage> {
                 controller: minuteController, // Используем контроллер
                 textAlign: TextAlign.center,
                 keyboardType: TextInputType.number,
-                decoration: InputDecoration(border: InputBorder.none),
-                style: TextStyle(fontSize: 20, color: Colors.black),
+                decoration: InputDecoration(border: InputBorder.none,contentPadding: EdgeInsets.zero,),
+                style: TextStyle(fontSize: 14, color: Colors.black),
+
                 onFieldSubmitted: (String value) {
                   _updateHour(reminder, habit, hourController, minuteController);
                   minuteFocusNode.unfocus();
+                   DatabaseHelper.instance.logAction(
+                    _currentSessionId!,
+                    "Пользователь установил минуту '$value' для привычки '${habit['name']}' на экране: $_currentScreenName.",
+                  );
                 },
               ),
             ),
@@ -779,11 +827,15 @@ class _NotificationsPageState extends State<NotificationsPage> {
             // Кнопка "+" для добавления уведомления
             GestureDetector(
               onTap: () async {
+                await DatabaseHelper.instance.logAction(
+                  _currentSessionId!,
+                  "Пользователь добавил новое уведомление для привычки '${habit['name']}' на экране: $_currentScreenName",
+                );
                 await _addNewReminder(habit);
               },
               child: Container(
-                width: 30,
-                height: 30,
+                width: 25,
+                height: 25,
                 decoration: BoxDecoration(
                   color: Color(0xFFEEE9FF),
                   borderRadius: BorderRadius.circular(10),
@@ -796,19 +848,23 @@ class _NotificationsPageState extends State<NotificationsPage> {
             if (!isLastNotification)
               GestureDetector(
                 onTap: () async {
+                  await DatabaseHelper.instance.logAction(
+                    _currentSessionId!,
+                    "Пользователь удалил уведомление для привычки '${habit['name']}' на экране: $_currentScreenName",
+                  );
                   _removeNotification(reminder);
                   setState(() {
                     notificationTimes.removeWhere((entry) => entry['id'] == reminder['id']);
                   });
                 },
                 child: Container(
-                  width: 30,
-                  height: 30,
+                  width: 25,
+                  height: 25,
                   decoration: BoxDecoration(
                     color: Color(0xFFFFE7E5),
                     borderRadius: BorderRadius.circular(10),
                   ),
-                  child: Icon(Icons.close, color: Color(0xFFFF3B30), size: 24),
+                  child: Icon(Icons.close, color: Color(0xFFFF3B30), size: 20),
                 ),
               ),
           ],
@@ -872,7 +928,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
                 days[dayIndex],
                 style: const TextStyle(
                   fontSize: 14,
-                  color: Colors.grey,  // Цвет текста всегда активен
+                  color: Color(0xFF212121),  // Цвет текста всегда активен
                 ),
               ),
             ),
@@ -888,6 +944,10 @@ class _NotificationsPageState extends State<NotificationsPage> {
                     // Показываем ошибку, если пытаются снять последний день
                     _showError('Должен быть выбран хотя бы один день');
                   } else {
+                     DatabaseHelper.instance.logAction(
+                      _currentSessionId!,
+                      "Пользователь ${selectedDays[dayIndex] ? 'выбрал' : 'снял выбор'} день '${days[dayIndex]}' для привычки '${habit['name']}' на экране: $_currentScreenName.",
+                    );
                     // Мгновенное обновление состояния чекбокса
                     selectedDays[dayIndex] = !selectedDays[dayIndex];
                     reminder['days'] = selectedDays;
