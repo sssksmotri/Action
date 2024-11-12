@@ -138,7 +138,7 @@ class _NoteAddPageState extends State<NoteAddPage> {
       }
 
       // Удаляем элемент из списка _questions, если в нем больше одного элемента
-      if (_questions.length > 1) {
+      if (_questions.length > 0) {
         _questions.removeAt(index);
       } else {
         print('Ошибка: невозможно удалить последний вопрос.');
@@ -247,7 +247,7 @@ class _NoteAddPageState extends State<NoteAddPage> {
         "noteController": TextEditingController(),
         "isSaveButtonVisible": true,
         "isDropdownVisible": true,
-        "isQuestionBlockVisible": true,
+        "isQuestionBlockVisible": false,
         "id": null  // Новый элемент, еще не добавленный в базу, поэтому id = null
       });
     });
@@ -293,6 +293,8 @@ class _NoteAddPageState extends State<NoteAddPage> {
                 child: GestureDetector(
                   onTap: () async {
                     setState(() {
+                      isTextVisible=false;
+                      _saveTextVisibility(false);
                       // Переключаем видимость текущего блока вопросов
                       _questions[index]["isQuestionBlockVisible"] =
                       !(_questions[index]["isQuestionBlockVisible"] ?? false);
@@ -339,7 +341,6 @@ class _NoteAddPageState extends State<NoteAddPage> {
                 ),
               ),
               const SizedBox(width: 8),
-              if (index == _questions.length - 1)
                 GestureDetector(
                   onTap: () async {
                     // Добавляем новый вопрос в список
@@ -412,6 +413,38 @@ class _NoteAddPageState extends State<NoteAddPage> {
                     ),
                   ),
                 ),
+                SizedBox(width: 6,),
+                if (!(_questions[index]["isSaveButtonVisible"] ?? true)) ...[
+                  // Plus icon appears if the note has been saved
+                  GestureDetector(
+                    onTap: () async {
+                      // Add a new question after the current one
+                      _addNewQuestion();
+                      isTextVisible = false;
+                      _saveTextVisibility(false);
+                      await DatabaseHelper.instance.logAction(
+                        widget.sessionId,
+                        "Пользователь добавил новый вопрос на экране: $_currentScreenName",
+                      );
+                    },
+                    child: Container(
+                      width: 30,
+                      height: 30,
+                      decoration: BoxDecoration(
+                        color: Color(0xFFEEE9FF),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Center(
+                        child: Icon(
+                          Icons.add,
+                          color: Color(0xFF5F33E1),
+                          size: 24,
+                        ),
+                      ),
+                    ),
+                  ),
+                  SizedBox(width: 8),
+                ],
                 if (!(_questions[index]["isSaveButtonVisible"] ?? true))
                   GestureDetector(
                     onTap: () async
@@ -437,6 +470,8 @@ class _NoteAddPageState extends State<NoteAddPage> {
             ),
             const SizedBox(height: 16),
             TextField(
+              minLines: 5,
+              maxLines: 10,
               controller: _questions[index]["noteController"],
               decoration: InputDecoration(
                 hintText: tr('Your_note'),
@@ -449,7 +484,6 @@ class _NoteAddPageState extends State<NoteAddPage> {
                 ),
                 hintStyle: TextStyle(color: Colors.grey),
               ),
-              maxLines: 5,
               textInputAction: TextInputAction.done,
               onSubmitted: (value) {
                 FocusScope.of(context).unfocus();
@@ -469,6 +503,7 @@ class _NoteAddPageState extends State<NoteAddPage> {
                         _addNoteToDbDirectly(index);
                         setState(() {
                           _questions[index]["isSaveButtonVisible"] = false;
+                          _questions[index]["isDropdownVisible"] = false;
                         });
                         await DatabaseHelper.instance.logAction(
                             widget.sessionId,
@@ -543,18 +578,9 @@ class _NoteAddPageState extends State<NoteAddPage> {
                 _saveTextVisibility(false);
 
                 // Скрываем dropdown текущего вопроса после выбора опции
-                _questions[index]["isDropdownVisible"] = false;
+                _questions[index]["isDropdownVisible"] = true;
 
-                // Добавляем новый вопрос снизу
-                _questions.add({
-                  "selectedOption": null,
-                  "isNoteInputVisible": false,
-                  "noteController": TextEditingController(),
-                  "isSaveButtonVisible": true,
-                  "isDropdownVisible": true, // Новый элемент видим
-                  "isQuestionBlockVisible": false, // Блок выбора открыт
-                  "id": DateTime.now().toString() // Уникальный ID для нового вопроса
-                });
+
               });
               await DatabaseHelper.instance.logAction(
                   widget.sessionId,
