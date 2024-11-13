@@ -66,6 +66,9 @@ class _EditActionPageState extends State<EditPage> {
     actionNameController = TextEditingController(text: widget.ActionName);
     _loadHabitData(habitId);
     _currentSessionId = widget.sessionId;
+    startDate=DateTime.now();
+    endDate=DateTime.now().add(Duration(days: 180));
+    _resetInvalidDays();
   }
 
   @override
@@ -466,6 +469,7 @@ class _EditActionPageState extends State<EditPage> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           TextField(
+            textCapitalization: TextCapitalization.sentences,
             controller: actionNameController, // Подключение контроллера к полю ввода
             decoration: InputDecoration(
               filled: true,
@@ -887,7 +891,7 @@ class _EditActionPageState extends State<EditPage> {
       onTap: () {
         DateTime initialDate = isStartDate
             ? (startDate ?? DateTime.now())
-            : (endDate ?? DateTime.now());
+            : (endDate ?? DateTime.now().add(Duration(days: 180)));
         _showCalendarDialog(initialDate, isStartDate, (selectedDate) {
           onDatePicked(selectedDate);
         });
@@ -948,7 +952,7 @@ class _EditActionPageState extends State<EditPage> {
                         tr('start_date'),
                         startDate != null
                             ? DateFormat('dd.MM.yy').format(startDate!)
-                            : tr('from'), // Отображаем "From" если дата не выбрана
+                            : DateFormat('dd.MM.yy').format(DateTime.now()),
                         true, // Это начальная дата
                             (pickedDate) {
                           setState(() {

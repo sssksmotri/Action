@@ -67,6 +67,9 @@ class _AddActionPageState extends State<AddActionPage> {
   void initState()  {
     super.initState();
     _currentSessionId = widget.sessionId; // Инициализируем _currentSessionId здесь
+    startDate=DateTime.now();
+    endDate=DateTime.now().add(Duration(days: 180));
+    _resetInvalidDays();
   }
 
   void _onItemTapped(int index) async {
@@ -250,8 +253,6 @@ class _AddActionPageState extends State<AddActionPage> {
     );
   }
 
-
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -404,6 +405,7 @@ class _AddActionPageState extends State<AddActionPage> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           TextField(
+            textCapitalization: TextCapitalization.sentences,
             decoration: InputDecoration(
               filled: true,
               fillColor: Color(0xFFF8F9F9),
@@ -691,7 +693,6 @@ class _AddActionPageState extends State<AddActionPage> {
 
   void _showCalendarDialog(DateTime initialDate, bool isStartDate, ValueChanged<DateTime> onDateSelected) {
     print("Showing calendar dialog with initial date: $initialDate");
-
     showDialog(
       context: context,
       barrierColor: Colors.black.withOpacity(0.1), // Полупрозрачный барьер
@@ -785,14 +786,14 @@ class _AddActionPageState extends State<AddActionPage> {
                           DateFormat.E(locale).format(date).toUpperCase(),
                     ),
                     enabledDayPredicate: (day) {
-                      return day.isAfter(DateTime.now().subtract(const Duration(days: 1)));
+                      return true;
                     },
                     onDaySelected: (selectedDay, focusedDay) {
                       print("Selected day: $selectedDay");
 
                       if (isStartDate) {
                         if (endDate != null && selectedDay.isAfter(endDate!)) {
-                          _showError(tr("error_start_date_later_than_end"));
+                          markAllDaysAsIncomplete();
                         } else {
                           onDateSelected(selectedDay);
                           DatabaseHelper.instance.logAction(
@@ -804,7 +805,7 @@ class _AddActionPageState extends State<AddActionPage> {
                         }
                       } else {
                         if (startDate != null && selectedDay.isBefore(startDate!)) {
-                          _showError(tr("error_end_date_earlier_than_start"));
+                          markAllDaysAsIncomplete();
                         } else {
                           onDateSelected(selectedDay);
                           DatabaseHelper.instance.logAction(
@@ -829,15 +830,13 @@ class _AddActionPageState extends State<AddActionPage> {
 
 
 
-
-
 // Метод для создания виджета выбора даты
   Widget _buildDatePicker(String label, String value, bool isStartDate, ValueChanged<DateTime?> onDatePicked) {
     return GestureDetector(
       onTap: () {
         DateTime initialDate = isStartDate
             ? (startDate ?? DateTime.now())
-            : (endDate ?? DateTime.now());
+            : (endDate ?? DateTime.now().add(Duration(days: 180)));
         _showCalendarDialog(initialDate, isStartDate, (selectedDate) {
           onDatePicked(selectedDate);
         });
@@ -901,7 +900,7 @@ class _AddActionPageState extends State<AddActionPage> {
                         tr('start_date'),
                         startDate != null
                             ? DateFormat('dd.MM.yy').format(startDate!)
-                            : '', // Значение пустое, если дата не выбрана
+                            : DateFormat('dd.MM.yy').format(DateTime.now()),
                         true, // Это начальная дата
                             (pickedDate) {
                           setState(() {
@@ -930,7 +929,7 @@ class _AddActionPageState extends State<AddActionPage> {
                         tr('end_date'),
                         endDate != null
                             ? DateFormat('dd.MM.yy').format(endDate!)
-                            : '', // Значение пустое, если дата не выбрана
+                            : DateFormat('dd.MM.yy').format(DateTime.now().add(Duration(days: 180))), // Через полгода от текущей даты
                         false, // Это конечная дата
                             (pickedDate) {
                           setState(() {
@@ -1045,7 +1044,13 @@ class _AddActionPageState extends State<AddActionPage> {
 
 
 
-
+  void markAllDaysAsIncomplete() {
+    setState(() {
+      for (int i = 0; i < selectedDays.length; i++) {
+        selectedDays[i] = false;
+      }
+    });
+  }
 
   Widget _buildDaysOfWeekCheckboxes() {
     List<String> days = [
@@ -1057,6 +1062,9 @@ class _AddActionPageState extends State<AddActionPage> {
       tr('days.friday'),
       tr('days.saturday'),
     ];
+
+    // Проверяем, все ли чекбоксы пустые
+    bool areAllEmpty = selectedDays.every((day) => !day);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1122,7 +1130,13 @@ class _AddActionPageState extends State<AddActionPage> {
                       size: 18,
                       color: Colors.white,
                     )
-                        : null,
+                        : areAllEmpty
+                        ? const Icon(
+                      Icons.close,
+                      size: 18,
+                      color: Colors.red, // Цвет крестика
+                    )
+                        : null, // Не показываем крестик, если не все чекбоксы пустые
                   ),
                 ),
               ],
@@ -1576,7 +1590,6 @@ class _AddActionPageState extends State<AddActionPage> {
 
       if (startDate != null && endDate != null) {
         final int periodLength = endDate!.difference(startDate!).inDays;
-
         if (periodLength <= 7) {
           bool invalidDaySelected = false;
           bool anyDaySelected = false; // Флаг, чтобы проверить, выбран ли хотя бы один день
