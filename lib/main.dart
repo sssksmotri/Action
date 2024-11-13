@@ -546,7 +546,25 @@ class _HomePageState extends State<HomePage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return GestureDetector(
+      // Обрабатываем горизонтальные свайпы для всего экрана
+        onHorizontalDragEnd: (details) {
+          if (details.primaryVelocity! > 0) {
+            setState(() {
+              _selectedDate = _selectedDate.subtract(const Duration(days: 1));
+              _loadHabitsForSelectedDate();
+            });
+          } else if (details.primaryVelocity! < 0) {
+            // Свайп вправо - увеличиваем дату на 1 день, если это не сегодняшний день
+            if (!isSameDay(_selectedDate, _today)) {
+              setState(() {
+                _selectedDate = _selectedDate.add(const Duration(days: 1));
+                _loadHabitsForSelectedDate();
+              });
+            }
+          }
+        },
+    child:  Scaffold(
       backgroundColor: const Color(0xFFF8F9F9),
       appBar: AppBar(
         automaticallyImplyLeading: false,
@@ -919,7 +937,7 @@ class _HomePageState extends State<HomePage> {
           ],
         ),
       ),
-
+    )
     );
   }
 
@@ -1219,7 +1237,6 @@ class _HomePageState extends State<HomePage> {
         Key? key,
       }) {
     bool isChecked = isCompleted;
-
     return _buildCard(
       key: key,
       child: GestureDetector(
@@ -1246,13 +1263,41 @@ class _HomePageState extends State<HomePage> {
               Expanded(
                 child: Padding(
                   padding: const EdgeInsets.only(left: 10.0, top: 8.0, bottom: 8.0),
-                  child: Text(
+                  child:Column(crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
                     title,
                     style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
+                  const SizedBox(height: 4),
+                  if(isChecked)
+                  TextButton(
+                    onPressed: () async {
+                      // Логируем действие пользователя при уменьшении счётчика
+                      await DatabaseHelper.instance.logAction(widget.sessionId, "Снял чек у привычки с типом нажатия 1 раз на экране:$_currentSection");
+                        onTap();
+                    },
+                    style: TextButton.styleFrom(
+                      backgroundColor: const Color(0xFF5F33E1),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(30),
+                      ),
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      minimumSize: Size(80, 30),
+                    ),
+                    child: const Text(
+                      "Cancel",
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ),
+                  ]
+                )
                 ),
               ),
               // Галочка или крестик справа
@@ -1300,7 +1345,8 @@ class _HomePageState extends State<HomePage> {
                     DatabaseHelper.instance.logAction(widget.sessionId, "Выбрал в меню действия: архивацию у привычки с типом нажатия 1 раз на экране:$_currentSection");// Открываем меню
                     _menuStates[habitId] == false;
                     _archiveHabit(habitId);
-                  } else if (value == 'Edit') {
+                  }
+                  else if (value == 'Edit') {
                     DatabaseHelper.instance.logAction(widget.sessionId, "Выбрал в меню действия: изменение у привычки с типом нажатия 1 раз");// Открываем меню
                     _menuStates[habitId] == false;
                     Navigator.pushReplacement(
@@ -1427,7 +1473,8 @@ class _HomePageState extends State<HomePage> {
                       ),
                       const SizedBox(height: 4),
                       // Кнопка "Cancel" под названием
-                      TextButton(
+                      if(count>0)
+                        TextButton(
                         onPressed: count > 0
                             ? () async {
                           // Логируем действие пользователя при уменьшении счётчика
@@ -1474,6 +1521,10 @@ class _HomePageState extends State<HomePage> {
                       color: Color(0xFF0AC70A),
                       size: 35,
                     ),
+
+                    (DateTime.now().hour == 23 && DateTime.now().minute > 55
+                        ? const Icon(Icons.close, color: Colors.red, size: 28)
+                        : const SizedBox.shrink()),
                   ],
                 )
                     : buildDiagonalText(count, maxCount, isCompleted),
@@ -1725,6 +1776,7 @@ class _HomePageState extends State<HomePage> {
                       ),
                       const SizedBox(height: 4),
                       // Кнопка "Cancel" под названием
+                      if(currentProgress>0)
                       TextButton(
                         onPressed: currentProgress > 0
                             ? () async {
@@ -1950,6 +2002,25 @@ class _HomePageState extends State<HomePage> {
       onTap: () async {
         await DatabaseHelper.instance.logAction(widget.sessionId, "пользователь открыл календарь на главном экране");
         _showCalendarDialog(); // Показываем календарь при нажатии на область с датой
+      },
+
+      onHorizontalDragEnd: (details) {
+        // Если скорость свайпа положительная, то свайп вправо, если отрицательная — влево
+        if (details.primaryVelocity! < 0) {
+          // Свайп влево - уменьшаем дату на 1 день
+          setState(() {
+            _selectedDate = _selectedDate.subtract(const Duration(days: 1));
+            _loadHabitsForSelectedDate();
+          });
+        } else if (details.primaryVelocity! > 0) {
+          // Свайп вправо - увеличиваем дату на 1 день, если это не сегодняшний день
+          if (!isSameDay(_selectedDate, _today)) {
+            setState(() {
+              _selectedDate = _selectedDate.add(const Duration(days: 1));
+              _loadHabitsForSelectedDate();
+            });
+          }
+        }
       },
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 10),
