@@ -315,7 +315,7 @@ class _HomePageState extends State<HomePage> {
   DateTime? _startTime;
   String _currentSection = 'HomePage';
   Map<int, bool> _menuStates = {};
-
+  Map<int, bool> _isNotCheckedSelected = {};
   @override
   void initState() {
     super.initState();
@@ -1237,6 +1237,9 @@ class _HomePageState extends State<HomePage> {
         Key? key,
       }) {
     bool isChecked = isCompleted;
+    bool showRedCloseIcon = (DateTime.now().hour == 23 && DateTime.now().minute > 55) && !isCompleted;
+    // Получаем состояние для текущего habitId (если его нет, считаем false)
+    bool isNotCheckedSelected = _isNotCheckedSelected[habitId] ?? false;
     return _buildCard(
       key: key,
       child: GestureDetector(
@@ -1245,6 +1248,7 @@ class _HomePageState extends State<HomePage> {
           await DatabaseHelper.instance.logAction(widget.sessionId, "Увеличил счетчик у привычки с типом нажатия 1 раз на экране:$_currentSection");
           onTap();
           if(isChecked){
+            _isNotCheckedSelected[habitId] =false;
               await DatabaseHelper.instance.logAction(widget.sessionId, "Выполнил объем у привычки c нажатием 1 раз на экране:$_currentSection");
           }
           else{
@@ -1279,6 +1283,7 @@ class _HomePageState extends State<HomePage> {
                       // Логируем действие пользователя при уменьшении счётчика
                       await DatabaseHelper.instance.logAction(widget.sessionId, "Снял чек у привычки с типом нажатия 1 раз на экране:$_currentSection");
                         onTap();
+                      _isNotCheckedSelected[habitId] = false;
                     },
                     style: TextButton.styleFrom(
                       backgroundColor: const Color(0xFF5F33E1),
@@ -1303,7 +1308,21 @@ class _HomePageState extends State<HomePage> {
               // Галочка или крестик справа
               Padding(
                 padding: const EdgeInsets.only(right: 10.0),
-                child: isChecked
+                child: (showRedCloseIcon || isNotCheckedSelected)
+                    ? const Stack(
+                  alignment: Alignment.center,
+                  children: [
+                  const Icon(
+                  Icons.close,
+                  color: Colors.red,
+                  size: 40,
+                ),
+                const Icon(
+                  Icons.close,
+                  color: Colors.red,
+                  size: 35,
+                )])
+                    : (isChecked
                     ? Stack(
                   alignment: Alignment.center,
                   children: [
@@ -1319,8 +1338,6 @@ class _HomePageState extends State<HomePage> {
                     ),
                   ],
                 )
-                    : (DateTime.now().hour == 23 && DateTime.now().minute > 55
-                    ? const Icon(Icons.close, color: Colors.red, size: 28)
                     : const SizedBox.shrink()),
               ),
               // Кнопка с иконкой меню, которая меняется в зависимости от состояния
@@ -1341,11 +1358,20 @@ class _HomePageState extends State<HomePage> {
                      DatabaseHelper.instance.logAction(widget.sessionId, "Выбрал в меню действия: удаления у привычки с типом нажатия 1 раз на экране:$_currentSection");// Открываем меню
                     _menuStates[habitId] == false;
                     _showDeleteDialog(context, title, habitId, () {});
+                  }else if (value == 'Not_checked') {
+                    DatabaseHelper.instance.logAction(
+                        widget.sessionId,
+                        "Выбрал в меню действия: Не выполнить у привычки с типом нажатия 1 раз на экране:$_currentSection"
+                    );
+                    setState(() {
+                      _isNotCheckedSelected[habitId] = true;
+                    });
                   } else if (value == 'Archive') {
                     DatabaseHelper.instance.logAction(widget.sessionId, "Выбрал в меню действия: архивацию у привычки с типом нажатия 1 раз на экране:$_currentSection");// Открываем меню
                     _menuStates[habitId] == false;
                     _archiveHabit(habitId);
                   }
+
                   else if (value == 'Edit') {
                     DatabaseHelper.instance.logAction(widget.sessionId, "Выбрал в меню действия: изменение у привычки с типом нажатия 1 раз");// Открываем меню
                     _menuStates[habitId] == false;
@@ -1399,6 +1425,14 @@ class _HomePageState extends State<HomePage> {
                       ),
                     ),
                     PopupMenuItem<String>(
+                      value: 'Not_checked',
+                      height: 25,
+                      child: Padding(
+                        padding: EdgeInsets.symmetric(vertical: 4),
+                        child: Text('not_checked'.tr(), style: TextStyle(fontSize: 14)),
+                      ),
+                    ),
+                    PopupMenuItem<String>(
                       value: 'Delete',
                       height: 25,
                       child: Padding(
@@ -1436,17 +1470,29 @@ class _HomePageState extends State<HomePage> {
         Key? key,
       }) {
     bool isCompleted = count >= maxCount;
+    bool showRedCloseIcon = (DateTime.now().hour == 23 && DateTime.now().minute > 55) && !isCompleted;
+
+    // Получаем состояние для текущего habitId (если его нет, считаем false)
+    bool isNotCheckedSelected = _isNotCheckedSelected[habitId] ?? false;
 
     return _buildCard(
       key: key,
       child: GestureDetector(
         onTap: () async {
-          // Логируем действие при нажатии на всю карточку
-          await DatabaseHelper.instance.logAction(widget.sessionId, "Увеличил счетчик у привычки с типом нажатия несколько раз на экране:$_currentSection");
+          await DatabaseHelper.instance.logAction(
+              widget.sessionId,
+              "Увеличил счетчик у привычки с типом нажатия несколько раз на экране:$_currentSection"
+          );
+          setState(() {
+            _isNotCheckedSelected[habitId] = false;
+          });
           onIncrement();
           if (count + 1 >= maxCount) {
-            await DatabaseHelper.instance.logAction(widget.sessionId, "Выполнил объем у привычки с типом нажатия несколько раз на экране:$_currentSection ");
-          }// Вызываем исходный onTap
+            await DatabaseHelper.instance.logAction(
+                widget.sessionId,
+                "Выполнил объем у привычки с типом нажатия несколько раз на экране:$_currentSection"
+            );
+          }
         },
         child: Container(
           decoration: BoxDecoration(
@@ -1463,7 +1509,6 @@ class _HomePageState extends State<HomePage> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Название
                       Text(
                         title,
                         style: TextStyle(
@@ -1472,62 +1517,59 @@ class _HomePageState extends State<HomePage> {
                         ),
                       ),
                       const SizedBox(height: 4),
-                      // Кнопка "Cancel" под названием
-                      if(count>0)
+                      if (count > 0)
                         TextButton(
-                        onPressed: count > 0
-                            ? () async {
-                          // Логируем действие пользователя при уменьшении счётчика
-                          await DatabaseHelper.instance.logAction(widget.sessionId, "Уменьшил счетчик у привычки с нажатием несколько раз на экране:$_currentSection");
-
-                          // Выполняем действие уменьшения счётчика
-                          onDecrement();
-                        }
-                            : null,
-                        style: TextButton.styleFrom(
-                          backgroundColor: const Color(0xFF5F33E1),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(30),
+                          onPressed: count > 0
+                              ? () async {
+                            await DatabaseHelper.instance.logAction(
+                                widget.sessionId,
+                                "Уменьшил счетчик у привычки с нажатием несколько раз на экране:$_currentSection"
+                            );
+                            onDecrement();
+                            _isNotCheckedSelected[habitId] = false;
+                          }
+                              : null,
+                          style: TextButton.styleFrom(
+                            backgroundColor: const Color(0xFF5F33E1),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(30),
+                            ),
+                            padding: const EdgeInsets.symmetric(horizontal: 12),
+                            minimumSize: Size(80, 30),
                           ),
-                          padding: const EdgeInsets.symmetric(horizontal: 12),
-                          minimumSize: Size(80, 30),
-                        ),
-                        child: const Text(
-                          "Cancel",
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 14,
+                          child: const Text(
+                            "Cancel",
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 14,
+                            ),
                           ),
                         ),
-                      ),
                     ],
                   ),
                 ),
               ),
-              // Галочка справа, если задача выполнена, иначе показываем прогресс
+              // Показ иконки крестика при выполнении условий времени, статуса или выбора Not_checked
+              // Предполагаемая корректировка с правильным тернарным оператором
               Padding(
                 padding: const EdgeInsets.only(right: 10.0),
-                child: isCompleted
+                child: (showRedCloseIcon || isNotCheckedSelected)
                     ? Stack(
                   alignment: Alignment.center,
                   children: [
-                    const Icon(
-                      Icons.check,
-                      size: 40,
-                      color: Color(0xFF0AC70A),
-                    ),
-                    const Icon(
-                      Icons.check,
-                      color: Color(0xFF0AC70A),
-                      size: 35,
-                    ),
-
-                    (DateTime.now().hour == 23 && DateTime.now().minute > 55
-                        ? const Icon(Icons.close, color: Colors.red, size: 28)
-                        : const SizedBox.shrink()),
+                    Icon(Icons.close, color: Colors.red, size: 40),
+                    Icon(Icons.close, color: Colors.red, size: 35),
                   ],
                 )
-                    : buildDiagonalText(count, maxCount, isCompleted),
+                    : (isCompleted
+                    ? Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    Icon(Icons.check, size: 40, color: Color(0xFF0AC70A)),
+                    Icon(Icons.check, color: Color(0xFF0AC70A), size: 35),
+                  ],
+                )
+                    : buildDiagonalText(count, maxCount, isCompleted)),
               ),
               // Кнопка с тремя точками по центру справа
               PopupMenuButton<String>(
@@ -1543,16 +1585,30 @@ class _HomePageState extends State<HomePage> {
                     _menuStates[habitId] = false; // Закрываем меню после выбора
                   });
                   if (value == 'Delete') {
-                    DatabaseHelper.instance.logAction(widget.sessionId, "Выбрал в меню действия: удаления у привычки с типом нажатия несколько раз на экране:$_currentSection");// Открываем меню
-                    _menuStates[habitId] == false;
+                    DatabaseHelper.instance.logAction(
+                        widget.sessionId,
+                        "Выбрал в меню действия: удаления у привычки с типом нажатия несколько раз на экране:$_currentSection"
+                    );
                     _showDeleteDialog(context, title, habitId, () {});
                   } else if (value == 'Archive') {
-                    DatabaseHelper.instance.logAction(widget.sessionId, "Выбрал в меню действия: архивацию у привычки с типом нажатия несколько раз на экране:$_currentSection");// Открываем меню
-                    _menuStates[habitId] == false;
+                    DatabaseHelper.instance.logAction(
+                        widget.sessionId,
+                        "Выбрал в меню действия: архивацию у привычки с типом нажатия несколько раз на экране:$_currentSection"
+                    );
                     _archiveHabit(habitId);
+                  } else if (value == 'Not_checked') {
+                    DatabaseHelper.instance.logAction(
+                        widget.sessionId,
+                        "Выбрал в меню действия: Не выполнить у привычки с типом нажатия несколько раз на экране:$_currentSection"
+                    );
+                    setState(() {
+                      _isNotCheckedSelected[habitId] = true;
+                    });
                   } else if (value == 'Edit') {
-                    DatabaseHelper.instance.logAction(widget.sessionId, "Выбрал в меню действия: изменение у привычки с типом нажатия несколько раз на экране:$_currentSection");// Открываем меню
-                    _menuStates[habitId] == false;
+                    DatabaseHelper.instance.logAction(
+                        widget.sessionId,
+                        "Выбрал в меню действия: изменение у привычки с типом нажатия несколько раз на экране:$_currentSection"
+                    );
                     Navigator.pushReplacement(
                       context,
                       MaterialPageRoute(
@@ -1569,21 +1625,6 @@ class _HomePageState extends State<HomePage> {
                     );
                   }
                 },
-                onCanceled: () async {
-                  await DatabaseHelper.instance.logAction(widget.sessionId, "Закрыл меню действия у привычки с типом нажатия несколько раз на экране:$_currentSection");// Открываем меню
-                  setState(() {
-                    _menuStates[habitId] = false; // Закрываем меню при отмене
-                  });
-                },
-                onOpened: () async {
-                  await DatabaseHelper.instance.logAction(widget.sessionId, "Открыл меню действия у привычки с типом нажатия несколько раз на экране:$_currentSection");// Открываем меню
-                  setState(() {
-                    _menuStates[habitId] = true;
-                  });
-                },
-                constraints: BoxConstraints.tightFor(
-                  width: context.locale.languageCode == 'en' ? 95 : 155,
-                ),
                 itemBuilder: (BuildContext context) {
                   return [
                     PopupMenuItem<String>(
@@ -1600,6 +1641,14 @@ class _HomePageState extends State<HomePage> {
                       child: Padding(
                         padding: EdgeInsets.symmetric(vertical: 4),
                         child: Text('edit'.tr(), style: TextStyle(fontSize: 14)),
+                      ),
+                    ),
+                    PopupMenuItem<String>(
+                      value: 'Not_checked',
+                      height: 25,
+                      child: Padding(
+                        padding: EdgeInsets.symmetric(vertical: 4),
+                        child: Text('not_checked'.tr(), style: TextStyle(fontSize: 14)),
                       ),
                     ),
                     PopupMenuItem<String>(
@@ -1624,6 +1673,8 @@ class _HomePageState extends State<HomePage> {
       ),
     );
   }
+
+
 
 
 
@@ -1739,7 +1790,9 @@ class _HomePageState extends State<HomePage> {
     double currentProgress = habit['currentProgress'] ?? 0.0;
     double maxProgress = habit['volume_specified'] ?? 1.0;
     bool isCompleted = currentProgress >= maxProgress;
-
+    bool showRedCloseIcon = (DateTime.now().hour == 23 && DateTime.now().minute > 55) && !isCompleted;
+    // Получаем состояние для текущего habitId (если его нет, считаем false)
+    bool isNotCheckedSelected = _isNotCheckedSelected[habitId] ?? false;
     return _buildCard(
       key: key,
       child: GestureDetector(
@@ -1747,6 +1800,7 @@ class _HomePageState extends State<HomePage> {
           // Логируем действие при нажатии на всю карточку
           await DatabaseHelper.instance.logAction(widget.sessionId, "Увеличил счетчик у привычки с типом нажатия свой обьем на экране:$_currentSection ");
           onIncrement();
+          _isNotCheckedSelected[habitId] = false;
           if (currentProgress + 1 >= maxProgress) {
             await DatabaseHelper.instance.logAction(widget.sessionId, "Выполнил объем у привычки с типом нажатия свой обьем на экране:$_currentSection ");
           }// Вызываем исходный onTap
@@ -1782,7 +1836,7 @@ class _HomePageState extends State<HomePage> {
                             ? () async {
                           // Логируем действие пользователя при уменьшении счётчика
                           await DatabaseHelper.instance.logAction(widget.sessionId, "Уменьшил счетчик у привычки с типом нажатия свой обьем на экране:$_currentSection");
-
+                          _isNotCheckedSelected[habitId] = false;
                           // Выполняем действие уменьшения счётчика
                           onDecrement();
                         }
@@ -1810,23 +1864,23 @@ class _HomePageState extends State<HomePage> {
               // Отображение галочки, если цель выполнена, либо прогресса
               Padding(
                 padding: const EdgeInsets.only(right: 10.0),
-                child: isCompleted
+                child: (showRedCloseIcon || isNotCheckedSelected)
                     ? Stack(
                   alignment: Alignment.center,
                   children: [
-                    const Icon(
-                      Icons.check,
-                      size: 40,
-                      color: Color(0xFF0AC70A),
-                    ),
-                    const Icon(
-                      Icons.check,
-                      color: Color(0xFF0AC70A),
-                      size: 35,
-                    ),
+                    Icon(Icons.close, color: Colors.red, size: 40),
+                    Icon(Icons.close, color: Colors.red, size: 35),
                   ],
                 )
-                    : buildDiagonalTextdouble(currentProgress, maxProgress, isCompleted),
+                    : (isCompleted
+                    ? Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    Icon(Icons.check, size: 40, color: Color(0xFF0AC70A)),
+                    Icon(Icons.check, color: Color(0xFF0AC70A), size: 35),
+                  ],
+                )
+                    : buildDiagonalTextdouble(currentProgress, maxProgress, isCompleted)),
               ),
               // Кнопка с тремя точками по центру справа
               PopupMenuButton<String>(
@@ -1849,7 +1903,17 @@ class _HomePageState extends State<HomePage> {
                     DatabaseHelper.instance.logAction(widget.sessionId, "Выбрал в меню действия: архивацию у привычки с типом нажатия свой обьем на экране:$_currentSection");// Открываем меню
                     _menuStates[habitId] == false;
                     _archiveHabit(habitId);
-                  } else if (value == 'Edit') {
+                  }
+                  else if (value == 'Not_checked') {
+                    DatabaseHelper.instance.logAction(
+                        widget.sessionId,
+                        "Выбрал в меню действия: Не выполнить у привычки с типом нажатия свой обьем на экране:$_currentSection"
+                    );
+                    setState(() {
+                      _isNotCheckedSelected[habitId] = true;
+                    });
+                  }
+                  else if (value == 'Edit') {
                     DatabaseHelper.instance.logAction(widget.sessionId, "Выбрал в меню действия: изменение у привычки с типом нажатия свой обьем на экране:$_currentSection");// Открываем меню
                     _menuStates[habitId] == false;
                     Navigator.pushReplacement(
@@ -1899,6 +1963,14 @@ class _HomePageState extends State<HomePage> {
                       child: Padding(
                         padding: EdgeInsets.symmetric(vertical: 4),
                         child: Text('edit'.tr(), style: TextStyle(fontSize: 14)),
+                      ),
+                    ),
+                    PopupMenuItem<String>(
+                      value: 'Not_checked',
+                      height: 25,
+                      child: Padding(
+                        padding: EdgeInsets.symmetric(vertical: 4),
+                        child: Text('not_checked'.tr(), style: TextStyle(fontSize: 14)),
                       ),
                     ),
                     PopupMenuItem<String>(
