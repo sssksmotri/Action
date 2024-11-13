@@ -10,7 +10,7 @@ import 'stat.dart';
 import 'package:action_notes/Service/HabitReminderService.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:action_notes/Widgets/loggable_screen.dart';
-
+import 'package:flutter/cupertino.dart';
 class AddActionPage extends StatefulWidget {
   final int sessionId;
   const AddActionPage({Key? key, required this.sessionId}) : super(key: key);
@@ -54,7 +54,6 @@ class _AddActionPageState extends State<AddActionPage> {
   FocusNode quantityNode = FocusNode();
   int? _currentSessionId;
   String _currentScreenName = "AddActionPage";
-
   @override
   void dispose() {
     hourFocusNode.dispose();
@@ -616,8 +615,8 @@ class _AddActionPageState extends State<AddActionPage> {
               borderSide: BorderSide.none,
             ),
           ),
-          keyboardType: TextInputType.number,
-      textInputAction: TextInputAction.done,
+          keyboardType: TextInputType.numberWithOptions(decimal: true,signed: false),
+          textInputAction: TextInputAction.done,
           onChanged: (value) {
             // Логируем ввод объема пользователем
             DatabaseHelper.instance.logAction(
@@ -661,7 +660,7 @@ class _AddActionPageState extends State<AddActionPage> {
               borderSide: BorderSide.none,
             ),
           ),
-          keyboardType: TextInputType.number,
+          keyboardType: TextInputType.numberWithOptions(decimal: true,signed: false),
       textInputAction: TextInputAction.done,
           onChanged: (value) {
             // Логируем ввод объема на нажим
@@ -690,6 +689,7 @@ class _AddActionPageState extends State<AddActionPage> {
       ],
     );
   }
+
 
   void _showCalendarDialog(DateTime initialDate, bool isStartDate, ValueChanged<DateTime> onDateSelected) {
     print("Showing calendar dialog with initial date: $initialDate");
@@ -786,36 +786,18 @@ class _AddActionPageState extends State<AddActionPage> {
                           DateFormat.E(locale).format(date).toUpperCase(),
                     ),
                     enabledDayPredicate: (day) {
-                      return true;
+                      return true; // Все дни доступны для выбора
                     },
                     onDaySelected: (selectedDay, focusedDay) {
-                      print("Selected day: $selectedDay");
+                      // Записываем выбранную дату, не проверяя начальную или конечную
+                      onDateSelected(selectedDay);
+                      DatabaseHelper.instance.logAction(
+                          _currentSessionId!,
+                          "Пользователь выбрал дату: $selectedDay на экране: $_currentScreenName"
+                      );
+                      dateError = null;
+                      _resetInvalidDays();
 
-                      if (isStartDate) {
-                        if (endDate != null && selectedDay.isAfter(endDate!)) {
-                          markAllDaysAsIncomplete();
-                        } else {
-                          onDateSelected(selectedDay);
-                          DatabaseHelper.instance.logAction(
-                              _currentSessionId!,
-                              "Пользователь выбрал дату начала: $selectedDay на экране: $_currentScreenName"
-                          );
-                          dateError = null;
-                          _resetInvalidDays();
-                        }
-                      } else {
-                        if (startDate != null && selectedDay.isBefore(startDate!)) {
-                          markAllDaysAsIncomplete();
-                        } else {
-                          onDateSelected(selectedDay);
-                          DatabaseHelper.instance.logAction(
-                              _currentSessionId!,
-                              "Пользователь выбрал дату окончания: $selectedDay на экране: $_currentScreenName"
-                          );
-                          dateError = null;
-                          _resetInvalidDays();
-                        }
-                      }
                       Navigator.pop(context);
                     },
                   ),
@@ -827,7 +809,6 @@ class _AddActionPageState extends State<AddActionPage> {
       },
     );
   }
-
 
 
 // Метод для создания виджета выбора даты
@@ -1036,6 +1017,39 @@ class _AddActionPageState extends State<AddActionPage> {
                 widget['days'][i] = i >= startDayIndex || i <= endDayIndex; // Сбрасываем чекбоксы уведомлений
               });
             }
+            if (endDate!.isBefore(startDate!)) {
+              // Если конечная дата раньше начальной, сбрасываем все чекбоксы
+              markAllDaysAsIncomplete();
+              notificationWidgets.forEach((widget) {
+                for (int i = 0; i < 7; i++) {
+                  widget['days'][i] = false; // Сбрасываем все дни
+                }
+              });
+            } else if (periodLength >= 7) {
+              // Если диапазон больше 7 дней, разрешаем выбрать все дни
+              for (int i = 0; i < 7; i++) {
+                selectedDays[i] = true;
+              }
+              notificationWidgets.forEach((widget) {
+                for (int i = 0; i < 7; i++) {
+                  widget['days'][i] = true; // Разрешаем все дни для уведомлений
+                }
+              });
+              dateError = null; // Сбрасываем сообщение об ошибке
+            } else {
+              // Обновляем состояние чекбоксов в пределах корректного диапазона
+              for (int i = 0; i < 7; i++) {
+                bool isInRange = (startDayIndex <= endDayIndex)
+                    ? i >= startDayIndex && i <= endDayIndex
+                    : i >= startDayIndex || i <= endDayIndex;
+
+                selectedDays[i] = isInRange;
+                notificationWidgets.forEach((widget) {
+                  widget['days'][i] = isInRange; // Обновляем дни уведомлений в пределах диапазона
+                });
+              }
+              dateError = null; // Сбрасываем сообщение об ошибке
+            }
           }
         }
       });
@@ -1054,17 +1068,14 @@ class _AddActionPageState extends State<AddActionPage> {
 
   Widget _buildDaysOfWeekCheckboxes() {
     List<String> days = [
-      tr('days.sunday'),
       tr('days.monday'),
       tr('days.tuesday'),
       tr('days.wednesday'),
       tr('days.thursday'),
       tr('days.friday'),
       tr('days.saturday'),
+      tr('days.sunday'),
     ];
-
-    // Проверяем, все ли чекбоксы пустые
-    bool areAllEmpty = selectedDays.every((day) => !day);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1072,6 +1083,7 @@ class _AddActionPageState extends State<AddActionPage> {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: List.generate(7, (index) {
+            int adjustedIndex = (index + 1) % 7;
             return Column(
               children: [
                 Text(
@@ -1093,13 +1105,13 @@ class _AddActionPageState extends State<AddActionPage> {
                       int selectedCount = selectedDays.where((day) => day).length;
 
                       // Если текущий чекбокс выбран и это единственный выбранный день
-                      if (selectedDays[index] && selectedCount == 1) {
+                      if (selectedDays[adjustedIndex] && selectedCount == 1) {
                         _showError(tr('error_days_selection'));
                       } else {
                         // Либо переключаем чекбокс, если есть другие выбранные дни
                         if (startDate != null && endDate != null) {
-                          if (_isWithinDateRange(startDate!, endDate!, index)) {
-                            selectedDays[index] = !selectedDays[index];
+                          if (_isWithinDateRange(startDate!, endDate!, adjustedIndex)) {
+                            selectedDays[adjustedIndex] = !selectedDays[adjustedIndex];
                           } else {
                             _showError(tr('error_selected_day_out_of_range'));
                           }
@@ -1113,24 +1125,24 @@ class _AddActionPageState extends State<AddActionPage> {
                     width: 24,
                     height: 24,
                     decoration: BoxDecoration(
-                      color: selectedDays[index]
+                      color: selectedDays[adjustedIndex]
                           ? const Color(0xFF5F33E1)
                           : Colors.transparent,
                       borderRadius: BorderRadius.circular(5),
                       border: Border.all(
-                        color: selectedDays[index]
+                        color: selectedDays[adjustedIndex]
                             ? const Color(0xFF5F33E1)
                             : Colors.grey,
                         width: 1,
                       ),
                     ),
-                    child: selectedDays[index]
+                    child: selectedDays[adjustedIndex]
                         ? const Icon(
                       Icons.check,
                       size: 18,
                       color: Colors.white,
                     )
-                        : areAllEmpty
+                        :  (endDate != null && startDate != null && endDate!.isBefore(startDate!))
                         ? const Icon(
                       Icons.close,
                       size: 18,
@@ -1148,34 +1160,34 @@ class _AddActionPageState extends State<AddActionPage> {
   }
 
 
-  // Тумблер для включения/выключения уведомлений
-  bool _isValidTime(int hour, int minute) {
-    return hour >= 0 && hour < 24 && minute >= 0 && minute < 60;
-  }
 
   Widget _buildDaysOfWeekCheckboxesNot(int index) {
+    // Список дней, начиная с понедельника
     List<String> days = [
-      tr('days.sunday'),
       tr('days.monday'),
       tr('days.tuesday'),
       tr('days.wednesday'),
       tr('days.thursday'),
       tr('days.friday'),
       tr('days.saturday'),
+      tr('days.sunday'),
     ];
     List<bool> selectedDays = notificationWidgets[index]['days'];
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: List.generate(7, (dayIndex) {
-            bool isInRange = startDate != null && endDate != null && _isWithinDateRange(startDate!, endDate!, dayIndex);
+            // Приводим индексы к порядку, где 0 — понедельник, 6 — воскресенье
+            int adjustedDayIndex = (dayIndex + 1) % 7; // Сдвиг индексов на один вправо
+
+            bool isInRange = startDate != null && endDate != null && _isWithinDateRange(startDate!, endDate!, adjustedDayIndex);
+
             return Column(
               children: [
                 Text(
-                  days[dayIndex],
+                  days[dayIndex], // Название дня из обновленного списка
                   style: const TextStyle(
                     fontSize: 14,
                     color: Color(0xFF616060),
@@ -1186,15 +1198,15 @@ class _AddActionPageState extends State<AddActionPage> {
                   onTap: () {
                     DatabaseHelper.instance.logAction(
                         _currentSessionId!,
-                        "пользователь ${selectedDays[dayIndex] ? 'выбрал' : 'убрал'} день у уведомления: $index: ${days[dayIndex]} на экране: $_currentScreenName"
+                        "пользователь ${selectedDays[adjustedDayIndex] ? 'выбрал' : 'убрал'} день у уведомления: $index: ${days[dayIndex]} на экране: $_currentScreenName"
                     );
                     if (isInRange) {
                       setState(() {
                         int selectedCount = selectedDays.where((day) => day).length;
-                        if (selectedDays[dayIndex] && selectedCount == 1) {
+                        if (selectedDays[adjustedDayIndex] && selectedCount == 1) {
                           _showError(tr('error_days_selection'));
                         } else {
-                          selectedDays[dayIndex] = !selectedDays[dayIndex];
+                          selectedDays[adjustedDayIndex] = !selectedDays[adjustedDayIndex];
                         }
                       });
                     } else {
@@ -1205,16 +1217,30 @@ class _AddActionPageState extends State<AddActionPage> {
                     width: 24,
                     height: 24,
                     decoration: BoxDecoration(
-                      color: selectedDays[dayIndex] ? const Color(0xFF5F33E1) : Colors.transparent,
+                      color: selectedDays[adjustedDayIndex]
+                          ? const Color(0xFF5F33E1)
+                          : Colors.transparent,
                       borderRadius: BorderRadius.circular(5),
                       border: Border.all(
-                        color: isInRange ? (selectedDays[dayIndex] ? const Color(0xFF5F33E1) : Colors.grey) : Colors.grey.shade300,
+                        color: selectedDays[adjustedDayIndex]
+                            ? const Color(0xFF5F33E1)
+                            : Colors.grey,
                         width: 1,
                       ),
                     ),
-                    child: selectedDays[dayIndex]
-                        ? const Icon(Icons.check, size: 18, color: Colors.white)
-                        : null,
+                    child: selectedDays[adjustedDayIndex]
+                        ? const Icon(
+                      Icons.check,
+                      size: 18,
+                      color: Colors.white,
+                    )
+                        : (endDate != null && startDate != null && endDate!.isBefore(startDate!))
+                        ? const Icon(
+                      Icons.close,
+                      size: 18,
+                      color: Colors.red, // Цвет крестика
+                    )
+                        : null, // Не показываем крестик, если не все чекбоксы пустые
                   ),
                 ),
               ],
@@ -1225,6 +1251,7 @@ class _AddActionPageState extends State<AddActionPage> {
     );
   }
 
+
   Widget _buildTimePicker(int index) {
     final timeEntry = notificationWidgets[index];
     int selectedHour = timeEntry['hour'];
@@ -1232,69 +1259,51 @@ class _AddActionPageState extends State<AddActionPage> {
 
     return Column(
       children: [
+        SizedBox(height: 15,),
         Padding(
-          padding: const EdgeInsets.symmetric(vertical: 4.0),
+          padding: const EdgeInsets.symmetric(vertical: 0.0),
           child: Row(
             children: [
-              Container(
-                width: 80,
-                height: 50,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: Color(0xFFF8F9F9),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: TextFormField(
-                  textAlign: TextAlign.center,
-                  initialValue: selectedHour.toString().padLeft(2, '0'),
-                  keyboardType: TextInputType.number,
-                  decoration: InputDecoration(border: InputBorder.none),
-                  style: TextStyle(fontSize: 20, color: Colors.black),
-                  onChanged: (String value) {
-
-                    setState(() {
-                      int? hour = int.tryParse(value);
-                      DatabaseHelper.instance.logAction(
-                          _currentSessionId!,
-                          "Пользователь изменил час уведомления на ${hour.toString().padLeft(2, '0')} на экране: $_currentScreenName"
-                      );
-                      if (hour != null && _isValidTime(hour, selectedMinute)) {
-                        notificationWidgets[index]['hour'] = hour;
-                        _resetInvalidDays();
-                        hourFocusNode.unfocus();
-                      }
-                    });
-                  },
+              // Контейнер для часов
+              GestureDetector(
+                onTap: () {
+                  _showTimePicker(index);
+                },
+                child: Container(
+                  width: 80,
+                  height: 50,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: Color(0xFFF8F9F9),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    "${selectedHour.toString().padLeft(2, '0')}",
+                    style: TextStyle(fontSize: 20, color: Colors.black),
+                  ),
                 ),
               ),
-              Text(' : ', style: TextStyle(fontSize: 24, color: Colors.black)),
-              Container(
-                width: 80,
-                height: 50,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: Color(0xFFF8F9F9),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: TextFormField(
-                  textAlign: TextAlign.center,
-                  initialValue: selectedMinute.toString().padLeft(2, '0'),
-                  keyboardType: TextInputType.number,
-                  decoration: InputDecoration(border: InputBorder.none),
-                  style: TextStyle(fontSize: 20, color: Colors.black),
-                  onChanged: (String value) {
-                    setState(() {
-                      int? minute = int.tryParse(value);
-                      DatabaseHelper.instance.logAction(
-                          _currentSessionId!,
-                          "Пользователь изменил минуту уведомления на ${minute.toString().padLeft(2, '0')} на экране: $_currentScreenName"
-                      );
-                      if (minute != null && _isValidTime(selectedHour, minute)) {
-                        notificationWidgets[index]['minute'] = minute;
-                        minuteFocusNode.unfocus();
-                      }
-                    });
-                  },
+              Text(
+                ' : ',
+                style: TextStyle(fontSize: 24, color: Colors.black),
+              ),
+              // Контейнер для минут
+              GestureDetector(
+                onTap: () {
+                  _showTimePicker(index);
+                },
+                child: Container(
+                  width: 80,
+                  height: 50,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: Color(0xFFF8F9F9),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    "${selectedMinute.toString().padLeft(2, '0')}",
+                    style: TextStyle(fontSize: 20, color: Colors.black),
+                  ),
                 ),
               ),
               SizedBox(width: 12),
@@ -1310,8 +1319,8 @@ class _AddActionPageState extends State<AddActionPage> {
                       return _isWithinDateRange(startDate!, endDate!, dayIndex);
                     });
                     notificationWidgets.add({
-                      'hour': 8,
-                      'minute': 0,
+                      'hour': 23,
+                      'minute': 59,
                       'days': newDays,
                     });
                   });
@@ -1353,11 +1362,49 @@ class _AddActionPageState extends State<AddActionPage> {
             ],
           ),
         ),
+        SizedBox(height: 4),
         _buildDaysOfWeekCheckboxesNot(index),
       ],
     );
   }
 
+
+  void _showTimePicker(int index) {
+    final timeEntry = notificationWidgets[index];
+    int selectedHour = timeEntry['hour'];
+    int selectedMinute = timeEntry['minute'];
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,  // Transparent background for blur effect
+      barrierColor: Colors.black.withOpacity(0.5), // Dimming the background
+      isScrollControlled: true, // Allows controlling the height of the modal
+      builder: (BuildContext builder) {
+        return ClipRRect(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),  // Rounded top corners
+          child: Container(
+            decoration: BoxDecoration(
+              color: Colors.white,  // White background for the modal
+              borderRadius: BorderRadius.vertical(top: Radius.circular(20)),  // Rounded top corners
+            ),
+            height: MediaQuery.of(context).size.height / 3,  // Modal height
+            child: CupertinoDatePicker(
+              mode: CupertinoDatePickerMode.time,
+              initialDateTime: DateTime(0, 0, 0, selectedHour, selectedMinute),
+              use24hFormat: true,  // Forces 24-hour format (no AM/PM)
+              onDateTimeChanged: (newTime) {
+                setState(() {
+                  // Update the hour and minute without AM/PM
+                  notificationWidgets[index]['hour'] = newTime.hour;
+                  notificationWidgets[index]['minute'] = newTime.minute;
+                });
+              },
+            ),
+          ),
+        );
+      },
+    );
+  }
 
 
   Widget _buildNotificationToggle() {
@@ -1375,7 +1422,7 @@ class _AddActionPageState extends State<AddActionPage> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                  Text(
-                  tr('notifications'),
+                  tr('napomin'),
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
@@ -1446,9 +1493,6 @@ class _AddActionPageState extends State<AddActionPage> {
                     ),
                   ),
                 ),
-
-
-
               ],
             ),
             if (notificationsEnabled)
@@ -1460,14 +1504,11 @@ class _AddActionPageState extends State<AddActionPage> {
                       .toList(),
                 ),
             const SizedBox(height: 10),
-
           ],
         ),
       ),
     );
   }
-
-
 
   //Кнопка
   Widget _buildAddButton(String taskTitle) {
@@ -1571,20 +1612,29 @@ class _AddActionPageState extends State<AddActionPage> {
           int? quantityValue = int.tryParse(quantityText);
           if (quantityValue == null) {
             quantityError = tr('error_quantity_integer');
+          } else if (quantityValue < 1 || quantityValue > 99) {
+            quantityError = tr('error_quantity_range_1_99'); // Проверка на диапазон от 1 до 99
           } else {
             quantityError = null; // Если всё в порядке, сбрасываем ошибку
           }
         }
       }
 
-      // Валидация объема для типа 2
+      // Валидация для типа 2 (число с плавающей точкой до десятых)
       if (selectedType == 2) {
         double? volumePerPress = double.tryParse(volumePerPressController.text);
         double? volumeSpecified = double.tryParse(volumeSpecifiedController.text);
+
         if (volumePerPress == null || volumeSpecified == null) {
           volumeError = tr('error_volume_valid_numbers');
         } else {
-          volumeError = null;
+          // Проверка на десятичные знаки, чтобы оставить только до одной цифры после запятой
+          if ((volumePerPress * 10).toInt() != (volumePerPress * 10).round() ||
+              (volumeSpecified * 10).toInt() != (volumeSpecified * 10).round()) {
+            volumeError = tr('error_volume_decimal');
+          } else {
+            volumeError = null;
+          }
         }
       }
 
