@@ -600,14 +600,26 @@ class _HomePageState extends State<HomePage> {
             Row(
               children: [
                 IconButton(
-                  icon: Image.asset('assets/images/Filter.png'),
+                  icon: SizedBox(
+                    width: 28,
+                    height: 28,
+                    child: Image.asset(
+                      'assets/images/Filter.png',
+                    ),
+                  ),
                   onPressed: () async {
                     await DatabaseHelper.instance.logAction(widget.sessionId, "Открыл фильтры на главном экране");
                     _showPopupMenu(context);
                   },
                 ),
                 IconButton(
-                  icon: Image.asset('assets/images/Folder.png'),
+                  icon: SizedBox(
+                    width: 28,
+                    height: 28,
+                    child: Image.asset(
+                      'assets/images/Folder.png',
+                    ),
+                  ),
                   onPressed: () async {
                     if (_currentSessionId != null) {
                       await DatabaseHelper.instance.logAction(widget.sessionId, "Перешел на страницу архива");
@@ -779,6 +791,7 @@ class _HomePageState extends State<HomePage> {
                       else if (habitType == 2) {
                         double currentProgress = habit['currentProgress'] ?? 0.0;
                         double maxProgress = habit['volume_specified'] ?? 1.0;
+
 
                         return _buildPressCountHabit(
                           habit,
@@ -1404,7 +1417,7 @@ class _HomePageState extends State<HomePage> {
                   });
                 },
                 constraints: BoxConstraints.tightFor(
-                  width: context.locale.languageCode == 'en' ? 95 : 155,
+                  width: context.locale.languageCode == 'en' ? 135 : 155,
                 ),
                 itemBuilder: (BuildContext context) {
                   return [
@@ -1625,6 +1638,9 @@ class _HomePageState extends State<HomePage> {
                     );
                   }
                 },
+                constraints: BoxConstraints.tightFor(
+                  width: context.locale.languageCode == 'en' ? 135 : 155,
+                ),
                 itemBuilder: (BuildContext context) {
                   return [
                     PopupMenuItem<String>(
@@ -1728,6 +1744,16 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
+  String formatNumber(double number) {
+    if (number == number.toInt()) {
+      // Если число целое, возвращаем как целое
+      return number.toInt().toString();
+    } else {
+      // Если число с плавающей точкой, возвращаем с одним знаком после запятой
+      return number.toStringAsFixed(1);
+    }
+  }
+
   Widget buildDiagonalTextdouble(double count, double maxCount, bool isCompleted) {
     return Stack(
       alignment: Alignment.center,
@@ -1750,7 +1776,7 @@ class _HomePageState extends State<HomePage> {
               child: Align(
                 alignment: Alignment.centerLeft,
                 child: Text(
-                  '$count',
+                  formatNumber(count), // Применяем форматирование
                   style: TextStyle(
                     fontSize: 18,
                     color: isCompleted ? Colors.green : Colors.red,
@@ -1763,7 +1789,7 @@ class _HomePageState extends State<HomePage> {
               child: Align(
                 alignment: Alignment.centerRight,
                 child: Text(
-                  '$maxCount',
+                  formatNumber(maxCount), // Применяем форматирование
                   style: TextStyle(
                     fontSize: 18,
                     color: isCompleted ? Colors.green : Colors.red,
@@ -1945,7 +1971,7 @@ class _HomePageState extends State<HomePage> {
                   });
                 },
                 constraints: BoxConstraints.tightFor(
-                  width: context.locale.languageCode == 'en' ? 95 : 155,
+                  width: context.locale.languageCode == 'en' ? 135 : 155,
                 ),
                 itemBuilder: (BuildContext context) {
                   return [
@@ -2108,8 +2134,8 @@ class _HomePageState extends State<HomePage> {
               icon: Image.asset(
                 'assets/images/arr_left.png', // путь к вашей картинке
                 color: const Color(0xFF5F33E1), // если нужно применить цвет
-                width: 18, // установите ширину
-                height: 18,
+                width: 24, // установите ширину
+                height: 24,
               ),
               onPressed: () async {
                 await DatabaseHelper.instance.logAction(widget.sessionId, "Выбрал новую дату в календаре в главном экране");
@@ -2153,8 +2179,8 @@ class _HomePageState extends State<HomePage> {
                 color: isSameDay(_selectedDate, _today)
                     ? const Color(0x4D5F33E1)  // Полупрозрачный цвет, если выбран сегодняшний день
                     : const Color(0xFF5F33E1), // Обычный цвет
-                width: 18, // Устанавливаем ширину
-                height: 18, // Устанавливаем высоту (необязательно)
+                width: 24, // Устанавливаем ширину
+                height: 24, // Устанавливаем высоту (необязательно)
               ),
               onPressed: isSameDay(_selectedDate, _today)
                   ? null  // Блокируем стрелку, если выбранная дата — сегодняшняя
@@ -2271,8 +2297,8 @@ class _HomePageState extends State<HomePage> {
                         padding: const EdgeInsets.only(left: 35.0),
                         child: Image.asset(
                           'assets/images/arr_left.png',
-                          width: 20,
-                          height: 20,
+                          width: 24,
+                          height: 24,
                           color: const Color(0xFF5F33E1),
                         ),
                       ),
@@ -2280,8 +2306,8 @@ class _HomePageState extends State<HomePage> {
                         padding: const EdgeInsets.only(right: 35.0),
                         child: Image.asset(
                           'assets/images/arr_right.png',
-                          width: 20,
-                          height: 20,
+                          width: 24,
+                          height: 24,
                           color: const Color(0xFF5F33E1),
                         ),
                       ),

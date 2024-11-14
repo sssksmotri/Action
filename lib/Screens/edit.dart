@@ -869,9 +869,7 @@ class _EditActionPageState extends State<EditPage> {
   Widget _buildDatePicker(String label, String value, bool isStartDate, ValueChanged<DateTime?> onDatePicked) {
     return GestureDetector(
       onTap: () {
-        DateTime initialDate = isStartDate
-            ? (startDate ?? DateTime.now())
-            : (endDate ?? DateTime.now().add(Duration(days: 180)));
+        DateTime initialDate = isStartDate ? startDate! : endDate!;
         _showCalendarDialog(initialDate, isStartDate, (selectedDate) {
           onDatePicked(selectedDate);
         });

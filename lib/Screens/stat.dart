@@ -60,6 +60,8 @@ class _StatsPageState extends State<StatsPage> {
         _endDate = _today;
         _loadTasks();
       } else if (_selectedPeriod == 'another_period'.tr()) {
+        _startDate = _today.subtract(const Duration(days: 59));  // 14-дневный период
+        _endDate = _today;
         _loadTasks();
       }
     });
@@ -275,9 +277,7 @@ class _StatsPageState extends State<StatsPage> {
 
 
   Widget _buildProgressBar(int completed, int total, List<bool> isCompleted) {
-    // Логика для разных состояний
     if (total <= 14) {
-      // Для 14 и меньше элементов — прямоугольные, расположенные в 1 или 2 строки
       int maxItemsPerRow = total <= 7 ? total : (total / 1).ceil();
       int numberOfRows = total <= 7 ? 1 : 2;
 
@@ -293,13 +293,13 @@ class _StatsPageState extends State<StatsPage> {
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 1.0, vertical: 1.0),
                   child: Container(
-                    height: 15,
+                    height: 8, // Сделаем элементы более плоскими
                     decoration: BoxDecoration(
                       color: isCompleted[currentIndex]
                           ? const Color(0xFF5F33E1)
                           : Colors.grey[300],
                       shape: BoxShape.rectangle,
-                      borderRadius: BorderRadius.circular(10),
+                      borderRadius: BorderRadius.circular(6), // Плоские углы
                     ),
                   ),
                 ),
@@ -308,39 +308,28 @@ class _StatsPageState extends State<StatsPage> {
           );
         }),
       );
-    } else if (total <= 30) {
-      // Для 15-30 элементов — круги, расположенные в 2 строки
-      int maxItemsPerRow = (total / 2).ceil();
-      int numberOfRows = 2;
-
-      return Column(
-        children: List.generate(numberOfRows, (rowIndex) {
-          return Row(
-            mainAxisAlignment: MainAxisAlignment.start,
-            children: List.generate(maxItemsPerRow, (index) {
-              int currentIndex = rowIndex * maxItemsPerRow + index;
-              if (currentIndex >= total) return Container();
-
-              return Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 1.0, vertical: 1.0),
-                  child: Container(
-                    height: 18,
-                    decoration: BoxDecoration(
-                      color: isCompleted[currentIndex]
-                          ? const Color(0xFF5F33E1)
-                          : Colors.grey[300],
-                      shape: BoxShape.circle,
-                    ),
-                  ),
+    } else if (total <= 32) {
+      return Row(
+        mainAxisAlignment: MainAxisAlignment.start,
+        children: List.generate(total, (index) {
+          return Expanded(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 1.0, vertical: 1.0),
+              child: Container(
+                height: 9, // Плоская форма с небольшой высотой
+                decoration: BoxDecoration(
+                  color: isCompleted[index]
+                      ? const Color(0xFF5F33E1)
+                      : Colors.grey[300],
+                  shape: BoxShape.rectangle,
+                  borderRadius: BorderRadius.circular(4), // Плоские углы
                 ),
-              );
-            }),
+              ),
+            ),
           );
         }),
       );
     } else {
-      // Для больше 30 элементов — круги в одной строке с возможностью прокрутки
       int maxItemsPerRow = (total / 2).ceil();
       int numberOfRows = 2;
 
@@ -356,12 +345,13 @@ class _StatsPageState extends State<StatsPage> {
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 1.0, vertical: 1.0),
                   child: Container(
-                    height: 18,
+                    height: 8, // Плоские и компактные элементы
                     decoration: BoxDecoration(
                       color: isCompleted[currentIndex]
                           ? const Color(0xFF5F33E1)
                           : Colors.grey[300],
-                      shape: BoxShape.circle,
+                      shape: BoxShape.rectangle,
+                      borderRadius: BorderRadius.circular(6), // Плоские углы
                     ),
                   ),
                 ),
@@ -391,8 +381,13 @@ class _StatsPageState extends State<StatsPage> {
             Row(
               children: [
                 IconButton(
-                  iconSize: 32,
-                  icon: Image.asset('assets/images/Chart.png'),
+                  icon: SizedBox(
+                    width: 28,
+                    height: 28,
+                    child: Image.asset(
+                      'assets/images/Chart.png',
+                    ),
+                  ),
                   onPressed: () async {
                    await DatabaseHelper.instance.logAction(
                         _currentSessionId!,
@@ -415,7 +410,13 @@ class _StatsPageState extends State<StatsPage> {
                 ),
                 IconButton(
                   iconSize: 32,
-                  icon: Image.asset('assets/images/Folder.png'),
+                  icon: SizedBox(
+                    width: 28,
+                    height: 28,
+                    child: Image.asset(
+                      'assets/images/Folder.png',
+                    ),
+                  ),
                   onPressed: () async {
                    await DatabaseHelper.instance.logAction(
                         _currentSessionId!,
@@ -482,8 +483,8 @@ class _StatsPageState extends State<StatsPage> {
                 IconButton(
                   icon: Image.asset(
                     'assets/images/arr_left.png',
-                    width: 20,
-                    height: 20,
+                    width: 24,
+                    height: 24,
                   ),
                   onPressed: () async {
                     await DatabaseHelper.instance.logAction(
@@ -516,8 +517,8 @@ class _StatsPageState extends State<StatsPage> {
                 IconButton(
                   icon: Image.asset(
                     'assets/images/arr_right.png',
-                    width: 20,
-                    height: 20,
+                    width: 24,
+                    height: 24,
                     color: (_endDate != null && _endDate!.add(Duration(days: 7)).isBefore(DateTime.now().add(Duration(days: 1))))
                         ? const Color(0xFF5F33E1)
                         : const Color(0x4D5F33E1),
@@ -675,6 +676,42 @@ class _StatsPageState extends State<StatsPage> {
                 );
               }).toList(),
             ),
+          const SizedBox(height: 3,),
+          if (_selectedPeriod == tr('two_weeks'))
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: _generate14DaysForPeriod(_startDate!).map((day) {
+                int completedHabits = _getCompletedHabitsForDate(day);
+                return Container(
+                  width: 25,
+                  padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 1),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFEEE9FF),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Column(
+                    children: [
+                      Text(
+                        DateFormat('dd.MM').format(day),
+                        style: const TextStyle(
+                          fontSize: 5,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        '$completedHabits',
+                        style: const TextStyle(
+                          color: Color(0xFF5F33E1),
+                          fontSize: 9,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }).toList(),
+            ),
           const SizedBox(height: 3),
           // Логика для "Другого периода"
           if (_selectedPeriod == tr('another_period')) ...[
@@ -771,6 +808,9 @@ class _StatsPageState extends State<StatsPage> {
   List<DateTime> _generateDaysForPeriod(DateTime startDate) {
     return List.generate(7, (index) => startDate.add(Duration(days: index)));
   }
+  List<DateTime> _generate14DaysForPeriod(DateTime startDate) {
+    return List.generate(14, (index) => startDate.add(Duration(days: index)));
+  }
 
   void _showCalendarDialog({required bool isStartDate}) {
     showDialog(
@@ -835,8 +875,8 @@ class _StatsPageState extends State<StatsPage> {
                         padding: const EdgeInsets.only(left: 35.0),
                         child: Image.asset(
                           'assets/images/arr_left.png',
-                          width: 20,
-                          height: 20,
+                          width: 24,
+                          height: 24,
                           color: const Color(0xFF5F33E1),
                         ),
                       ),
@@ -844,8 +884,8 @@ class _StatsPageState extends State<StatsPage> {
                         padding: const EdgeInsets.only(right: 35.0),
                         child: Image.asset(
                           'assets/images/arr_right.png',
-                          width: 20,
-                          height: 20,
+                          width: 24,
+                          height: 24,
                           color: const Color(0xFF5F33E1),
                         ),
                       ),

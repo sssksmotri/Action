@@ -13,7 +13,7 @@ import 'settings_screen.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'dart:ui';
 import 'package:action_notes/Widgets/loggable_screen.dart';
-
+import 'package:flutter/cupertino.dart';
 class NotificationsPage extends StatefulWidget {
   final int sessionId;
   const NotificationsPage({Key? key, required this.sessionId}) : super(key: key);
@@ -257,7 +257,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
 
     if (status.isDenied) {
       // Если статус "Denied", выводим диалог для запроса разрешения
-      await _showPermissionDialog();
+      await _requestNotificationPermission();
     } else if (status.isPermanentlyDenied) {
       // Если статус "PermanentlyDenied", показываем диалог с предложением открыть настройки
       await _showSettingsDialog();
@@ -270,7 +270,9 @@ class _NotificationsPageState extends State<NotificationsPage> {
     if (status.isGranted) {
       SharedPreferences prefs = await SharedPreferences.getInstance();
       await prefs.setBool('isDialogShown', true);
-      allNotificationsEnabled=true;
+      setState(() {
+        allNotificationsEnabled=true;
+      });
       await _saveToggleState('allNotificationsEnabled', true);
       await DatabaseHelper.instance.logAction(
         widget.sessionId,
@@ -279,114 +281,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
     }
   }
 
-  Future<void> _showPermissionDialog() async {
-    return showDialog(
-      context: context,
-      barrierColor: Colors.black.withOpacity(0.1),
-      builder: (BuildContext context) {
-        return Stack(
-          children: [
-            BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
-              child: Container(color: Colors.black.withOpacity(0)),
-            ),
-            AlertDialog(
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-              contentPadding: const EdgeInsets.fromLTRB(24, 20, 24, 10),
-              insetPadding: const EdgeInsets.all(5),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  RichText(
-                    textAlign: TextAlign.center,
-                    text: TextSpan(
-                      text: "want_to_allow_notifications".tr(),
-                      style: TextStyle(
-                        color: Colors.black,
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                      ),
-                      children: [
-                        TextSpan(
-                          text: "reminders".tr(),
-                          style: TextStyle(
-                            color: Color(0xFF5F33E1),
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        TextSpan(text: "?"),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              actionsPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-              actions: <Widget>[
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Expanded(
-                      child: TextButton(
-                        onPressed: () async {
-                          await DatabaseHelper.instance.logAction(widget.sessionId, "Пользователь отказался дать разрешения на уведомления на экране: $_currentScreenName");
-                          Navigator.of(context).pop();
-                        },
-                        style: TextButton.styleFrom(
-                          backgroundColor: const Color(0xFFEEE9FF),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                          padding: const EdgeInsets.symmetric(
-                            vertical: 10,
-                            horizontal: 20,
-                          ),
-                        ),
-                        child: Text(
-                          "no_thanks".tr(),
-                          style: TextStyle(
-                            color: Color(0xFF5F33E1),
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: TextButton(
-                        onPressed: () async {
-                          await DatabaseHelper.instance.logAction(widget.sessionId, "Пользователь дал разрешение на уведомления(появляется окно запроса на разрешение уведомлений) на экране: $_currentScreenName");
-                          Navigator.of(context).pop();
-                          await _requestNotificationPermission();
-                        },
-                        style: TextButton.styleFrom(
-                          backgroundColor: Color(0xFF5F33E1),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                          padding: const EdgeInsets.symmetric(
-                            vertical: 10,
-                            horizontal: 20,
-                          ),
-                        ),
-                        child: Text(
-                          "yes_allow".tr(),
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ],
-        );
-      },
-    );
-  }
+
 
 // Диалог для перенаправления в настройки
   Future<void> _showSettingsDialog() async {
@@ -769,58 +664,54 @@ class _NotificationsPageState extends State<NotificationsPage> {
       children: [
         Row(
           children: [
-            // Поле для ввода часов
-            Container(
-              width: 70,
-              height: 45,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: Color(0xFFF8F9F9),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: TextFormField(
-                controller: hourController, // Используем контроллер
-                textAlign: TextAlign.center,
-                keyboardType: TextInputType.number,
-                decoration: InputDecoration(border: InputBorder.none),
-                style: TextStyle(fontSize: 14, color: Colors.black),
-                onFieldSubmitted: (String value) {
-                  _updateHour(reminder, habit, hourController, minuteController);
-                  hourFocusNode.unfocus();
-                   DatabaseHelper.instance.logAction(
-                    _currentSessionId!,
-                    "Пользователь установил час '$value' для привычки '${habit['name']}' на экране: $_currentScreenName.",
-                  );
-                },
+            // Квадрат для часов
+            GestureDetector(
+              onTap: () {
+                DatabaseHelper.instance.logAction(
+                  _currentSessionId!,
+                  "Пользователь выбрал, выбрать часы уведомление для привычки '${habit['name']}' на экране: $_currentScreenName",
+                );
+                _showTimePicker(reminder,habit);
+              }, // Показываем таймпикер
+              child: Container(
+                width: 70,
+                height: 45,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: Color(0xFFF8F9F9),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  hourController.text, // Показываем час
+                  style: TextStyle(fontSize: 14, color: Colors.black),
+                ),
               ),
             ),
             SizedBox(width: 4),
             Text(' : ', style: TextStyle(fontSize: 24, color: Colors.black)),
             SizedBox(width: 4),
-            // Поле для ввода минут
-            Container(
-              width: 70,
-              height: 45,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: Color(0xFFF8F9F9),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: TextFormField(
-                controller: minuteController, // Используем контроллер
-                textAlign: TextAlign.center,
-                keyboardType: TextInputType.number,
-                decoration: InputDecoration(border: InputBorder.none,contentPadding: EdgeInsets.zero,),
-                style: TextStyle(fontSize: 14, color: Colors.black),
+            // Квадрат для минут
+            GestureDetector(
+              onTap: () {
+                DatabaseHelper.instance.logAction(
+                  _currentSessionId!,
+                  "Пользователь выбрал, выбрать минуты уведомление для привычки '${habit['name']}' на экране: $_currentScreenName",
+                );
+                _showTimePicker(reminder,habit);
+                }, // Показываем таймпикер
+              child: Container(
+                width: 70,
+                height: 45,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: Color(0xFFF8F9F9),
+                  borderRadius: BorderRadius.circular(8),
 
-                onFieldSubmitted: (String value) {
-                  _updateHour(reminder, habit, hourController, minuteController);
-                  minuteFocusNode.unfocus();
-                   DatabaseHelper.instance.logAction(
-                    _currentSessionId!,
-                    "Пользователь установил минуту '$value' для привычки '${habit['name']}' на экране: $_currentScreenName.",
-                  );
-                },
+                ),
+                child: Text(
+                  minuteController.text, // Показываем минуту
+                  style: TextStyle(fontSize: 14, color: Colors.black),
+                ),
               ),
             ),
             SizedBox(width: 12),
@@ -875,14 +766,52 @@ class _NotificationsPageState extends State<NotificationsPage> {
     );
   }
 
-// Обновление времени при завершении ввода
-  void _updateHour(Map<String, dynamic> reminder, Map<String, dynamic> habit, TextEditingController hourController, TextEditingController minuteController) {
-    setState(() {
-      int? hour = int.tryParse(hourController.text);
-      int? minute = int.tryParse(minuteController.text);
+  void _showTimePicker(Map<String, dynamic> reminder,Map<String, dynamic> habit) {
+    String selectedTime = reminder['time'];
+    List<String> timeParts = selectedTime.split(":");
+    int selectedHour = int.parse(timeParts[0]);
+    int selectedMinute = int.parse(timeParts[1]);
 
-      if (hour != null && hour >= 0 && hour < 24 && minute != null && minute >= 0 && minute < 60) {
-        // Обновляем копию списка
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,  // Transparent background for blur effect
+      barrierColor: Colors.black.withOpacity(0.5), // Dimming the background
+      isScrollControlled: true, // Allows controlling the height of the modal
+      builder: (BuildContext builder) {
+        return ClipRRect(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),  // Rounded top corners
+          child: Container(
+            decoration: BoxDecoration(
+              color: Colors.white,  // White background for the modal
+              borderRadius: BorderRadius.vertical(top: Radius.circular(20)),  // Rounded top corners
+            ),
+            height: MediaQuery.of(context).size.height / 3,  // Modal height
+            child: CupertinoDatePicker(
+              mode: CupertinoDatePickerMode.time,
+              initialDateTime: DateTime(0, 0, 0, selectedHour, selectedMinute),
+              use24hFormat: true,  // Forces 24-hour format (no AM/PM)
+              onDateTimeChanged: (newTime) {
+                setState(() {
+                   DatabaseHelper.instance.logAction(
+                    _currentSessionId!,
+                    "Пользователь выбрал время уведомление для привычки '${habit['name']}' на экране: $_currentScreenName",
+                  );
+                  // Update the time in reminder
+                  reminder['time'] = '${newTime.hour.toString().padLeft(2, '0')}:${newTime.minute.toString().padLeft(2, '0')}';
+                  _updateHour(reminder, habit, newTime.hour, newTime.minute);
+                });
+              },
+            ),
+          ),
+        );
+      },
+    );
+  }
+// Обновление времени при завершении ввода
+  void _updateHour(Map<String, dynamic> reminder, Map<String, dynamic> habit, int hour, int minute) {
+    setState(() {
+      if (hour >= 0 && hour < 24 && minute >= 0 && minute < 60) {
+        // Обновляем копию списка уведомлений
         notificationTimes = notificationTimes.map((entry) {
           if (entry['id'] == reminder['id']) {
             return {...entry, 'time': '${hour.toString().padLeft(2, '0')}:${minute.toString().padLeft(2, '0')}'};
@@ -895,7 +824,6 @@ class _NotificationsPageState extends State<NotificationsPage> {
       }
     });
   }
-
 
   Widget _buildDaysOfWeekCheckboxes(Map<String, dynamic> reminder, Map<String, dynamic> habit) {
     // Получаем startDate и endDate из habit

@@ -106,5 +106,6 @@
   "reinforcement_text": "Here you can add reinforcements by answering a series of questions or writing a note. These reinforcements will help you stick to doing the action. You can write your thoughts and attach links to materials.",
   "notifications_denied_permanently": "Notifications permanently denied",
   "please_enable_notifications_in_settings": "Please enable notifications in settings to receive updates.",
-  "open_settings": "Open Settings"
+  "open_settings": "Open Settings",
+  "not_checked": "Not completed"
 }

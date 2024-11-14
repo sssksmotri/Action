@@ -252,8 +252,8 @@ class _ArchivePageState extends State<ArchivePage> {
                   padding: EdgeInsets.zero,
                   icon: Image.asset(
                     'assets/images/Chart.png',
-                    width: 32,
-                    height: 32,
+                    width: 28,
+                    height: 28,
                   ),
                   onPressed: () {
                     DatabaseHelper.instance.logAction(
@@ -293,6 +293,8 @@ class _ArchivePageState extends State<ArchivePage> {
                       padding: EdgeInsets.all(4.0),
                       child: Image.asset(
                         'assets/images/Folder2.png',
+                        height: 28,
+                        width: 28,
                         fit: BoxFit.cover,
                       ),
                     ),
