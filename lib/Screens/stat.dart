@@ -381,8 +381,13 @@ class _StatsPageState extends State<StatsPage> {
             Row(
               children: [
                 IconButton(
-                  iconSize: 32,
-                  icon: Image.asset('assets/images/Chart.png'),
+                  icon: SizedBox(
+                    width: 28,
+                    height: 28,
+                    child: Image.asset(
+                      'assets/images/Chart.png',
+                    ),
+                  ),
                   onPressed: () async {
                    await DatabaseHelper.instance.logAction(
                         _currentSessionId!,
@@ -405,7 +410,13 @@ class _StatsPageState extends State<StatsPage> {
                 ),
                 IconButton(
                   iconSize: 32,
-                  icon: Image.asset('assets/images/Folder.png'),
+                  icon: SizedBox(
+                    width: 28,
+                    height: 28,
+                    child: Image.asset(
+                      'assets/images/Folder.png',
+                    ),
+                  ),
                   onPressed: () async {
                    await DatabaseHelper.instance.logAction(
                         _currentSessionId!,
@@ -472,8 +483,8 @@ class _StatsPageState extends State<StatsPage> {
                 IconButton(
                   icon: Image.asset(
                     'assets/images/arr_left.png',
-                    width: 20,
-                    height: 20,
+                    width: 24,
+                    height: 24,
                   ),
                   onPressed: () async {
                     await DatabaseHelper.instance.logAction(
@@ -506,8 +517,8 @@ class _StatsPageState extends State<StatsPage> {
                 IconButton(
                   icon: Image.asset(
                     'assets/images/arr_right.png',
-                    width: 20,
-                    height: 20,
+                    width: 24,
+                    height: 24,
                     color: (_endDate != null && _endDate!.add(Duration(days: 7)).isBefore(DateTime.now().add(Duration(days: 1))))
                         ? const Color(0xFF5F33E1)
                         : const Color(0x4D5F33E1),
@@ -864,8 +875,8 @@ class _StatsPageState extends State<StatsPage> {
                         padding: const EdgeInsets.only(left: 35.0),
                         child: Image.asset(
                           'assets/images/arr_left.png',
-                          width: 20,
-                          height: 20,
+                          width: 24,
+                          height: 24,
                           color: const Color(0xFF5F33E1),
                         ),
                       ),
@@ -873,8 +884,8 @@ class _StatsPageState extends State<StatsPage> {
                         padding: const EdgeInsets.only(right: 35.0),
                         child: Image.asset(
                           'assets/images/arr_right.png',
-                          width: 20,
-                          height: 20,
+                          width: 24,
+                          height: 24,
                           color: const Color(0xFF5F33E1),
                         ),
                       ),

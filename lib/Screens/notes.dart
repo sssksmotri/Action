@@ -106,7 +106,13 @@ class _NotesPageState extends State<NotesPage> {
         ),
         actions: [
           IconButton(
-            icon: Image.asset('assets/images/Folder.png'), // Иконка архивной кнопки
+            icon: SizedBox(
+              width: 24,
+              height: 24,
+              child: Image.asset(
+                'assets/images/Folder.png',
+              ),
+            ),     // Иконка архивной кнопки
             onPressed: () async {
               await DatabaseHelper.instance.logAction(widget.sessionId, "Пользователь нажал показать архивные привычки на экране: $_currentScreenName");
               setState(() {
@@ -205,8 +211,8 @@ class _NotesPageState extends State<NotesPage> {
           ),
           Image.asset(
             'assets/images/arr_right.png',
-            width: 18,
-            height: 18,
+            width: 24,
+            height: 24,
           ),
         ],
       ),

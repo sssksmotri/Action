@@ -251,6 +251,8 @@ class _ChartScreenState extends State<ChartScreen> {
                       padding: EdgeInsets.all(4.0), // Отступы вокруг изображения
                       child: Image.asset(
                         'assets/images/Chart2.png',
+                        height: 28,
+                        width: 28,
                         fit: BoxFit.cover, // Масштабируем изображение
                       ),
                     ),
@@ -261,9 +263,8 @@ class _ChartScreenState extends State<ChartScreen> {
                   padding: EdgeInsets.zero, // Убираем отступы
                   icon: Image.asset(
                     'assets/images/Folder.png',
-                    // Укажите путь к изображению
-                    width: 32, // Ширина иконки
-                    height: 32, // Высота иконки
+                    width: 28,
+                    height: 28,
                   ),
                   onPressed: () {
                     DatabaseHelper.instance.logAction(
@@ -1012,8 +1013,8 @@ class _ChartScreenState extends State<ChartScreen> {
                 padding: const EdgeInsets.all(8.0), // Отступ вокруг изображения
                 child: Image.asset(
                   'assets/images/arr_left.png', // Путь к вашему изображению
-                  width: 22, // Ширина изображения
-                  height: 22, // Высота изображения
+                  width: 24, // Ширина изображения
+                  height: 24, // Высота изображения
                   color: Color(0xFF5F33E1), // Цвет изображения, если требуется
                 ),
               ),
@@ -1068,8 +1069,8 @@ class _ChartScreenState extends State<ChartScreen> {
                 padding: const EdgeInsets.all(8.0), // Отступ вокруг изображения
                 child: Image.asset(
                   'assets/images/arr_right.png', // Путь к вашему изображению
-                  width: 22, // Ширина изображения
-                  height: 22, // Высота изображения
+                  width: 24, // Ширина изображения
+                  height: 24, // Высота изображения
                   color: _isForwardNavigationAllowed() ? Color(0xFF5F33E1) : Color(0x4D5F33E1), // Цвет изображения
                 ),
               ),
@@ -1211,8 +1212,8 @@ class _ChartScreenState extends State<ChartScreen> {
                         padding: const EdgeInsets.only(left: 35.0),
                         child: Image.asset(
                           'assets/images/arr_left.png', // Путь к изображению стрелки влево
-                          width: 20,
-                          height: 20,
+                          width: 24,
+                          height: 24,
                           color: const Color(0xFF5F33E1), // Цвет изображения
                         ),
                       ),
@@ -1220,8 +1221,8 @@ class _ChartScreenState extends State<ChartScreen> {
                         padding: const EdgeInsets.only(right: 35.0),
                         child: Image.asset(
                           'assets/images/arr_right.png', // Путь к изображению стрелки вправо
-                          width: 20,
-                          height: 20,
+                          width: 24,
+                          height: 24,
                           color: const Color(0xFF5F33E1), // Цвет изображения
                         ),
                       ),

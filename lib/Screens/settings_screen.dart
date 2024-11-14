@@ -286,8 +286,8 @@ class _SettingsPageState extends State<SettingsPage> {
           ),
           Image.asset(
             'assets/images/arr_right.png',
-            width: 18,
-            height: 18,
+            width: 24,
+            height: 24,
           ),
 
         ],
