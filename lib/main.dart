@@ -780,6 +780,7 @@ class _HomePageState extends State<HomePage> {
                         double currentProgress = habit['currentProgress'] ?? 0.0;
                         double maxProgress = habit['volume_specified'] ?? 1.0;
 
+
                         return _buildPressCountHabit(
                           habit,
                               () async {
@@ -1404,7 +1405,7 @@ class _HomePageState extends State<HomePage> {
                   });
                 },
                 constraints: BoxConstraints.tightFor(
-                  width: context.locale.languageCode == 'en' ? 95 : 155,
+                  width: context.locale.languageCode == 'en' ? 135 : 155,
                 ),
                 itemBuilder: (BuildContext context) {
                   return [
@@ -1625,6 +1626,9 @@ class _HomePageState extends State<HomePage> {
                     );
                   }
                 },
+                constraints: BoxConstraints.tightFor(
+                  width: context.locale.languageCode == 'en' ? 135 : 155,
+                ),
                 itemBuilder: (BuildContext context) {
                   return [
                     PopupMenuItem<String>(
@@ -1728,6 +1732,16 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
+  String formatNumber(double number) {
+    if (number == number.toInt()) {
+      // Если число целое, возвращаем как целое
+      return number.toInt().toString();
+    } else {
+      // Если число с плавающей точкой, возвращаем с одним знаком после запятой
+      return number.toStringAsFixed(1);
+    }
+  }
+
   Widget buildDiagonalTextdouble(double count, double maxCount, bool isCompleted) {
     return Stack(
       alignment: Alignment.center,
@@ -1750,7 +1764,7 @@ class _HomePageState extends State<HomePage> {
               child: Align(
                 alignment: Alignment.centerLeft,
                 child: Text(
-                  '$count',
+                  formatNumber(count), // Применяем форматирование
                   style: TextStyle(
                     fontSize: 18,
                     color: isCompleted ? Colors.green : Colors.red,
@@ -1763,7 +1777,7 @@ class _HomePageState extends State<HomePage> {
               child: Align(
                 alignment: Alignment.centerRight,
                 child: Text(
-                  '$maxCount',
+                  formatNumber(maxCount), // Применяем форматирование
                   style: TextStyle(
                     fontSize: 18,
                     color: isCompleted ? Colors.green : Colors.red,
@@ -1945,7 +1959,7 @@ class _HomePageState extends State<HomePage> {
                   });
                 },
                 constraints: BoxConstraints.tightFor(
-                  width: context.locale.languageCode == 'en' ? 95 : 155,
+                  width: context.locale.languageCode == 'en' ? 135 : 155,
                 ),
                 itemBuilder: (BuildContext context) {
                   return [
