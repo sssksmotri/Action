@@ -60,6 +60,8 @@ class _StatsPageState extends State<StatsPage> {
         _endDate = _today;
         _loadTasks();
       } else if (_selectedPeriod == 'another_period'.tr()) {
+        _startDate = _today.subtract(const Duration(days: 59));  // 14-дневный период
+        _endDate = _today;
         _loadTasks();
       }
     });
@@ -663,6 +665,42 @@ class _StatsPageState extends State<StatsPage> {
                 );
               }).toList(),
             ),
+          const SizedBox(height: 3,),
+          if (_selectedPeriod == tr('two_weeks'))
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: _generate14DaysForPeriod(_startDate!).map((day) {
+                int completedHabits = _getCompletedHabitsForDate(day);
+                return Container(
+                  width: 25,
+                  padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 1),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFEEE9FF),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Column(
+                    children: [
+                      Text(
+                        DateFormat('dd.MM').format(day),
+                        style: const TextStyle(
+                          fontSize: 5,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        '$completedHabits',
+                        style: const TextStyle(
+                          color: Color(0xFF5F33E1),
+                          fontSize: 9,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }).toList(),
+            ),
           const SizedBox(height: 3),
           // Логика для "Другого периода"
           if (_selectedPeriod == tr('another_period')) ...[
@@ -758,6 +796,9 @@ class _StatsPageState extends State<StatsPage> {
   }
   List<DateTime> _generateDaysForPeriod(DateTime startDate) {
     return List.generate(7, (index) => startDate.add(Duration(days: index)));
+  }
+  List<DateTime> _generate14DaysForPeriod(DateTime startDate) {
+    return List.generate(14, (index) => startDate.add(Duration(days: index)));
   }
 
   void _showCalendarDialog({required bool isStartDate}) {
