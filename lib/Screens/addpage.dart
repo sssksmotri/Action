@@ -280,7 +280,7 @@ class _NoteAddPageState extends State<NoteAddPage> {
     }
 
     return Container(
-      padding: const EdgeInsets.all(4),
+      padding: const EdgeInsets.all(2),
       decoration: BoxDecoration(
         color: Color(0xFFF8F9F9),
         borderRadius: BorderRadius.circular(12),
@@ -305,7 +305,7 @@ class _NoteAddPageState extends State<NoteAddPage> {
                     );
                   },
                   child: Container(
-                    height: 56,
+                    height: 76,
                     decoration: BoxDecoration(
                       color: Colors.white,
                       borderRadius: BorderRadius.circular(18),
